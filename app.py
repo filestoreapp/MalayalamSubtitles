@@ -8,7 +8,9 @@ import pysrt
 from deep_translator import GoogleTranslator
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
+
+# --- THE NEW CLOUD DATABASE CONNECTION ---
+app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://neondb_owner:npg_fuIRzQj83YZo@ep-fragrant-forest-a1pm9zrx-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.secret_key = 'malayalam_subtitle_hub_secret_key' # Change this later for security
 
@@ -23,7 +25,7 @@ class Movie(db.Model):
     episode = db.Column(db.Integer, nullable=True) 
     year = db.Column(db.String(4))           
     rating = db.Column(db.String(10))        
-    poster_url = db.Column(db.String(500)) # CHANGED: Now saves an Image URL
+    poster_url = db.Column(db.String(500)) # Saves Image URL
     english_srt = db.Column(db.Text)
     views = db.Column(db.Integer, default=0)
 
@@ -160,7 +162,6 @@ def download(movie_id, language):
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        # Change these credentials for production!
         if request.form['username'] == 'admin' and request.form['password'] == 'malayalam123':
             session['logged_in'] = True
             return redirect(url_for('dashboard'))
@@ -186,7 +187,6 @@ def dashboard():
 @login_required
 def delete_media(movie_id):
     media = Movie.query.get_or_404(movie_id)
-    # Deletes the DB entry (cascades and deletes associated translations too)
     db.session.delete(media)
     db.session.commit()
     return redirect(url_for('dashboard'))
@@ -201,7 +201,7 @@ def admin():
         episode = request.form.get('episode')
         year = request.form.get('year')
         rating = request.form.get('rating')
-        poster_url = request.form.get('poster_url') # Getting the URL instead of file
+        poster_url = request.form.get('poster_url') 
         srt_file = request.files.get('file')           
         
         if srt_file and title and poster_url:
@@ -211,7 +211,7 @@ def admin():
                 season=int(season) if season else None,
                 episode=int(episode) if episode else None,
                 year=year, rating=rating, 
-                poster_url=poster_url, # Saving the URL to the database
+                poster_url=poster_url, 
                 english_srt=content
             )
             db.session.add(new_media)
