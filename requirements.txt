@@ -1,0 +1,6 @@
+Flask
+Flask-SQLAlchemy
+pysrt
+deep-translator
+gunicorn
+psycopg2-binary
