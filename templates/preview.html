@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Preview: {{ movie.title }}</title>
+    <style>
+        body { font-family: Arial; padding: 20px; max-width: 800px; margin: 0 auto; background: #f8f9fa; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .dl-btn { display: inline-block; background: #28a745; color: white; padding: 15px 30px; font-size: 20px; font-weight: bold; text-decoration: none; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .preview-box { background: white; border: 1px solid #ddd; border-radius: 8px; padding: 20px; height: 500px; overflow-y: scroll; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); }
+        .sub-line { margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        .timecode { font-size: 0.8em; color: #888; margin-bottom: 5px; }
+        .notice { background: #e9ecef; color: #555; padding: 10px; text-align: center; border-radius: 5px; font-size: 0.9em; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        {% if movie.media_type == 'series' %}<a href="/series/{{ movie.title }}" style="color: #666; text-decoration: none;">&larr; Back to Episodes</a>
+        {% else %}<a href="/movie/{{ movie.id }}" style="color: #666; text-decoration: none;">&larr; Back to Languages</a>{% endif %}
+        <h2>{{ movie.title }}</h2>
+        <a href="/download/{{ movie.id }}/{{ language }}" class="dl-btn">⬇️ Download Full .SRT File</a>
+    </div>
+    <div class="preview-box">
+        {% for sub in subs %}
+            <div class="sub-line"><div class="timecode">{{ sub.start }} --> {{ sub.end }}</div><div class="text">{{ sub.text }}</div></div>
+        {% endfor %}
+    </div>
+    <div class="notice">Showing the first 100 lines for preview. Click Download to get the complete file.</div>
+</body>
+</html>

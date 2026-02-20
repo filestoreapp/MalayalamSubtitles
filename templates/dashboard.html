@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Analytics & Management</title>
+    <style>
+        body { font-family: sans-serif; background: #f0f2f5; margin: 0; }
+        .nav { background: #1a1a1a; padding: 15px 50px; color: white; display: flex; justify-content: space-between; align-items: center; }
+        .nav a { color: white; text-decoration: none; margin-left: 20px; font-weight: bold; }
+        .container { padding: 40px 50px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); text-align: center; border-top: 4px solid #ff5722; }
+        .val { font-size: 2.2em; font-weight: bold; color: #1a1a1a; margin-bottom: 5px; }
+        .lbl { color: #666; text-transform: uppercase; font-size: 0.8em; letter-spacing: 1px; }
+        
+        .manage-box { background: white; margin-top: 30px; border-radius: 12px; padding: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th { text-align: left; padding: 12px; border-bottom: 2px solid #eee; color: #666; }
+        td { padding: 12px; border-bottom: 1px solid #eee; }
+        .del-btn { color: #ff5252; text-decoration: none; font-weight: bold; border: 1px solid #ff5252; padding: 5px 10px; border-radius: 5px; }
+        .del-btn:hover { background: #ff5252; color: white; }
+    </style>
+</head>
+<body>
+    <div class="nav">
+        <h2 style="margin:0; color:#ff5722">SubHub Analytics</h2>
+        <div><a href="/dashboard">Dashboard</a><a href="/admin">Upload</a><a href="/logout" style="color:#ff5252">Logout</a></div>
+    </div>
+    <div class="container">
+        <div class="grid">
+            <div class="card"><div class="val">{{ visitors }}</div><div class="lbl">Total Visitors</div></div>
+            <div class="card"><div class="val">{{ total_subtitles }}</div><div class="lbl">Total Subtitles Created</div></div>
+            <div class="card"><div class="val">{{ downloads }}</div><div class="lbl">Total Downloads</div></div>
+            <div class="card"><div class="val" style="font-size:1.5em; margin-top:10px">{% if popular_lang %}{{ popular_lang[0]|upper }}{% else %}N/A{% endif %}</div><div class="lbl">Top Language</div></div>
+        </div>
+
+        <div class="manage-box">
+            <h3>📂 Manage Content</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Type</th>
+                        <th>S/E</th>
+                        <th>Views</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for media in all_media %}
+                    <tr>
+                        <td>{{ media.title }}</td>
+                        <td>{{ media.media_type|upper }}</td>
+                        <td>{% if media.media_type == 'series' %}S{{media.season}} E{{media.episode}}{% else %}-{% endif %}</td>
+                        <td>{{ media.views }}</td>
+                        <td>
+                            <a href="/delete/{{ media.id }}" class="del-btn" onclick="return confirm('Are you sure you want to delete this?')">Delete</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>

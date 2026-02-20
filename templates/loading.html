@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Translating...</title>
+    <style>
+        body { font-family: Arial; padding: 50px 20px; text-align: center; background: #f4f7f6; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 40px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .progress-bg { width: 100%; background-color: #e0e0e0; border-radius: 20px; margin: 30px 0; height: 30px; overflow: hidden;}
+        .progress-bar { width: 0%; height: 100%; background-color: #ff5722; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;}
+        .status-text { color: #666; font-size: 1.1em; margin-bottom: 10px;}
+        .eta { font-weight: bold; color: #333; font-size: 1.2em; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Translating: {{ movie.title }} 🤖</h2>
+        <p>Creating the requested language file. Do not close this page.</p>
+        <div class="progress-bg"><div class="progress-bar" id="myBar">0%</div></div>
+        <div class="status-text" id="status-text">Starting engine...</div>
+        <div class="eta" id="eta-text">Calculating time remaining...</div>
+    </div>
+    <script>
+        window.onbeforeunload = function() { return "Translation is in progress. If you leave, it will stop!"; };
+        const movieId = {{ movie.id }}, language = "{{ language }}", totalLines = {{ total_lines }}, chunkSize = 50, totalChunks = Math.ceil(totalLines / chunkSize);
+        let allTranslatedTexts = [], startTime = Date.now();
+        async function processTranslation() {
+            for (let i = 0; i < totalChunks; i++) {
+                let endLine = Math.min(i * chunkSize + chunkSize, totalLines);
+                const response = await fetch('/api/translate_chunk', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ movie_id: movieId, language: language, start: i * chunkSize, end: endLine })
+                });
+                const data = await response.json();
+                allTranslatedTexts = allTranslatedTexts.concat(data.translated);
+                let chunksDone = i + 1, pct = Math.round((chunksDone / totalChunks) * 100);
+                document.getElementById('myBar').style.width = pct + '%'; document.getElementById('myBar').innerText = pct + '%';
+                document.getElementById('status-text').innerText = `Translated ${endLine} of ${totalLines} lines...`;
+                let etaSeconds = Math.round(((Date.now() - startTime) / 1000 / chunksDone) * (totalChunks - chunksDone));
+                document.getElementById('eta-text').innerText = etaSeconds > 60 ? `Estimated time: ${Math.floor(etaSeconds/60)}m ${etaSeconds%60}s` : (etaSeconds > 0 ? `Estimated time: ${etaSeconds}s` : "Finishing up...");
+            }
+            document.getElementById('status-text').innerText = "Saving to database for instant downloads...";
+            await fetch('/api/save_translation', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ movie_id: movieId, language: language, translated_texts: allTranslatedTexts }) });
+            window.onbeforeunload = null; 
+            window.location.href = `/preview/${movieId}/${language}`;
+        }
+        processTranslation();
+    </script>
+</body>
+</html>

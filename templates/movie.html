@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{ movie.title }} Subtitles</title>
+    <style>
+        body { font-family: sans-serif; margin: 0; background: #f8f9fa; color: #333; }
+        .hero { background: #121212; color: white; padding: 50px 20px; display: flex; justify-content: center; align-items: center; gap: 40px; flex-wrap: wrap; }
+        .hero-poster { width: 220px; border-radius: 10px; box-shadow: 0 10px 20px rgba(0,0,0,0.5); }
+        .hero-details { max-width: 500px; }
+        .container { max-width: 900px; margin: 40px auto; padding: 0 20px; }
+        .lang-grid { display: flex; flex-direction: column; gap: 15px; margin-top: 30px; }
+        .btn { padding: 15px; border: 1px solid #ccc; border-radius: 8px; text-decoration: none; color: #333; font-size: 1.1em; font-weight: bold; text-align: center;}
+        .btn.ready { background: #e8f5e9; color: #28a745; border-color: #28a745; }
+        .btn.ml { background: #ff5722; color: #fff; border: none; font-size: 1.5em; padding: 20px;}
+        .btn.ml.ready { background: #28a745; }
+        .back-link { display: inline-block; margin-bottom: 20px; color: #aaa; text-decoration: none; font-size: 0.9em;}
+        .back-link:hover { color: white; }
+    </style>
+</head>
+<body>
+    <div class="hero">
+        <img src="{{ movie.poster_url }}" class="hero-poster" alt="Poster">
+        <div class="hero-details">
+            <a href="/" class="back-link">&larr; Back to Search</a>
+            <h1 style="margin: 0 0 10px 0; font-size: 2.5em;">{{ movie.title }}</h1>
+            <p style="color: #aaa; font-size: 1.2em; margin-bottom: 20px;">{{ movie.year }} | ★ {{ movie.rating }}</p>
+            <p style="color: #ccc; line-height: 1.5;">Select a language below to generate or download the subtitles.</p>
+        </div>
+    </div>
+    <div class="container">
+        <div class="lang-grid">
+            <a href="/request_translation/{{ movie.id }}/ml" class="btn ml {% if 'ml' in ready_languages %}ready{% endif %}">Malayalam (മലയാളം)</a>
+            <a href="/request_translation/{{ movie.id }}/hi" class="btn {% if 'hi' in ready_languages %}ready{% endif %}">Hindi</a>
+            <a href="/request_translation/{{ movie.id }}/ta" class="btn {% if 'ta' in ready_languages %}ready{% endif %}">Tamil</a>
+            <a href="/request_translation/{{ movie.id }}/en" class="btn">English</a>
+        </div>
+    </div>
+</body>
+</html>

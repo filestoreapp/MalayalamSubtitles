@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin - Upload</title>
+    <style>
+        body { font-family: Arial; padding: 0; margin: 0; background: #f4f7f6; }
+        .admin-nav { background: #121212; padding: 15px 40px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px;}
+        .admin-nav h2 { color: #ff5722; margin: 0; }
+        .nav-links a { color: white; text-decoration: none; font-weight: bold; margin-left: 20px; padding: 8px 15px; border-radius: 5px; transition: 0.2s; }
+        .nav-links a:hover, .nav-links a.active { background: #333; }
+        .nav-links a.logout { background: #dc3545; }
+        .admin-box { background: white; padding: 30px; border-radius: 10px; max-width: 500px; margin: 0 auto 40px auto; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        input, select { width: 100%; padding: 10px; margin: 10px 0 20px 0; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
+        button { background: #007bff; color: white; border: none; padding: 15px; width: 100%; border-radius: 5px; font-size: 16px; cursor: pointer; }
+        .row { display: flex; gap: 10px; }
+        .row > div { flex: 1; }
+    </style>
+</head>
+<body>
+    <div class="admin-nav">
+        <h2>📊 Control Center</h2>
+        <div class="nav-links">
+            <a href="/dashboard">Dashboard</a>
+            <a href="/admin" class="active">Upload Media</a>
+            <a href="/" target="_blank">View Live Site</a>
+            <a href="/logout" class="logout">Logout</a>
+        </div>
+    </div>
+    <div class="admin-box">
+        <h2>Upload Media & Subtitles</h2>
+        <form action="/admin" method="post" enctype="multipart/form-data">
+            <label>Media Type:</label>
+            <select name="media_type" id="media_type" onchange="toggleSeriesFields()">
+                <option value="movie">Movie</option>
+                <option value="series">TV Series</option>
+            </select>
+            <label>Title:</label>
+            <input type="text" name="title" placeholder="e.g. Inception or Breaking Bad" required>
+            
+            <div id="series_fields" style="display: none;">
+                <div class="row">
+                    <div><label>Season:</label><input type="number" name="season" placeholder="e.g. 1"></div>
+                    <div><label>Episode:</label><input type="number" name="episode" placeholder="e.g. 5"></div>
+                </div>
+            </div>
+            
+            <label>Release Year:</label>
+            <input type="number" name="year" placeholder="e.g. 2010" required>
+            <label>IMDb Rating:</label>
+            <input type="text" name="rating" placeholder="e.g. 8.8" required>
+            
+            <label>Poster Image URL (From IMDB, Google, TMDB):</label>
+            <input type="url" name="poster_url" placeholder="https://..." required>
+            
+            <label>Upload English .SRT File:</label>
+            <input type="file" name="file" accept=".srt" required style="border: none; padding-left: 0;">
+            <button type="submit">Upload to Database</button>
+        </form>
+    </div>
+    <script>
+        function toggleSeriesFields() {
+            var type = document.getElementById('media_type').value;
+            document.getElementById('series_fields').style.display = (type === 'series') ? 'block' : 'none';
+        }
+    </script>
+</body>
+</html>
