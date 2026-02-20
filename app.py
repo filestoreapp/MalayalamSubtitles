@@ -75,6 +75,10 @@ def index():
             if m.title not in display_items: display_items[m.title] = m 
         else: display_items[f"movie_{m.id}"] = m 
     return render_template('index.html', media_list=display_items.values(), search_query=search_query)
+# --- KEEP ALIVE ROUTE FOR UPTIMEROBOT ---
+@app.route('/keep-alive')
+def keep_alive():
+    return "Server is awake!", 200
 
 @app.route('/series/<string:title>')
 def series_hub(title):
@@ -221,3 +225,4 @@ def admin():
 
 if __name__ == '__main__':
     app.run(debug=True, port=8080)
+
