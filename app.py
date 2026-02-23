@@ -146,13 +146,23 @@ def queue_translations(movie_id):
             db.session.add(new_job)
     db.session.commit()
 
-  # TRIGGER HUGGING FACE WEBHOOK
+    # TRIGGER HUGGING FACE WEBHOOK
     try:
-        hf_url = "https://malayalamsub-malayalamsubs.hf.space"
-        requests.post(hf_url, timeout=3)
+        # Fixed URL to hit the exact endpoint, and timeout increased to 10!
+        hf_url = "https://malayalamsub-malayalamsubs.hf.space/start-worker"
+        requests.post(hf_url, timeout=10)
     except Exception as e:
         print(f"Webhook signal failed, but job queued: {e}")
 
+    return redirect(url_for('dashboard'))
+
+# --- NEW ROUTE: DELETE PENDING JOBS ---
+@app.route('/admin/delete_job/<int:job_id>')
+@login_required
+def delete_job(job_id):
+    job = TranslationJob.query.get_or_404(job_id)
+    db.session.delete(job)
+    db.session.commit()
     return redirect(url_for('dashboard'))
 
 @app.route('/delete/<int:movie_id>')
@@ -191,4 +201,3 @@ def admin():
 
 if __name__ == '__main__':
     app.run(debug=True, port=8080)
-
