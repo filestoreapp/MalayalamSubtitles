@@ -1,29 +1,108 @@
 <!DOCTYPE html>
-<html>
-<head><title>Admin Upload</title></head>
-<body style="font-family: Arial; padding: 20px;">
-    <h2>Upload New Movie</h2>
-    <form method="POST" enctype="multipart/form-data" style="display: flex; flex-direction: column; width: 300px; gap: 10px;">
-        <select name="media_type"><option value="movie">Movie</option></select>
-        <input type="text" name="title" placeholder="Title" required>
-        <input type="text" name="year" placeholder="Year">
-        <input type="text" name="rating" placeholder="Rating (e.g. 8.5/10)">
-        <input type="text" name="poster_url" placeholder="Poster Image URL" required>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <title>Malayalam Subtitle Hub | Download ML, TA, HI Subs</title>
+    <meta name="description" content="Download high-quality Malayalam, Tamil, and Hindi subtitles for the latest movies and series.">
+    <meta name="keywords" content="Malayalam subtitles, Tamil subtitles, Hindi subtitles, SRT download, movies">
+    <meta property="og:title" content="🎬 Malayalam Subtitle Hub">
+    <meta property="og:description" content="Get the latest subtitles for your favorite movies and TV shows.">
+    
+    <style>
+        body { font-family: Arial, sans-serif; background: #141414; color: white; margin: 0; padding: 0; }
+        .navbar { background: #000; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 1000; border-bottom: 1px solid #333; }
+        .navbar a { color: white; text-decoration: none; font-weight: bold; }
+        .home-btn { background: #e50914; padding: 8px 15px; border-radius: 5px; }
         
-        <label>Category / Genre:</label>
-        <select name="category">
-            <option value="Action">Action</option>
-            <option value="Comedy">Comedy</option>
-            <option value="Drama">Drama</option>
-            <option value="Thriller">Thriller</option>
-            <option value="Horror">Horror</option>
-            <option value="Romance">Romance</option>
-        </select>
+        .container { padding: 20px; max-width: 1200px; margin: auto; }
+        .search-bar { width: 100%; max-width: 400px; padding: 10px; border-radius: 5px; border: none; margin-bottom: 10px; }
+        .search-btn { padding: 10px 20px; background: #e50914; color: white; border: none; border-radius: 5px; width: 100%; max-width: 120px; cursor: pointer; }
         
-        <label>Upload English .SRT</label>
-        <input type="file" name="file" accept=".srt" required>
-        <button type="submit" style="padding: 10px; background: green; color: white;">Upload to Database</button>
-    </form>
-    <br><a href="/dashboard">Back to Dashboard</a>
+        .scroll-row { display: flex; overflow-x: auto; gap: 15px; padding-bottom: 15px; -webkit-overflow-scrolling: touch; }
+        .scroll-row::-webkit-scrollbar { height: 6px; }
+        .scroll-row::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
+        
+        /* Mobile-Friendly Cards with Relative Position for Badges */
+        .movie-card { position: relative; flex: 0 0 auto; width: 140px; text-align: center; background: #222; padding: 10px; border-radius: 8px; text-decoration: none; color: white; }
+        .movie-card img { width: 100%; height: 200px; object-fit: cover; border-radius: 5px; }
+        
+        /* Series Badge Styling */
+        .ep-badge { position: absolute; top: 15px; right: 15px; background: #e50914; color: white; padding: 4px 8px; font-size: 0.75rem; font-weight: bold; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+        
+        h2 { border-bottom: 2px solid #e50914; display: inline-block; padding-bottom: 5px; font-size: 1.2rem; margin-top: 30px;}
+
+        @media (max-width: 600px) {
+            .movie-card { width: 120px; }
+            .movie-card img { height: 170px; }
+            .search-form { display: flex; flex-direction: column; gap: 10px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <a href="/" class="home-btn">🏠 Home</a>
+        <a href="/login" style="color: #aaa; font-size: 0.9rem;">Admin</a>
+    </div>
+
+    <div class="container">
+        <h1>🎬 Subtitle Hub</h1>
+
+        <form method="GET" class="search-form" style="margin-bottom: 30px;">
+            <input type="text" name="q" class="search-bar" placeholder="Search movies or series..." value="{{ search_query }}">
+            <button type="submit" class="search-btn">Search</button>
+        </form>
+
+        {% if search_results %}
+            <h2>Search Results</h2>
+            <div style="display: flex; flex-wrap: wrap; gap: 15px;">
+            {% for movie in search_results %}
+                <a href="/movie/{{ movie.id }}" class="movie-card">
+                    {% if movie.media_type == 'series' %}<div class="ep-badge">S{{ movie.season }} E{{ movie.episode }}</div>{% endif %}
+                    <img src="{{ movie.poster_url }}" alt="{{ movie.title }}">
+                    <p style="font-size: 0.9rem;"><b>{{ movie.title }}</b></p>
+                </a>
+            {% endfor %}
+            </div>
+        {% else %}
+            <h2>🔥 Latest Uploads</h2>
+            <div class="scroll-row">
+                {% for movie in latest_movies %}
+                <a href="/movie/{{ movie.id }}" class="movie-card">
+                    {% if movie.media_type == 'series' %}<div class="ep-badge">S{{ movie.season }} E{{ movie.episode }}</div>{% endif %}
+                    <img src="{{ movie.poster_url }}" alt="{{ movie.title }}">
+                    <p style="font-size: 0.9rem;"><b>{{ movie.title }}</b></p>
+                </a>
+                {% endfor %}
+            </div>
+
+            <h2>⭐ Top Downloaded</h2>
+            <div class="scroll-row">
+                {% for movie in top_movies %}
+                <a href="/movie/{{ movie.id }}" class="movie-card">
+                    {% if movie.media_type == 'series' %}<div class="ep-badge">S{{ movie.season }} E{{ movie.episode }}</div>{% endif %}
+                    <img src="{{ movie.poster_url }}" alt="{{ movie.title }}">
+                    <p style="font-size: 0.9rem;"><b>{{ movie.title }}</b></p>
+                </a>
+                {% endfor %}
+            </div>
+
+            {% for category in categories %}
+            <h2>🍿 {{ category }}</h2>
+            <div class="scroll-row">
+                {% for movie in all_media %}
+                    {% if movie.category == category %}
+                    <a href="/movie/{{ movie.id }}" class="movie-card">
+                        {% if movie.media_type == 'series' %}<div class="ep-badge">S{{ movie.season }} E{{ movie.episode }}</div>{% endif %}
+                        <img src="{{ movie.poster_url }}" alt="{{ movie.title }}">
+                        <p style="font-size: 0.9rem;"><b>{{ movie.title }}</b></p>
+                    </a>
+                    {% endif %}
+                {% endfor %}
+            </div>
+            {% endfor %}
+        {% endif %}
+    </div>
 </body>
 </html>
