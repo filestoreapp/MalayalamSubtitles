@@ -7,9 +7,13 @@
     <a href="/logout" style="float: right; color: red;">Logout</a>
     
     <hr>
-    <h3>⚙️ Live Translation Queue</h3>
+<h3>⚙️ Live Translation Queue</h3>
     <table border="1" style="width: 100%; text-align: left; margin-bottom: 20px;">
-        <tr><th>Movie</th><th>Language</th><th>Status</th></tr>
+        <tr>
+            <th>Movie</th>
+            <th>Language</th>
+            <th>Status</th>
+            <th>Action</th> </tr>
         {% for job in jobs %}
         <tr>
             <td>{{ job.movie.title }}</td>
@@ -19,6 +23,11 @@
                 {% elif job.status == 'Completed' %}<span style="color: green;">✅ Completed</span>
                 {% elif job.status == 'Failed' %}<span style="color: red;">❌ Failed</span>
                 {% else %}<span style="color: gray;">🕒 Pending</span>{% endif %}
+            </td>
+            <td>
+                <a href="/admin/delete_job/{{ job.id }}" style="color: red; text-decoration: none; font-size: 14px;">
+                    🗑️ Cancel
+                </a>
             </td>
         </tr>
         {% endfor %}
@@ -41,3 +50,4 @@
     </table>
 </body>
 </html>
+
