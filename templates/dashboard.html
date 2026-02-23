@@ -1,65 +1,43 @@
 <!DOCTYPE html>
 <html>
-<head>
-    <title>Analytics & Management</title>
-    <style>
-        body { font-family: sans-serif; background: #f0f2f5; margin: 0; }
-        .nav { background: #1a1a1a; padding: 15px 50px; color: white; display: flex; justify-content: space-between; align-items: center; }
-        .nav a { color: white; text-decoration: none; margin-left: 20px; font-weight: bold; }
-        .container { padding: 40px 50px; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
-        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); text-align: center; border-top: 4px solid #ff5722; }
-        .val { font-size: 2.2em; font-weight: bold; color: #1a1a1a; margin-bottom: 5px; }
-        .lbl { color: #666; text-transform: uppercase; font-size: 0.8em; letter-spacing: 1px; }
-        
-        .manage-box { background: white; margin-top: 30px; border-radius: 12px; padding: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th { text-align: left; padding: 12px; border-bottom: 2px solid #eee; color: #666; }
-        td { padding: 12px; border-bottom: 1px solid #eee; }
-        .del-btn { color: #ff5252; text-decoration: none; font-weight: bold; border: 1px solid #ff5252; padding: 5px 10px; border-radius: 5px; }
-        .del-btn:hover { background: #ff5252; color: white; }
-    </style>
-</head>
-<body>
-    <div class="nav">
-        <h2 style="margin:0; color:#ff5722">SubHub Analytics</h2>
-        <div><a href="/dashboard">Dashboard</a><a href="/admin">Upload</a><a href="/logout" style="color:#ff5252">Logout</a></div>
-    </div>
-    <div class="container">
-        <div class="grid">
-            <div class="card"><div class="val">{{ visitors }}</div><div class="lbl">Total Visitors</div></div>
-            <div class="card"><div class="val">{{ total_subtitles }}</div><div class="lbl">Total Subtitles Created</div></div>
-            <div class="card"><div class="val">{{ downloads }}</div><div class="lbl">Total Downloads</div></div>
-            <div class="card"><div class="val" style="font-size:1.5em; margin-top:10px">{% if popular_lang %}{{ popular_lang[0]|upper }}{% else %}N/A{% endif %}</div><div class="lbl">Top Language</div></div>
-        </div>
+<head><title>Admin Dashboard</title></head>
+<body style="font-family: Arial; padding: 20px;">
+    <h1>Admin Dashboard</h1>
+    <a href="/admin" style="padding: 10px; background: blue; color: white; text-decoration: none;">+ Upload New Movie</a>
+    <a href="/logout" style="float: right; color: red;">Logout</a>
+    
+    <hr>
+    <h3>⚙️ Live Translation Queue</h3>
+    <table border="1" style="width: 100%; text-align: left; margin-bottom: 20px;">
+        <tr><th>Movie</th><th>Language</th><th>Status</th></tr>
+        {% for job in jobs %}
+        <tr>
+            <td>{{ job.movie.title }}</td>
+            <td>{{ job.language | upper }}</td>
+            <td>
+                {% if job.status == 'Processing' %}<span style="color: orange;">⏳ Processing...</span>
+                {% elif job.status == 'Completed' %}<span style="color: green;">✅ Completed</span>
+                {% elif job.status == 'Failed' %}<span style="color: red;">❌ Failed</span>
+                {% else %}<span style="color: gray;">🕒 Pending</span>{% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
 
-        <div class="manage-box">
-            <h3>📂 Manage Content</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Title</th>
-                        <th>Type</th>
-                        <th>S/E</th>
-                        <th>Views</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for media in all_media %}
-                    <tr>
-                        <td>{{ media.title }}</td>
-                        <td>{{ media.media_type|upper }}</td>
-                        <td>{% if media.media_type == 'series' %}S{{media.season}} E{{media.episode}}{% else %}-{% endif %}</td>
-                        <td>{{ media.views }}</td>
-                        <td>
-                            <a href="/delete/{{ media.id }}" class="del-btn" onclick="return confirm('Are you sure you want to delete this?')">Delete</a>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
+    <h3>Movie Library</h3>
+    <table border="1" style="width: 100%; text-align: left;">
+        <tr><th>Title</th><th>Category</th><th>Views</th><th>Actions</th></tr>
+        {% for media in all_media %}
+        <tr>
+            <td>{{ media.title }}</td>
+            <td>{{ media.category }}</td>
+            <td>{{ media.views }}</td>
+            <td>
+                <a href="/delete/{{ media.id }}" style="color: red;">Delete</a> &nbsp;|&nbsp;
+                <a href="/admin/queue_translations/{{ media.id }}" style="color: green; font-weight: bold;">🚀 Auto-Translate All (ML, TA, HI)</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
 </body>
 </html>
