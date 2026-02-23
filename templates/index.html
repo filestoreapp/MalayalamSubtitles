@@ -8,11 +8,10 @@
     <meta name="description" content="Download high-quality Malayalam, Tamil, and Hindi subtitles for the latest movies and series.">
     <meta name="keywords" content="Malayalam subtitles, Tamil subtitles, Hindi subtitles, SRT download, movies">
     <meta property="og:title" content="🎬 Malayalam Subtitle Hub">
-    <meta property="og:description" content="Get the latest subtitles for your favorite movies.">
+    <meta property="og:description" content="Get the latest subtitles for your favorite movies and TV shows.">
     
     <style>
         body { font-family: Arial, sans-serif; background: #141414; color: white; margin: 0; padding: 0; }
-        /* Sticky Navigation Bar */
         .navbar { background: #000; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 1000; border-bottom: 1px solid #333; }
         .navbar a { color: white; text-decoration: none; font-weight: bold; }
         .home-btn { background: #e50914; padding: 8px 15px; border-radius: 5px; }
@@ -25,9 +24,13 @@
         .scroll-row::-webkit-scrollbar { height: 6px; }
         .scroll-row::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
         
-        /* Mobile-Friendly Cards */
-        .movie-card { flex: 0 0 auto; width: 140px; text-align: center; background: #222; padding: 10px; border-radius: 8px; text-decoration: none; color: white; }
+        /* Mobile-Friendly Cards with Relative Position for Badges */
+        .movie-card { position: relative; flex: 0 0 auto; width: 140px; text-align: center; background: #222; padding: 10px; border-radius: 8px; text-decoration: none; color: white; }
         .movie-card img { width: 100%; height: 200px; object-fit: cover; border-radius: 5px; }
+        
+        /* Series Badge Styling */
+        .ep-badge { position: absolute; top: 15px; right: 15px; background: #e50914; color: white; padding: 4px 8px; font-size: 0.75rem; font-weight: bold; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+        
         h2 { border-bottom: 2px solid #e50914; display: inline-block; padding-bottom: 5px; font-size: 1.2rem; margin-top: 30px;}
 
         @media (max-width: 600px) {
@@ -47,7 +50,7 @@
         <h1>🎬 Subtitle Hub</h1>
 
         <form method="GET" class="search-form" style="margin-bottom: 30px;">
-            <input type="text" name="q" class="search-bar" placeholder="Search movies..." value="{{ search_query }}">
+            <input type="text" name="q" class="search-bar" placeholder="Search movies or series..." value="{{ search_query }}">
             <button type="submit" class="search-btn">Search</button>
         </form>
 
@@ -56,6 +59,7 @@
             <div style="display: flex; flex-wrap: wrap; gap: 15px;">
             {% for movie in search_results %}
                 <a href="/movie/{{ movie.id }}" class="movie-card">
+                    {% if movie.media_type == 'series' %}<div class="ep-badge">S{{ movie.season }} E{{ movie.episode }}</div>{% endif %}
                     <img src="{{ movie.poster_url }}" alt="{{ movie.title }}">
                     <p style="font-size: 0.9rem;"><b>{{ movie.title }}</b></p>
                 </a>
@@ -66,6 +70,7 @@
             <div class="scroll-row">
                 {% for movie in latest_movies %}
                 <a href="/movie/{{ movie.id }}" class="movie-card">
+                    {% if movie.media_type == 'series' %}<div class="ep-badge">S{{ movie.season }} E{{ movie.episode }}</div>{% endif %}
                     <img src="{{ movie.poster_url }}" alt="{{ movie.title }}">
                     <p style="font-size: 0.9rem;"><b>{{ movie.title }}</b></p>
                 </a>
@@ -76,6 +81,7 @@
             <div class="scroll-row">
                 {% for movie in top_movies %}
                 <a href="/movie/{{ movie.id }}" class="movie-card">
+                    {% if movie.media_type == 'series' %}<div class="ep-badge">S{{ movie.season }} E{{ movie.episode }}</div>{% endif %}
                     <img src="{{ movie.poster_url }}" alt="{{ movie.title }}">
                     <p style="font-size: 0.9rem;"><b>{{ movie.title }}</b></p>
                 </a>
@@ -88,6 +94,7 @@
                 {% for movie in all_media %}
                     {% if movie.category == category %}
                     <a href="/movie/{{ movie.id }}" class="movie-card">
+                        {% if movie.media_type == 'series' %}<div class="ep-badge">S{{ movie.season }} E{{ movie.episode }}</div>{% endif %}
                         <img src="{{ movie.poster_url }}" alt="{{ movie.title }}">
                         <p style="font-size: 0.9rem;"><b>{{ movie.title }}</b></p>
                     </a>
