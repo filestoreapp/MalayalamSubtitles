@@ -146,10 +146,10 @@ def queue_translations(movie_id):
             db.session.add(new_job)
     db.session.commit()
 
-    # TRIGGER KOYEB WEBHOOK
+  # TRIGGER HUGGING FACE WEBHOOK
     try:
-        koyeb_url = "https://YOUR_KOYEB_APP_URL/start-worker" # UPDATE THIS LATER!
-        requests.post(koyeb_url, timeout=3)
+        hf_url = "https://malayalamsub-malayalamsubs.hf.space"
+        requests.post(hf_url, timeout=3)
     except Exception as e:
         print(f"Webhook signal failed, but job queued: {e}")
 
@@ -191,3 +191,4 @@ def admin():
 
 if __name__ == '__main__':
     app.run(debug=True, port=8080)
+
