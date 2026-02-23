@@ -1,38 +1,61 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>{{ movie.title }}</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <title>{{ movie.title }} Subtitles</title>
+    <meta property="og:title" content="Download {{ movie.title }} Subtitles">
+    <meta property="og:description" content="Available in Malayalam, Tamil, Hindi, and English.">
+    <meta property="og:image" content="{{ movie.poster_url }}">
+    
     <style>
-        body { font-family: Arial, sans-serif; background: #141414; color: white; padding: 20px; text-align: center; }
-        img { width: 250px; border-radius: 10px; }
-        .btn { padding: 10px 20px; margin: 10px; background: #e50914; color: white; text-decoration: none; border-radius: 5px; display: inline-block; }
-        .related-row { display: flex; justify-content: center; gap: 15px; margin-top: 20px; overflow-x: auto;}
-        .movie-card { width: 120px; text-decoration: none; color: white; }
-        .movie-card img { width: 100%; height: 180px; object-fit: cover; }
+        body { font-family: Arial, sans-serif; background: #141414; color: white; margin: 0; padding: 0; }
+        .navbar { background: #000; padding: 15px 20px; display: flex; align-items: center; position: sticky; top: 0; z-index: 1000; border-bottom: 1px solid #333; }
+        .navbar a { color: white; text-decoration: none; font-weight: bold; }
+        .home-btn { background: #e50914; padding: 8px 15px; border-radius: 5px; }
+        
+        .container { padding: 20px; max-width: 800px; margin: auto; text-align: center; }
+        .poster { width: 100%; max-width: 300px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); margin-bottom: 20px; }
+        .btn { padding: 12px 20px; margin: 8px; background: #e50914; color: white; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold; width: 80%; max-width: 250px; }
+        .btn:hover { background: #f40612; }
+        
+        .related-row { display: flex; justify-content: flex-start; gap: 15px; margin-top: 20px; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 10px; }
+        .movie-card { flex: 0 0 auto; width: 100px; text-decoration: none; color: white; text-align: center; }
+        .movie-card img { width: 100%; height: 150px; object-fit: cover; border-radius: 5px; }
+        
+        @media (max-width: 600px) {
+            .btn { width: 100%; margin: 5px 0; }
+        }
     </style>
 </head>
 <body>
-    <a href="/" style="color: gray; text-decoration: none;">&larr; Back Home</a>
-    <h1>{{ movie.title }} ({{ movie.year }})</h1>
-    <img src="{{ movie.poster_url }}" alt="Poster">
-    <p>Rating: ⭐ {{ movie.rating }} | Category: {{ movie.category }}</p>
+    <div class="navbar">
+        <a href="/" class="home-btn">🏠 Home</a>
+    </div>
 
-    <h3>Download Subtitles</h3>
-    <a href="/download/{{ movie.id }}/en" class="btn">English (Original)</a>
-    
-    {% if 'ml' in ready_languages %}<a href="/download/{{ movie.id }}/ml" class="btn">Malayalam (Ready)</a>{% endif %}
-    {% if 'ta' in ready_languages %}<a href="/download/{{ movie.id }}/ta" class="btn">Tamil (Ready)</a>{% endif %}
-    {% if 'hi' in ready_languages %}<a href="/download/{{ movie.id }}/hi" class="btn">Hindi (Ready)</a>{% endif %}
+    <div class="container">
+        <h1>{{ movie.title }} ({{ movie.year }})</h1>
+        <img src="{{ movie.poster_url }}" alt="Poster" class="poster">
+        <p style="color: #aaa;">⭐ {{ movie.rating }} | 🍿 {{ movie.category }}</p>
 
-    <hr style="border-color: #333; margin-top: 40px;">
-    <h2>More in {{ movie.category }}</h2>
-    <div class="related-row">
-        {% for rel in related_movies %}
-        <a href="/movie/{{ rel.id }}" class="movie-card">
-            <img src="{{ rel.poster_url }}">
-            <p style="font-size: 12px;">{{ rel.title }}</p>
-        </a>
-        {% endfor %}
+        <h3 style="margin-top: 30px;">📥 Download Subtitles</h3>
+        <a href="/download/{{ movie.id }}/en" class="btn">🇬🇧 English (Original)</a>
+        
+        {% if 'ml' in ready_languages %}<a href="/download/{{ movie.id }}/ml" class="btn">🇮🇳 Malayalam</a>{% endif %}
+        {% if 'ta' in ready_languages %}<a href="/download/{{ movie.id }}/ta" class="btn">🇮🇳 Tamil</a>{% endif %}
+        {% if 'hi' in ready_languages %}<a href="/download/{{ movie.id }}/hi" class="btn">🇮🇳 Hindi</a>{% endif %}
+
+        <hr style="border-color: #333; margin-top: 50px;">
+        <h2 style="text-align: left; font-size: 1.2rem;">More in {{ movie.category }}</h2>
+        <div class="related-row">
+            {% for rel in related_movies %}
+            <a href="/movie/{{ rel.id }}" class="movie-card">
+                <img src="{{ rel.poster_url }}">
+                <p style="font-size: 12px; margin-top: 5px;">{{ rel.title }}</p>
+            </a>
+            {% endfor %}
+        </div>
     </div>
 </body>
 </html>
