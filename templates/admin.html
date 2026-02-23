@@ -3,106 +3,120 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    
-    <title>Malayalam Subtitle Hub | Download ML, TA, HI Subs</title>
-    <meta name="description" content="Download high-quality Malayalam, Tamil, and Hindi subtitles for the latest movies and series.">
-    <meta name="keywords" content="Malayalam subtitles, Tamil subtitles, Hindi subtitles, SRT download, movies">
-    <meta property="og:title" content="🎬 Malayalam Subtitle Hub">
-    <meta property="og:description" content="Get the latest subtitles for your favorite movies and TV shows.">
+    <title>Upload Media | Admin Dashboard</title>
     
     <style>
-        body { font-family: Arial, sans-serif; background: #141414; color: white; margin: 0; padding: 0; }
-        .navbar { background: #000; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 1000; border-bottom: 1px solid #333; }
+        body { font-family: Arial, sans-serif; background: #f4f7f6; color: #333; margin: 0; padding: 0; }
+        
+        /* Admin Navigation Bar */
+        .navbar { background: #2c3e50; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; color: white; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
         .navbar a { color: white; text-decoration: none; font-weight: bold; }
-        .home-btn { background: #e50914; padding: 8px 15px; border-radius: 5px; }
+        .back-btn { background: #34495e; padding: 8px 15px; border-radius: 5px; }
         
-        .container { padding: 20px; max-width: 1200px; margin: auto; }
-        .search-bar { width: 100%; max-width: 400px; padding: 10px; border-radius: 5px; border: none; margin-bottom: 10px; }
-        .search-btn { padding: 10px 20px; background: #e50914; color: white; border: none; border-radius: 5px; width: 100%; max-width: 120px; cursor: pointer; }
+        /* Form Container */
+        .container { max-width: 600px; margin: 40px auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #2c3e50; margin-bottom: 25px; border-bottom: 2px solid #ecf0f1; padding-bottom: 10px; }
         
-        .scroll-row { display: flex; overflow-x: auto; gap: 15px; padding-bottom: 15px; -webkit-overflow-scrolling: touch; }
-        .scroll-row::-webkit-scrollbar { height: 6px; }
-        .scroll-row::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
+        /* Input Fields */
+        label { font-weight: bold; color: #34495e; display: block; margin-top: 15px; margin-bottom: 5px; }
+        input[type="text"], input[type="number"], select, input[type="file"] { 
+            width: 100%; 
+            padding: 12px; 
+            border: 1px solid #ccd1d9; 
+            border-radius: 5px; 
+            box-sizing: border-box; 
+            font-size: 1rem;
+            background: #fdfdfd;
+        }
+        input[type="file"] { padding: 9px; }
         
-        /* Mobile-Friendly Cards with Relative Position for Badges */
-        .movie-card { position: relative; flex: 0 0 auto; width: 140px; text-align: center; background: #222; padding: 10px; border-radius: 8px; text-decoration: none; color: white; }
-        .movie-card img { width: 100%; height: 200px; object-fit: cover; border-radius: 5px; }
+        /* Smart Series Fields (Hidden by default) */
+        #series_fields { display: none; background: #fef9e7; padding: 15px; border-left: 4px solid #f39c12; margin-top: 15px; border-radius: 4px; }
         
-        /* Series Badge Styling */
-        .ep-badge { position: absolute; top: 15px; right: 15px; background: #e50914; color: white; padding: 4px 8px; font-size: 0.75rem; font-weight: bold; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.5); }
-        
-        h2 { border-bottom: 2px solid #e50914; display: inline-block; padding-bottom: 5px; font-size: 1.2rem; margin-top: 30px;}
+        /* Upload Button */
+        .submit-btn { 
+            background: #27ae60; 
+            color: white; 
+            border: none; 
+            padding: 15px; 
+            font-size: 1.1rem; 
+            font-weight: bold;
+            cursor: pointer; 
+            border-radius: 5px; 
+            width: 100%; 
+            margin-top: 30px;
+            transition: background 0.3s;
+        }
+        .submit-btn:hover { background: #219150; }
 
+        /* Mobile Adjustments */
         @media (max-width: 600px) {
-            .movie-card { width: 120px; }
-            .movie-card img { height: 170px; }
-            .search-form { display: flex; flex-direction: column; gap: 10px; }
+            .container { margin: 20px; padding: 20px; }
         }
     </style>
+
+    <script>
+        function toggleSeriesFields() {
+            var type = document.getElementById("media_type").value;
+            var seriesFields = document.getElementById("series_fields");
+            if (type === "series") {
+                seriesFields.style.display = "block";
+            } else {
+                seriesFields.style.display = "none";
+                // Clear the fields if they switch back to Movie
+                document.getElementById("season").value = "";
+                document.getElementById("episode").value = "";
+            }
+        }
+    </script>
 </head>
 <body>
+
     <div class="navbar">
-        <a href="/" class="home-btn">🏠 Home</a>
-        <a href="/login" style="color: #aaa; font-size: 0.9rem;">Admin</a>
+        <a href="/dashboard" class="back-btn">⬅️ Back to Dashboard</a>
+        <a href="/logout" style="color: #e74c3c;">Logout</a>
     </div>
 
     <div class="container">
-        <h1>🎬 Subtitle Hub</h1>
+        <h2>🎬 Upload New Media</h2>
+        
+        <form method="POST" enctype="multipart/form-data">
+            
+            <label for="media_type">Type of Media</label>
+            <select name="media_type" id="media_type" onchange="toggleSeriesFields()" required>
+                <option value="movie">Movie</option>
+                <option value="series">TV Series</option>
+            </select>
 
-        <form method="GET" class="search-form" style="margin-bottom: 30px;">
-            <input type="text" name="q" class="search-bar" placeholder="Search movies or series..." value="{{ search_query }}">
-            <button type="submit" class="search-btn">Search</button>
+            <label for="title">Title</label>
+            <input type="text" name="title" id="title" placeholder="e.g. The Matrix" required>
+
+            <div id="series_fields">
+                <label for="season">Season Number</label>
+                <input type="number" name="season" id="season" placeholder="e.g. 1" min="1">
+
+                <label for="episode">Episode Number</label>
+                <input type="number" name="episode" id="episode" placeholder="e.g. 5" min="1">
+            </div>
+
+            <label for="year">Release Year</label>
+            <input type="number" name="year" id="year" placeholder="e.g. 1999" required>
+
+            <label for="rating">IMDb Rating</label>
+            <input type="text" name="rating" id="rating" placeholder="e.g. 8.7/10" required>
+
+            <label for="category">Category / Genre</label>
+            <input type="text" name="category" id="category" placeholder="e.g. Action, Drama, Thriller" required>
+
+            <label for="poster_url">Poster Image URL</label>
+            <input type="text" name="poster_url" id="poster_url" placeholder="https://example.com/poster.jpg" required>
+
+            <label for="file">English Subtitle File (.srt)</label>
+            <input type="file" name="file" id="file" accept=".srt" required>
+
+            <button type="submit" class="submit-btn">☁️ Upload to Database</button>
         </form>
-
-        {% if search_results %}
-            <h2>Search Results</h2>
-            <div style="display: flex; flex-wrap: wrap; gap: 15px;">
-            {% for movie in search_results %}
-                <a href="/movie/{{ movie.id }}" class="movie-card">
-                    {% if movie.media_type == 'series' %}<div class="ep-badge">S{{ movie.season }} E{{ movie.episode }}</div>{% endif %}
-                    <img src="{{ movie.poster_url }}" alt="{{ movie.title }}">
-                    <p style="font-size: 0.9rem;"><b>{{ movie.title }}</b></p>
-                </a>
-            {% endfor %}
-            </div>
-        {% else %}
-            <h2>🔥 Latest Uploads</h2>
-            <div class="scroll-row">
-                {% for movie in latest_movies %}
-                <a href="/movie/{{ movie.id }}" class="movie-card">
-                    {% if movie.media_type == 'series' %}<div class="ep-badge">S{{ movie.season }} E{{ movie.episode }}</div>{% endif %}
-                    <img src="{{ movie.poster_url }}" alt="{{ movie.title }}">
-                    <p style="font-size: 0.9rem;"><b>{{ movie.title }}</b></p>
-                </a>
-                {% endfor %}
-            </div>
-
-            <h2>⭐ Top Downloaded</h2>
-            <div class="scroll-row">
-                {% for movie in top_movies %}
-                <a href="/movie/{{ movie.id }}" class="movie-card">
-                    {% if movie.media_type == 'series' %}<div class="ep-badge">S{{ movie.season }} E{{ movie.episode }}</div>{% endif %}
-                    <img src="{{ movie.poster_url }}" alt="{{ movie.title }}">
-                    <p style="font-size: 0.9rem;"><b>{{ movie.title }}</b></p>
-                </a>
-                {% endfor %}
-            </div>
-
-            {% for category in categories %}
-            <h2>🍿 {{ category }}</h2>
-            <div class="scroll-row">
-                {% for movie in all_media %}
-                    {% if movie.category == category %}
-                    <a href="/movie/{{ movie.id }}" class="movie-card">
-                        {% if movie.media_type == 'series' %}<div class="ep-badge">S{{ movie.season }} E{{ movie.episode }}</div>{% endif %}
-                        <img src="{{ movie.poster_url }}" alt="{{ movie.title }}">
-                        <p style="font-size: 0.9rem;"><b>{{ movie.title }}</b></p>
-                    </a>
-                    {% endif %}
-                {% endfor %}
-            </div>
-            {% endfor %}
-        {% endif %}
     </div>
+
 </body>
 </html>
