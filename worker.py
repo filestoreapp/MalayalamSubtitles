@@ -59,4 +59,4 @@ def start_worker():
     return "Worker Started", 200
 
 if __name__ == "__main__":
-    worker_app.run(host='0.0.0.0', port=8000)
+    worker_app.run(host='0.0.0.0', port=7860)
