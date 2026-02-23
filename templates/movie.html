@@ -4,9 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
-    <title>{{ movie.title }} Subtitles</title>
-    <meta property="og:title" content="Download {{ movie.title }} Subtitles">
-    <meta property="og:description" content="Available in Malayalam, Tamil, Hindi, and English.">
+    {% if movie.media_type == 'series' %}
+        <title>{{ movie.title }} S{{ movie.season }}E{{ movie.episode }} Subtitles</title>
+        <meta property="og:title" content="🎬 {{ movie.title }} - Season {{ movie.season }} Episode {{ movie.episode }}">
+        <meta property="og:description" content="Download subtitles for S{{ movie.season }}E{{ movie.episode }} in Malayalam, Tamil, Hindi, and English.">
+    {% else %}
+        <title>{{ movie.title }} Subtitles</title>
+        <meta property="og:title" content="🎬 Download {{ movie.title }} Subtitles">
+        <meta property="og:description" content="Available in Malayalam, Tamil, Hindi, and English.">
+    {% endif %}
     <meta property="og:image" content="{{ movie.poster_url }}">
     
     <style>
@@ -16,7 +22,10 @@
         .home-btn { background: #e50914; padding: 8px 15px; border-radius: 5px; }
         
         .container { padding: 20px; max-width: 800px; margin: auto; text-align: center; }
-        .poster { width: 100%; max-width: 300px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); margin-bottom: 20px; }
+        .poster { width: 100%; max-width: 300px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); margin-bottom: 10px; }
+        
+        .series-badge { display: inline-block; background: #e50914; color: white; padding: 5px 15px; border-radius: 20px; font-weight: bold; margin-bottom: 15px; font-size: 1.1rem; }
+        
         .btn { padding: 12px 20px; margin: 8px; background: #e50914; color: white; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold; width: 80%; max-width: 250px; }
         .btn:hover { background: #f40612; }
         
@@ -36,6 +45,12 @@
 
     <div class="container">
         <h1>{{ movie.title }} ({{ movie.year }})</h1>
+        
+        {% if movie.media_type == 'series' %}
+            <div class="series-badge">Season {{ movie.season }} • Episode {{ movie.episode }}</div>
+        {% endif %}
+        <br>
+        
         <img src="{{ movie.poster_url }}" alt="Poster" class="poster">
         <p style="color: #aaa;">⭐ {{ movie.rating }} | 🍿 {{ movie.category }}</p>
 
@@ -52,7 +67,10 @@
             {% for rel in related_movies %}
             <a href="/movie/{{ rel.id }}" class="movie-card">
                 <img src="{{ rel.poster_url }}">
-                <p style="font-size: 12px; margin-top: 5px;">{{ rel.title }}</p>
+                <p style="font-size: 12px; margin-top: 5px;">
+                    {{ rel.title }}
+                    {% if rel.media_type == 'series' %} (S{{ rel.season }}E{{ rel.episode }}) {% endif %}
+                </p>
             </a>
             {% endfor %}
         </div>
