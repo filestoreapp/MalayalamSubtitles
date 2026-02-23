@@ -4,3 +4,4 @@ pysrt
 deep-translator
 gunicorn
 psycopg2-binary
+requests
