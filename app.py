@@ -66,6 +66,17 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+@app.route('/robots.txt')
+def robots_txt():
+    rules = """User-agent: *
+Disallow: /admin
+Disallow: /login
+Disallow: /delete/
+Allow: /
+"""
+    return rules, 200, {'Content-Type': 'text/plain'}
+    
+
 # --- USER ROUTES ---
 @app.route('/')
 def index():
@@ -216,3 +227,4 @@ def admin():
 
 if __name__ == '__main__':
     app.run(debug=True, port=8080)
+
