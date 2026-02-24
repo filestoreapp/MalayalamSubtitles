@@ -92,7 +92,7 @@
             <h2>🍿 {{ category }}</h2>
             <div class="scroll-row">
                 {% for movie in all_media %}
-                    {% if movie.category == category %}
+                    {% if movie.category and category in movie.category %}
                     <a href="/movie/{{ movie.id }}" class="movie-card">
                         {% if movie.media_type == 'series' %}<div class="ep-badge">S{{ movie.season }} E{{ movie.episode }}</div>{% endif %}
                         <img src="{{ movie.poster_url }}" alt="{{ movie.title }}">
