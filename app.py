@@ -30,7 +30,7 @@ class Movie(db.Model):
     poster_url = db.Column(db.String(500)) 
     english_srt = db.Column(db.Text)
     views = db.Column(db.Integer, default=0)
-    category = db.Column(db.String(50), default='General') # NEW CATEGORY COLUMN
+    category = db.Column(db.String(200), default='General') # Multi-genre string
 
 class TranslationCache(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -74,15 +74,24 @@ def index():
     db.session.commit()
     
     search_query = request.args.get('q', '')
-    if search_query:
-        all_media = Movie.query.filter(Movie.title.ilike(f'%{search_query}%')).order_by(Movie.id.desc()).all()
-        return render_template('index.html', search_results=all_media, search_query=search_query)
-    
-    latest_movies = Movie.query.order_by(Movie.id.desc()).limit(5).all()
-    top_movies = Movie.query.order_by(Movie.views.desc()).limit(5).all()
-    unique_categories = db.session.query(Movie.category).distinct().all()
-    categories_list = [c[0] for c in unique_categories if c[0]]
     all_media = Movie.query.order_by(Movie.id.desc()).all()
+
+    if search_query:
+        search_results = Movie.query.filter(Movie.title.ilike(f'%{search_query}%')).order_by(Movie.id.desc()).all()
+        return render_template('index.html', search_results=search_results, search_query=search_query)
+    
+    latest_movies = all_media[:5]
+    top_movies = Movie.query.order_by(Movie.views.desc()).limit(5).all()
+    
+    # Extract unique genres from comma-separated strings
+    categories_set = set()
+    for movie in all_media:
+        if movie.category:
+            for cat in movie.category.split(','):
+                if cat.strip():
+                    categories_set.add(cat.strip())
+    
+    categories_list = sorted(list(categories_set))
 
     return render_template('index.html', latest_movies=latest_movies, top_movies=top_movies, categories=categories_list, all_media=all_media)
 
@@ -96,7 +105,11 @@ def movie_hub(movie_id):
     movie.views += 1
     db.session.commit()
     ready_languages = [c.language for c in movie.translations]
-    related_movies = Movie.query.filter(Movie.category == movie.category, Movie.id != movie.id).limit(4).all()
+    
+    # Find related movies matching any of the same genres
+    primary_genre = movie.category.split(',')[0].strip() if movie.category else 'General'
+    related_movies = Movie.query.filter(Movie.category.ilike(f'%{primary_genre}%'), Movie.id != movie.id).limit(4).all()
+    
     return render_template('movie.html', movie=movie, ready_languages=ready_languages, related_movies=related_movies)
 
 @app.route('/download/<int:movie_id>/<language>')
@@ -148,15 +161,13 @@ def queue_translations(movie_id):
 
     # TRIGGER HUGGING FACE WEBHOOK
     try:
-        # Fixed URL to hit the exact endpoint, and timeout increased to 10!
         hf_url = "https://malayalamsub-malayalamsubs.hf.space/start-worker"
-        requests.post(hf_url, timeout=10)
+        requests.get(hf_url, timeout=10)
     except Exception as e:
         print(f"Webhook signal failed, but job queued: {e}")
 
     return redirect(url_for('dashboard'))
 
-# --- NEW ROUTE: DELETE PENDING JOBS ---
 @app.route('/admin/delete_job/<int:job_id>')
 @login_required
 def delete_job(job_id):
@@ -184,7 +195,11 @@ def admin():
         year = request.form.get('year')
         rating = request.form.get('rating')
         poster_url = request.form.get('poster_url') 
-        category = request.form.get('category')
+        
+        # Combine multiple checkboxes into a single string
+        categories = request.form.getlist('category')
+        category_string = ", ".join(categories)
+        
         srt_file = request.files.get('file')           
         
         if srt_file and title and poster_url:
@@ -192,7 +207,7 @@ def admin():
             new_media = Movie(
                 media_type=media_type, title=title, season=int(season) if season else None,
                 episode=int(episode) if episode else None, year=year, rating=rating, 
-                poster_url=poster_url, english_srt=content, category=category
+                poster_url=poster_url, english_srt=content, category=category_string
             )
             db.session.add(new_media)
             db.session.commit()
