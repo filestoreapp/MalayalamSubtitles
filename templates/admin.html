@@ -3,120 +3,92 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Upload Media | Admin Dashboard</title>
-    
+    <title>Admin Upload - Subtitle Hub</title>
     <style>
-        body { font-family: Arial, sans-serif; background: #f4f7f6; color: #333; margin: 0; padding: 0; }
+        body { font-family: Arial, sans-serif; background: #f4f7f6; color: #333; margin: 0; padding: 20px; }
+        .container { max-width: 500px; margin: auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        h2 { margin-top: 0; color: #2c3e50; border-bottom: 2px solid #e50914; display: inline-block; padding-bottom: 5px; }
         
-        /* Admin Navigation Bar */
-        .navbar { background: #2c3e50; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; color: white; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
-        .navbar a { color: white; text-decoration: none; font-weight: bold; }
-        .back-btn { background: #34495e; padding: 8px 15px; border-radius: 5px; }
+        form { display: flex; flex-direction: column; gap: 15px; margin-top: 20px; }
+        label { font-weight: bold; font-size: 0.9rem; color: #555; }
+        input, select { padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 1rem; width: 100%; box-sizing: border-box;}
         
-        /* Form Container */
-        .container { max-width: 600px; margin: 40px auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        h2 { text-align: center; color: #2c3e50; margin-bottom: 25px; border-bottom: 2px solid #ecf0f1; padding-bottom: 10px; }
-        
-        /* Input Fields */
-        label { font-weight: bold; color: #34495e; display: block; margin-top: 15px; margin-bottom: 5px; }
-        input[type="text"], input[type="number"], select, input[type="file"] { 
-            width: 100%; 
-            padding: 12px; 
-            border: 1px solid #ccd1d9; 
-            border-radius: 5px; 
-            box-sizing: border-box; 
-            font-size: 1rem;
-            background: #fdfdfd;
-        }
-        input[type="file"] { padding: 9px; }
-        
-        /* Smart Series Fields (Hidden by default) */
-        #series_fields { display: none; background: #fef9e7; padding: 15px; border-left: 4px solid #f39c12; margin-top: 15px; border-radius: 4px; }
-        
-        /* Upload Button */
-        .submit-btn { 
-            background: #27ae60; 
-            color: white; 
-            border: none; 
-            padding: 15px; 
-            font-size: 1.1rem; 
-            font-weight: bold;
-            cursor: pointer; 
-            border-radius: 5px; 
-            width: 100%; 
-            margin-top: 30px;
-            transition: background 0.3s;
-        }
-        .submit-btn:hover { background: #219150; }
+        /* Magic UI to hide/show series boxes */
+        .hidden { display: none !important; }
+        .series-fields { display: flex; gap: 10px; }
+        .series-fields div { flex: 1; }
 
-        /* Mobile Adjustments */
-        @media (max-width: 600px) {
-            .container { margin: 20px; padding: 20px; }
-        }
+        .btn-submit { padding: 12px; background: #27ae60; color: white; border: none; border-radius: 5px; font-size: 1.1rem; font-weight: bold; cursor: pointer; margin-top: 10px;}
+        .btn-submit:hover { background: #2ecc71; }
+        .back-link { display: block; margin-top: 20px; text-align: center; color: #2980b9; text-decoration: none; font-weight: bold; }
     </style>
-
-    <script>
-        function toggleSeriesFields() {
-            var type = document.getElementById("media_type").value;
-            var seriesFields = document.getElementById("series_fields");
-            if (type === "series") {
-                seriesFields.style.display = "block";
-            } else {
-                seriesFields.style.display = "none";
-                // Clear the fields if they switch back to Movie
-                document.getElementById("season").value = "";
-                document.getElementById("episode").value = "";
-            }
-        }
-    </script>
 </head>
 <body>
-
-    <div class="navbar">
-        <a href="/dashboard" class="back-btn">⬅️ Back to Dashboard</a>
-        <a href="/logout" style="color: #e74c3c;">Logout</a>
-    </div>
-
     <div class="container">
-        <h2>🎬 Upload New Media</h2>
+        <h2>Upload Media</h2>
         
         <form method="POST" enctype="multipart/form-data">
             
-            <label for="media_type">Type of Media</label>
-            <select name="media_type" id="media_type" onchange="toggleSeriesFields()" required>
+            <label>Media Type:</label>
+            <select name="media_type" id="media_type" onchange="toggleSeriesFields()">
                 <option value="movie">Movie</option>
                 <option value="series">TV Series</option>
             </select>
 
-            <label for="title">Title</label>
-            <input type="text" name="title" id="title" placeholder="e.g. The Matrix" required>
+            <label>Title:</label>
+            <input type="text" name="title" placeholder="e.g. Premalu" required>
 
-            <div id="series_fields">
-                <label for="season">Season Number</label>
-                <input type="number" name="season" id="season" placeholder="e.g. 1" min="1">
-
-                <label for="episode">Episode Number</label>
-                <input type="number" name="episode" id="episode" placeholder="e.g. 5" min="1">
+            <div id="series_data" class="series-fields hidden">
+                <div>
+                    <label>Season:</label>
+                    <input type="number" name="season" placeholder="e.g. 1" min="1">
+                </div>
+                <div>
+                    <label>Episode:</label>
+                    <input type="number" name="episode" placeholder="e.g. 5" min="1">
+                </div>
             </div>
 
-            <label for="year">Release Year</label>
-            <input type="number" name="year" id="year" placeholder="e.g. 1999" required>
+            <label>Release Year:</label>
+            <input type="text" name="year" placeholder="e.g. 2024">
 
-            <label for="rating">IMDb Rating</label>
-            <input type="text" name="rating" id="rating" placeholder="e.g. 8.7/10" required>
+            <label>Rating:</label>
+            <input type="text" name="rating" placeholder="e.g. 8.5/10">
 
-            <label for="category">Category / Genre</label>
-            <input type="text" name="category" id="category" placeholder="e.g. Action, Drama, Thriller" required>
+            <label>Category / Genre (Select up to 3):</label>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: #f9f9f9; padding: 10px; border: 1px solid #ccc; border-radius: 5px;">
+                <label style="font-weight: normal;"><input type="checkbox" name="category" value="Action"> Action</label>
+                <label style="font-weight: normal;"><input type="checkbox" name="category" value="Comedy"> Comedy</label>
+                <label style="font-weight: normal;"><input type="checkbox" name="category" value="Drama"> Drama</label>
+                <label style="font-weight: normal;"><input type="checkbox" name="category" value="Thriller"> Thriller</label>
+                <label style="font-weight: normal;"><input type="checkbox" name="category" value="Horror"> Horror</label>
+                <label style="font-weight: normal;"><input type="checkbox" name="category" value="Romance"> Romance</label>
+                <label style="font-weight: normal;"><input type="checkbox" name="category" value="Sci-Fi"> Sci-Fi</label>
+                <label style="font-weight: normal;"><input type="checkbox" name="category" value="Animation"> Animation</label>
+            </div>
 
-            <label for="poster_url">Poster Image URL</label>
-            <input type="text" name="poster_url" id="poster_url" placeholder="https://example.com/poster.jpg" required>
+            <label>Poster Image URL:</label>
+            <input type="text" name="poster_url" placeholder="https://..." required>
+            
+            <label>Upload English .SRT File:</label>
+            <input type="file" name="file" accept=".srt" required style="border: none; padding: 0;">
 
-            <label for="file">English Subtitle File (.srt)</label>
-            <input type="file" name="file" id="file" accept=".srt" required>
-
-            <button type="submit" class="submit-btn">☁️ Upload to Database</button>
+            <button type="submit" class="btn-submit">Upload to Database</button>
         </form>
+        
+        <a href="/dashboard" class="back-link">&larr; Back to Dashboard</a>
     </div>
 
+    <script>
+        function toggleSeriesFields() {
+            const type = document.getElementById('media_type').value;
+            const seriesFields = document.getElementById('series_data');
+            if (type === 'series') {
+                seriesFields.classList.remove('hidden');
+            } else {
+                seriesFields.classList.add('hidden');
+            }
+        }
+    </script>
 </body>
 </html>
