@@ -133,17 +133,28 @@ def series_page(title, season):
 @app.route('/download/<int:movie_id>/<language>')
 def download(movie_id, language):
     movie = Movie.query.get_or_404(movie_id)
-    if language == 'en': srt_text = movie.english_srt
+    if language == 'en': 
+        srt_text = movie.english_srt
     else:
         cache = TranslationCache.query.filter_by(movie_id=movie_id, language=language).first_or_404()
         srt_text = cache.translated_srt
         cache.downloads += 1
         db.session.commit()
+        
     mem_file = io.BytesIO()
     mem_file.write(srt_text.encode('utf-8'))
     mem_file.seek(0)
-    name = f"{movie.title}_S{movie.season:02d}E{movie.episode:02d}_{language}.srt" if movie.media_type == 'series' else f"{movie.title}_{language}.srt"
-        return send_file(mem_file, as_attachment=True, download_name=name.replace(" ", "_"), mimetype='application/octet-stream')
+    
+    # --- BULLETPROOF FIX FOR TELEGRAM & MISSING NUMBERS ---
+    s = movie.season or 1
+    e = movie.episode or 1
+    
+    if movie.media_type == 'series':
+        name = f"{movie.title}_S{s:02d}E{e:02d}_{language}.srt"
+    else:
+        name = f"{movie.title}_{language}.srt"
+        
+    return send_file(mem_file, as_attachment=True, download_name=name.replace(" ", "_"), mimetype='application/octet-stream')
 
 # --- ADMIN & DASHBOARD ROUTES ---
 @app.route('/login', methods=['GET', 'POST'])
@@ -233,6 +244,3 @@ def admin():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
-
-
-
