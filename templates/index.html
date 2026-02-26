@@ -60,7 +60,7 @@
             {% for movie in search_results %}
                 <a href="/movie/{{ movie.id }}" class="movie-card">
                     {% if movie.media_type == 'series' %}<div class="ep-badge">S{{ movie.season }} E{{ movie.episode }}</div>{% endif %}
-                    <img src="{{ movie.poster_url }}" alt="{{ movie.title }}">
+                    <img src="{{ movie.poster_url }}" alt="{{ movie.title }}" loading="lazy">
                     <p style="font-size: 0.9rem;"><b>{{ movie.title }}</b></p>
                 </a>
             {% endfor %}
@@ -71,7 +71,7 @@
                 {% for movie in latest_movies %}
                 <a href="/movie/{{ movie.id }}" class="movie-card">
                     {% if movie.media_type == 'series' %}<div class="ep-badge">S{{ movie.season }} E{{ movie.episode }}</div>{% endif %}
-                    <img src="{{ movie.poster_url }}" alt="{{ movie.title }}">
+                    <img src="{{ movie.poster_url }}" alt="{{ movie.title }}" loading="lazy">
                     <p style="font-size: 0.9rem;"><b>{{ movie.title }}</b></p>
                 </a>
                 {% endfor %}
@@ -82,7 +82,7 @@
                 {% for movie in top_movies %}
                 <a href="/movie/{{ movie.id }}" class="movie-card">
                     {% if movie.media_type == 'series' %}<div class="ep-badge">S{{ movie.season }} E{{ movie.episode }}</div>{% endif %}
-                    <img src="{{ movie.poster_url }}" alt="{{ movie.title }}">
+                    <img src="{{ movie.poster_url }}" alt="{{ movie.title }}" loading="lazy">
                     <p style="font-size: 0.9rem;"><b>{{ movie.title }}</b></p>
                 </a>
                 {% endfor %}
@@ -95,7 +95,7 @@
                     {% if movie.category and category in movie.category %}
                     <a href="/movie/{{ movie.id }}" class="movie-card">
                         {% if movie.media_type == 'series' %}<div class="ep-badge">S{{ movie.season }} E{{ movie.episode }}</div>{% endif %}
-                        <img src="{{ movie.poster_url }}" alt="{{ movie.title }}">
+                        <img src="{{ movie.poster_url }}" alt="{{ movie.title }}" loading="lazy">
                         <p style="font-size: 0.9rem;"><b>{{ movie.title }}</b></p>
                     </a>
                     {% endif %}
@@ -103,6 +103,7 @@
             </div>
             {% endfor %}
         {% endif %}
+
         <div style="margin-top: 50px; padding: 30px; background: #222; border-radius: 8px; border-top: 3px solid #e50914;">
             <h2 style="font-size: 1.5rem; margin-top: 0; border: none;">Why Use Subtitle Hub?</h2>
             <p style="color: #ccc; line-height: 1.6; font-size: 0.95rem;">
@@ -127,23 +128,21 @@
                 </div>
             </div>
         </div>
-
-        <script type="application/ld+json">
-        {
-          "@context": "https://schema.org",
-          "@type": "WebSite",
-          "name": "Malayalam Subtitle Hub",
-          "url": "https://malayalamsubtitles.onrender.com",
-          "description": "Download free perfectly synced Malayalam, Tamil, and Hindi subtitles for movies and TV series.",
-          "potentialAction": {
-            "@type": "SearchAction",
-            "target": "https://malayalamsubtitles.onrender.com/?q={search_term_string}",
-            "query-input": "required name=search_term_string"
-          }
-        }
-        </script>
-        
     </div>
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "Malayalam Subtitle Hub",
+      "url": "https://malayalamsubtitles.onrender.com",
+      "description": "Download free perfectly synced Malayalam, Tamil, and Hindi subtitles for movies and TV series.",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://malayalamsubtitles.onrender.com/?q={search_term_string}",
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
 </body>
 </html>
-
