@@ -143,7 +143,7 @@ def download(movie_id, language):
     mem_file.write(srt_text.encode('utf-8'))
     mem_file.seek(0)
     name = f"{movie.title}_S{movie.season:02d}E{movie.episode:02d}_{language}.srt" if movie.media_type == 'series' else f"{movie.title}_{language}.srt"
-    return send_file(mem_file, as_attachment=True, download_name=name.replace(" ", "_"))
+        return send_file(mem_file, as_attachment=True, download_name=name.replace(" ", "_"), mimetype='application/octet-stream')
 
 # --- ADMIN & DASHBOARD ROUTES ---
 @app.route('/login', methods=['GET', 'POST'])
@@ -233,5 +233,6 @@ def admin():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
+
 
 
