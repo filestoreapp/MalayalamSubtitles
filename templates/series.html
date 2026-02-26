@@ -1,59 +1,55 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>{{ title }} - Subtitles</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} - Season {{ season }} Subtitles</title>
+    <meta property="og:title" content="📺 Download {{ title }} - Season {{ season }}">
+    <meta property="og:description" content="Get subtitles for all episodes in Season {{ season }} of {{ title }}.">
+    <meta property="og:image" content="{{ show_data.poster_url }}">
+    
     <style>
-        body { font-family: sans-serif; margin: 0; background: #f8f9fa; color: #333; }
-        .hero { background: #121212; color: white; padding: 50px 20px; display: flex; justify-content: center; align-items: center; gap: 40px; flex-wrap: wrap; }
-        .hero-poster { width: 220px; border-radius: 10px; box-shadow: 0 10px 20px rgba(0,0,0,0.5); }
-        .hero-details { max-width: 500px; }
-        .container { max-width: 900px; margin: 40px auto; padding: 0 20px; }
-        .season-card { background: #fff; margin-bottom: 10px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); overflow: hidden; }
-        .season-header { background: #1f1f1f; padding: 15px 20px; cursor: pointer; color: #fff; display: flex; justify-content: space-between; font-weight: bold; }
-        .episode-list { display: none; padding: 10px 0; background: #fff; }
-        .episode-item { padding: 20px; border-bottom: 1px solid #eee; }
-        .lang-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
-        .btn { padding: 10px 15px; border: 1px solid #ccc; border-radius: 6px; text-decoration: none; color: #333; font-size: 0.9em; font-weight: bold; }
-        .btn.ready { background: #e8f5e9; color: #28a745; border-color: #28a745; }
-        .btn.ml { background: #ff5722; color: #fff; border: none; }
-        .btn.ml.ready { background: #28a745; }
-        .back-link { display: inline-block; margin-bottom: 20px; color: #aaa; text-decoration: none; font-size: 0.9em;}
-        .back-link:hover { color: white; }
+        body { font-family: Arial, sans-serif; background: #141414; color: white; margin: 0; padding: 0; }
+        .navbar { background: #000; padding: 15px 20px; display: flex; align-items: center; position: sticky; top: 0; z-index: 1000; border-bottom: 1px solid #333; }
+        .navbar a { color: white; text-decoration: none; font-weight: bold; }
+        .home-btn { background: #e50914; padding: 8px 15px; border-radius: 5px; }
+        
+        .container { padding: 20px; max-width: 800px; margin: auto; text-align: center; }
+        .poster { width: 100%; max-width: 250px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); margin-bottom: 20px; }
+        
+        /* Episode List Styling */
+        .ep-list { display: flex; flex-direction: column; gap: 10px; margin-top: 30px; text-align: left; }
+        .ep-card { background: #222; padding: 15px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid #e50914; text-decoration: none; color: white; transition: background 0.2s;}
+        .ep-card:hover { background: #333; }
+        .ep-num { font-size: 1.2rem; font-weight: bold; color: #e50914; width: 50px; }
+        .ep-title { flex: 1; font-weight: bold; }
+        .ep-btn { background: #444; padding: 8px 15px; border-radius: 4px; font-size: 0.85rem; }
     </style>
 </head>
 <body>
-    <div class="hero">
-        <img src="{{ master_info.poster_url }}" class="hero-poster" alt="Poster">
-        <div class="hero-details">
-            <a href="/" class="back-link">&larr; Back to Search</a>
-            <h1 style="margin: 0 0 10px 0;">{{ title }}</h1>
-            <p style="color: #aaa; font-size: 1.2em; margin-bottom: 20px;">
-                <span style="background: #444; padding: 2px 8px; border-radius: 5px; font-size: 0.8em; margin-right: 10px; color: white;">TV SERIES</span>
-                {{ master_info.year }} | ★ {{ master_info.rating }}
-            </p>
-            <p style="color: #ccc; line-height: 1.5;">Click a season below to view episodes and download subtitles.</p>
+    <div class="navbar">
+        <a href="/" class="home-btn">🏠 Home</a>
+    </div>
+
+    <div class="container">
+        <h1>{{ title }}</h1>
+        <h2 style="color: #aaa; margin-top: -10px;">Season {{ season }}</h2>
+        
+        <img src="{{ show_data.poster_url }}" alt="Poster" class="poster" loading="lazy">
+        
+        <p style="color: #aaa;">⭐ {{ show_data.rating }} | 🍿 {{ show_data.category }}</p>
+
+        <div class="ep-list">
+            <h3 style="border-bottom: 1px solid #333; padding-bottom: 10px;">All Episodes</h3>
+            
+            {% for ep in episodes %}
+            <a href="/movie/{{ ep.id }}" class="ep-card">
+                <div class="ep-num">E{{ ep.episode }}</div>
+                <div class="ep-title">{{ title }}</div>
+                <div class="ep-btn">Get Subs &rarr;</div>
+            </a>
+            {% endfor %}
         </div>
     </div>
-    <div class="container">
-        {% for sn, eps in seasons.items() %}
-            <div class="season-card">
-                <div class="season-header" onclick="toggleSn('sn-{{ sn }}')">Season {{ sn }} <span>▼</span></div>
-                <div class="episode-list" id="sn-{{ sn }}" style="{% if loop.first %}display: block;{% else %}display: none;{% endif %}">
-                    {% for ep in eps %}
-                        <div class="episode-item">
-                            <strong style="font-size: 1.3em;">Episode {{ ep.episode }}</strong>
-                            <div class="lang-grid">
-                                <a href="/request_translation/{{ ep.id }}/ml" class="btn ml {% if 'ml' in ep.ready_languages %}ready{% endif %}">Malayalam (മലയാളം)</a>
-                                <a href="/request_translation/{{ ep.id }}/hi" class="btn {% if 'hi' in ep.ready_languages %}ready{% endif %}">Hindi</a>
-                                <a href="/request_translation/{{ ep.id }}/ta" class="btn {% if 'ta' in ep.ready_languages %}ready{% endif %}">Tamil</a>
-                                <a href="/request_translation/{{ ep.id }}/en" class="btn">English</a>
-                            </div>
-                        </div>
-                    {% endfor %}
-                </div>
-            </div>
-        {% endfor %}
-    </div>
-    <script>function toggleSn(id){var el=document.getElementById(id); el.style.display=el.style.display==='block'?'none':'block';}</script>
 </body>
 </html>
