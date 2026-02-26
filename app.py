@@ -154,7 +154,7 @@ def download(movie_id, language):
     else:
         name = f"{movie.title}_{language}.srt"
         
-        return send_file(mem_file, as_attachment=True, download_name=name.replace(" ", "_"), mimetype='application/x-subrip')
+    return send_file(mem_file, as_attachment=True, download_name=name.replace(" ", "_"), mimetype='application/x-subrip')
 
 # --- ADMIN & DASHBOARD ROUTES ---
 @app.route('/login', methods=['GET', 'POST'])
@@ -244,4 +244,5 @@ def admin():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
+
 
