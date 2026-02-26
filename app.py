@@ -66,17 +66,6 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-@app.route('/robots.txt')
-def robots_txt():
-    rules = """User-agent: *
-Disallow: /admin
-Disallow: /login
-Disallow: /delete/
-Allow: /
-"""
-    return rules, 200, {'Content-Type': 'text/plain'}
-    
-
 # --- USER ROUTES ---
 @app.route('/')
 def index():
@@ -94,7 +83,6 @@ def index():
     latest_movies = all_media[:5]
     top_movies = Movie.query.order_by(Movie.views.desc()).limit(5).all()
     
-    # Extract unique genres from comma-separated strings
     categories_set = set()
     for movie in all_media:
         if movie.category:
@@ -105,6 +93,16 @@ def index():
     categories_list = sorted(list(categories_set))
 
     return render_template('index.html', latest_movies=latest_movies, top_movies=top_movies, categories=categories_list, all_media=all_media)
+
+@app.route('/robots.txt')
+def robots_txt():
+    rules = """User-agent: *
+Disallow: /admin
+Disallow: /login
+Disallow: /delete/
+Allow: /
+"""
+    return rules, 200, {'Content-Type': 'text/plain'}
 
 @app.route('/keep-alive')
 def keep_alive():
@@ -117,11 +115,20 @@ def movie_hub(movie_id):
     db.session.commit()
     ready_languages = [c.language for c in movie.translations]
     
-    # Find related movies matching any of the same genres
     primary_genre = movie.category.split(',')[0].strip() if movie.category else 'General'
     related_movies = Movie.query.filter(Movie.category.ilike(f'%{primary_genre}%'), Movie.id != movie.id).limit(4).all()
     
     return render_template('movie.html', movie=movie, ready_languages=ready_languages, related_movies=related_movies)
+
+# --- NEW: SMART TV SERIES PAGE ---
+@app.route('/series/<string:title>/<int:season>')
+def series_page(title, season):
+    episodes = Movie.query.filter_by(media_type='series', title=title, season=season).order_by(Movie.episode.asc()).all()
+    if not episodes:
+        return "Season not found", 404
+        
+    show_data = episodes[0] 
+    return render_template('series.html', title=title, season=season, episodes=episodes, show_data=show_data)
 
 @app.route('/download/<int:movie_id>/<language>')
 def download(movie_id, language):
@@ -170,7 +177,6 @@ def queue_translations(movie_id):
             db.session.add(new_job)
     db.session.commit()
 
-    # TRIGGER HUGGING FACE WEBHOOK
     try:
         hf_url = "https://malayalamsub-malayalamsubs.hf.space/start-worker"
         requests.get(hf_url, timeout=10)
@@ -207,7 +213,6 @@ def admin():
         rating = request.form.get('rating')
         poster_url = request.form.get('poster_url') 
         
-        # Combine multiple checkboxes into a single string
         categories = request.form.getlist('category')
         category_string = ", ".join(categories)
         
@@ -227,4 +232,4 @@ def admin():
 
 if __name__ == '__main__':
     app.run(debug=True, port=8080)
-
+    
