@@ -48,10 +48,12 @@
         
         {% if movie.media_type == 'series' %}
             <div class="series-badge">Season {{ movie.season }} • Episode {{ movie.episode }}</div>
+            <br>
+            <a href="/series/{{ movie.title | urlencode }}/{{ movie.season }}" style="color: #e50914; text-decoration: none; font-weight: bold; font-size: 0.95rem; display: inline-block; margin-bottom: 15px; padding: 10px; border: 1px solid #e50914; border-radius: 5px;">📺 View All Episodes in Season {{ movie.season }} &rarr;</a>
         {% endif %}
         <br>
         
-        <img src="{{ movie.poster_url }}" alt="Poster" class="poster">
+        <img src="{{ movie.poster_url }}" alt="Poster" class="poster" loading="lazy">
         <p style="color: #aaa;">⭐ {{ movie.rating }} | 🍿 {{ movie.category }}</p>
 
         <h3 style="margin-top: 30px;">📥 Download Subtitles</h3>
@@ -60,7 +62,10 @@
         {% if 'ml' in ready_languages %}<a href="/download/{{ movie.id }}/ml" class="btn">🇮🇳 Malayalam</a>{% endif %}
         {% if 'ta' in ready_languages %}<a href="/download/{{ movie.id }}/ta" class="btn">🇮🇳 Tamil</a>{% endif %}
         {% if 'hi' in ready_languages %}<a href="/download/{{ movie.id }}/hi" class="btn">🇮🇳 Hindi</a>{% endif %}
-                <div style="margin-top: 40px; text-align: left; background: #1a1a1a; padding: 20px; border-radius: 8px;">
+
+        <hr style="border-color: #333; margin-top: 50px;">
+        
+        <div style="margin-top: 40px; text-align: left; background: #1a1a1a; padding: 20px; border-radius: 8px;">
             <h3 style="color: #e50914; font-size: 1.1rem; margin-top: 0;">About {{ movie.title }} Subtitles</h3>
             <p style="color: #bbb; font-size: 0.9rem; line-height: 1.5;">
                 Download perfectly synced subtitles for <strong>{{ movie.title }} ({{ movie.year }})</strong>. 
@@ -77,26 +82,12 @@
                 <strong>How to use:</strong> Extract the downloaded file and place it in the same folder as your video file. Ensure both files share the exact same name to allow media players like VLC, MX Player, or Plex to load the subtitles automatically.
             </p>
         </div>
-
-        <script type="application/ld+json">
-        {
-          "@context": "https://schema.org",
-          "@type": "{% if movie.media_type == 'series' %}TVEpisode{% else %}Movie{% endif %}",
-          "name": "{{ movie.title }}",
-          "image": "{{ movie.poster_url }}",
-          "dateCreated": "{{ movie.year }}",
-          "genre": "{{ movie.category }}",
-          "description": "Download subtitles for {{ movie.title }} in Malayalam, Tamil, and Hindi."
-        }
-        </script>
         
-
-        <hr style="border-color: #333; margin-top: 50px;">
-        <h2 style="text-align: left; font-size: 1.2rem;">More in {{ movie.category }}</h2>
+        <h2 style="text-align: left; font-size: 1.2rem; margin-top: 40px;">More in {{ movie.category.split(',')[0] if movie.category else 'General' }}</h2>
         <div class="related-row">
             {% for rel in related_movies %}
             <a href="/movie/{{ rel.id }}" class="movie-card">
-                <img src="{{ rel.poster_url }}">
+                <img src="{{ rel.poster_url }}" loading="lazy">
                 <p style="font-size: 12px; margin-top: 5px;">
                     {{ rel.title }}
                     {% if rel.media_type == 'series' %} (S{{ rel.season }}E{{ rel.episode }}) {% endif %}
@@ -105,6 +96,17 @@
             {% endfor %}
         </div>
     </div>
+    
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "{% if movie.media_type == 'series' %}TVEpisode{% else %}Movie{% endif %}",
+      "name": "{{ movie.title }}",
+      "image": "{{ movie.poster_url }}",
+      "dateCreated": "{{ movie.year }}",
+      "genre": "{{ movie.category }}",
+      "description": "Download subtitles for {{ movie.title }} in Malayalam, Tamil, and Hindi."
+    }
+    </script>
 </body>
 </html>
-
