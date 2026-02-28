@@ -2,93 +2,77 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Upload - Subtitle Hub</title>
+    <title>Admin Dashboard - Upload Subtitles</title>
     <style>
-        body { font-family: Arial, sans-serif; background: #f4f7f6; color: #333; margin: 0; padding: 20px; }
-        .container { max-width: 500px; margin: auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        h2 { margin-top: 0; color: #2c3e50; border-bottom: 2px solid #e50914; display: inline-block; padding-bottom: 5px; }
-        
-        form { display: flex; flex-direction: column; gap: 15px; margin-top: 20px; }
-        label { font-weight: bold; font-size: 0.9rem; color: #555; }
-        input, select { padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 1rem; width: 100%; box-sizing: border-box;}
-        
-        /* Magic UI to hide/show series boxes */
-        .hidden { display: none !important; }
-        .series-fields { display: flex; gap: 10px; }
-        .series-fields div { flex: 1; }
-
-        .btn-submit { padding: 12px; background: #27ae60; color: white; border: none; border-radius: 5px; font-size: 1.1rem; font-weight: bold; cursor: pointer; margin-top: 10px;}
-        .btn-submit:hover { background: #2ecc71; }
-        .back-link { display: block; margin-top: 20px; text-align: center; color: #2980b9; text-decoration: none; font-weight: bold; }
+        body { font-family: Arial, sans-serif; margin: 40px; background-color: #f4f4f9; }
+        .upload-box { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); max-width: 600px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; }
+        input[type="text"], input[type="number"], select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        .silent-box { background: #ffeaa7; padding: 10px; border-radius: 5px; border: 1px dashed #e1b12c; margin-top: 15px; margin-bottom: 15px; }
+        button { background-color: #0984e3; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        button:hover { background-color: #74b9ff; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h2>Upload Media</h2>
-        
-        <form method="POST" enctype="multipart/form-data">
+
+    <div class="upload-box">
+        <h2>🎬 Upload New Subtitle</h2>
+        <form action="/admin/upload" method="POST" enctype="multipart/form-data">
             
-            <label>Media Type:</label>
-            <select name="media_type" id="media_type" onchange="toggleSeriesFields()">
-                <option value="movie">Movie</option>
-                <option value="series">TV Series</option>
-            </select>
-
-            <label>Title:</label>
-            <input type="text" name="title" placeholder="e.g. Premalu" required>
-
-            <div id="series_data" class="series-fields hidden">
-                <div>
-                    <label>Season:</label>
-                    <input type="number" name="season" placeholder="e.g. 1" min="1">
-                </div>
-                <div>
-                    <label>Episode:</label>
-                    <input type="number" name="episode" placeholder="e.g. 5" min="1">
-                </div>
+            <div class="form-group">
+                <label>Title:</label>
+                <input type="text" name="title" placeholder="e.g., Tell Me Lies" required>
             </div>
 
-            <label>Release Year:</label>
-            <input type="text" name="year" placeholder="e.g. 2024">
-
-            <label>Rating:</label>
-            <input type="text" name="rating" placeholder="e.g. 8.5/10">
-
-            <label>Category / Genre (Select up to 3):</label>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: #f9f9f9; padding: 10px; border: 1px solid #ccc; border-radius: 5px;">
-                <label style="font-weight: normal;"><input type="checkbox" name="category" value="Action"> Action</label>
-                <label style="font-weight: normal;"><input type="checkbox" name="category" value="Comedy"> Comedy</label>
-                <label style="font-weight: normal;"><input type="checkbox" name="category" value="Drama"> Drama</label>
-                <label style="font-weight: normal;"><input type="checkbox" name="category" value="Thriller"> Thriller</label>
-                <label style="font-weight: normal;"><input type="checkbox" name="category" value="Horror"> Horror</label>
-                <label style="font-weight: normal;"><input type="checkbox" name="category" value="Romance"> Romance</label>
-                <label style="font-weight: normal;"><input type="checkbox" name="category" value="Sci-Fi"> Sci-Fi</label>
-                <label style="font-weight: normal;"><input type="checkbox" name="category" value="Animation"> Animation</label>
+            <div class="form-group">
+                <label>Media Type:</label>
+                <select name="media_type" required>
+                    <option value="movie">Movie</option>
+                    <option value="series">TV Series</option>
+                </select>
             </div>
 
-            <label>Poster Image URL:</label>
-            <input type="text" name="poster_url" placeholder="https://..." required>
-            
-            <label>Upload English .SRT File:</label>
-            <input type="file" name="file" accept=".srt" required style="border: none; padding: 0;">
+            <div class="form-group">
+                <label>Season Number (Leave blank for movies):</label>
+                <input type="number" name="season" placeholder="e.g., 1">
+            </div>
 
-            <button type="submit" class="btn-submit">Upload to Database</button>
+            <div class="form-group">
+                <label>Episode Number (Leave blank for movies):</label>
+                <input type="number" name="episode" placeholder="e.g., 10">
+            </div>
+
+            <div class="form-group">
+                <label>Rating (Out of 10):</label>
+                <input type="text" name="rating" placeholder="e.g., 7.1" required>
+            </div>
+
+            <div class="form-group">
+                <label>Category/Genre (Comma separated):</label>
+                <input type="text" name="category" placeholder="e.g., Drama, Thriller" required>
+            </div>
+
+            <div class="form-group">
+                <label>Poster Image URL:</label>
+                <input type="text" name="poster_url" placeholder="https://..." required>
+            </div>
+
+            <div class="form-group">
+                <label>Upload English .SRT File:</label>
+                <input type="file" name="srt_file" accept=".srt" required>
+            </div>
+
+            <div class="form-group silent-box">
+                <label style="color: #d63031; cursor: pointer;">
+                    <input type="checkbox" name="silent_upload" value="yes"> 
+                    🤫 <b>Silent Upload</b> (Check this to translate without posting to Telegram)
+                </label>
+            </div>
+
+            <button type="submit">Upload & Start Translation</button>
         </form>
-        
-        <a href="/dashboard" class="back-link">&larr; Back to Dashboard</a>
     </div>
 
-    <script>
-        function toggleSeriesFields() {
-            const type = document.getElementById('media_type').value;
-            const seriesFields = document.getElementById('series_data');
-            if (type === 'series') {
-                seriesFields.classList.remove('hidden');
-            } else {
-                seriesFields.classList.add('hidden');
-            }
-        }
-    </script>
 </body>
 </html>
