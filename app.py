@@ -104,7 +104,8 @@ def index():
     for movie in all_media:
         if movie.category:
             for cat in movie.category.split(','):
-                if cat.strip():
+                # Hide the Secret Tag from the public categories list!
+                if cat.strip() and cat.strip() != "SilentMode":
                     categories_set.add(cat.strip())
     
     categories_list = sorted(list(categories_set))
@@ -156,12 +157,9 @@ def download(movie_id, language):
         cache.downloads += 1
         db.session.commit()
         
-    # --- SMART ROUTING: CLOUDFLARE URL VS LEGACY TEXT ---
     if srt_text.startswith('http'):
-        # It's an R2 URL! Redirect the user directly to Cloudflare's high-speed servers.
         return redirect(srt_text)
         
-    # --- LEGACY DATABASE TEXT FALLBACK ---
     mem_file = io.BytesIO()
     mem_file.write(srt_text.encode('utf-8'))
     mem_file.seek(0)
@@ -243,19 +241,23 @@ def admin():
         year = request.form.get('year')
         rating = request.form.get('rating')
         poster_url = request.form.get('poster_url') 
+        silent_upload = request.form.get('silent_upload') # <-- NEW: Catch the checkbox
         
         categories = request.form.getlist('category')
         category_string = ", ".join(categories)
         
+        # --- NEW: THE SECRET TAG TRICK ---
+        if silent_upload == 'yes':
+            category_string += ", SilentMode"
+            
         srt_file = request.files.get('file')           
         
         if srt_file and title and poster_url:
             content = srt_file.read().decode('utf-8', errors='ignore')
             
             # --- UPLOAD TO CLOUDFLARE R2 ---
-            storage_data = content # Default to database text if Cloudflare fails
+            storage_data = content 
             if s3_client and r2_bucket:
-                # Create a safe, unique filename (e.g. english_movie_a1b2.srt)
                 safe_title = title.replace(" ", "_").replace("/", "").lower()
                 r2_filename = f"english_{safe_title}_{os.urandom(4).hex()}.srt"
                 try:
@@ -265,7 +267,6 @@ def admin():
                         Body=content.encode('utf-8'),
                         ContentType='application/x-subrip'
                     )
-                    # Success! Save the URL instead of the 100KB text.
                     storage_data = f"{r2_public_url}/{r2_filename}"
                 except Exception as e:
                     print(f"R2 Upload Failed: {e}")
@@ -277,9 +278,24 @@ def admin():
             )
             db.session.add(new_media)
             db.session.commit()
+
+            # --- NEW: AUTO-QUEUE TRANSLATIONS ---
+            for lang in ['ml', 'ta', 'hi']:
+                new_job = TranslationJob(movie_id=new_media.id, language=lang, status='Pending')
+                db.session.add(new_job)
+            db.session.commit()
+
+            # --- NEW: WAKE UP HUGGING FACE AUTOMATICALLY ---
+            try:
+                hf_url = "https://malayalamsub-malayalamsubs.hf.space/start-worker"
+                requests.get(hf_url, timeout=10)
+            except Exception as e:
+                print(f"Failed to wake up worker: {e}")
+
             return redirect(url_for('dashboard'))
     return render_template('admin.html')
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
+    
