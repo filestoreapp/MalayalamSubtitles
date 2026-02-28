@@ -1,6 +1,7 @@
 import os
 import io
 import requests
+import boto3
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, send_file, jsonify, session
 from flask_sqlalchemy import SQLAlchemy
@@ -18,6 +19,22 @@ app.secret_key = 'malayalam_subtitle_hub_secret_key'
 
 db = SQLAlchemy(app)
 
+# --- CLOUDFLARE R2 SETUP ---
+r2_endpoint = os.environ.get('R2_ENDPOINT_URL')
+r2_access_key = os.environ.get('R2_ACCESS_KEY_ID')
+r2_secret_key = os.environ.get('R2_SECRET_ACCESS_KEY')
+r2_bucket = os.environ.get('R2_BUCKET_NAME')
+r2_public_url = os.environ.get('R2_PUBLIC_URL')
+
+if r2_endpoint and r2_access_key and r2_secret_key:
+    s3_client = boto3.client('s3',
+        endpoint_url=r2_endpoint,
+        aws_access_key_id=r2_access_key,
+        aws_secret_access_key=r2_secret_key
+    )
+else:
+    s3_client = None
+
 # --- DATABASE MODELS ---
 class Movie(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -30,7 +47,7 @@ class Movie(db.Model):
     poster_url = db.Column(db.String(500)) 
     english_srt = db.Column(db.Text)
     views = db.Column(db.Integer, default=0)
-    category = db.Column(db.String(200), default='General') # Multi-genre string
+    category = db.Column(db.String(200), default='General')
 
 class TranslationCache(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -91,7 +108,6 @@ def index():
                     categories_set.add(cat.strip())
     
     categories_list = sorted(list(categories_set))
-
     return render_template('index.html', latest_movies=latest_movies, top_movies=top_movies, categories=categories_list, all_media=all_media)
 
 @app.route('/robots.txt')
@@ -120,7 +136,6 @@ def movie_hub(movie_id):
     
     return render_template('movie.html', movie=movie, ready_languages=ready_languages, related_movies=related_movies)
 
-# --- NEW: SMART TV SERIES PAGE ---
 @app.route('/series/<string:title>/<int:season>')
 def series_page(title, season):
     episodes = Movie.query.filter_by(media_type='series', title=title, season=season).order_by(Movie.episode.asc()).all()
@@ -141,11 +156,16 @@ def download(movie_id, language):
         cache.downloads += 1
         db.session.commit()
         
+    # --- SMART ROUTING: CLOUDFLARE URL VS LEGACY TEXT ---
+    if srt_text.startswith('http'):
+        # It's an R2 URL! Redirect the user directly to Cloudflare's high-speed servers.
+        return redirect(srt_text)
+        
+    # --- LEGACY DATABASE TEXT FALLBACK ---
     mem_file = io.BytesIO()
     mem_file.write(srt_text.encode('utf-8'))
     mem_file.seek(0)
     
-    # --- BULLETPROOF FIX FOR TELEGRAM & MISSING NUMBERS ---
     s = movie.season or 1
     e = movie.episode or 1
     
@@ -231,10 +251,29 @@ def admin():
         
         if srt_file and title and poster_url:
             content = srt_file.read().decode('utf-8', errors='ignore')
+            
+            # --- UPLOAD TO CLOUDFLARE R2 ---
+            storage_data = content # Default to database text if Cloudflare fails
+            if s3_client and r2_bucket:
+                # Create a safe, unique filename (e.g. english_movie_a1b2.srt)
+                safe_title = title.replace(" ", "_").replace("/", "").lower()
+                r2_filename = f"english_{safe_title}_{os.urandom(4).hex()}.srt"
+                try:
+                    s3_client.put_object(
+                        Bucket=r2_bucket,
+                        Key=r2_filename,
+                        Body=content.encode('utf-8'),
+                        ContentType='application/x-subrip'
+                    )
+                    # Success! Save the URL instead of the 100KB text.
+                    storage_data = f"{r2_public_url}/{r2_filename}"
+                except Exception as e:
+                    print(f"R2 Upload Failed: {e}")
+
             new_media = Movie(
                 media_type=media_type, title=title, season=int(season) if season else None,
                 episode=int(episode) if episode else None, year=year, rating=rating, 
-                poster_url=poster_url, english_srt=content, category=category_string
+                poster_url=poster_url, english_srt=storage_data, category=category_string
             )
             db.session.add(new_media)
             db.session.commit()
@@ -244,5 +283,3 @@ def admin():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
-
-
