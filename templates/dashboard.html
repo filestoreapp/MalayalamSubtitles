@@ -2,112 +2,109 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard</title>
+    <title>Admin Control Panel</title>
     <style>
-        body { font-family: Arial, sans-serif; background: #f4f7f6; color: #333; margin: 0; padding: 0; }
-        .navbar { background: #2c3e50; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; color: white; }
-        .navbar a { color: white; text-decoration: none; font-weight: bold; }
-        .home-btn { background: #34495e; padding: 8px 15px; border-radius: 5px; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f6f9; color: #333; margin: 0; padding: 20px; }
+        .container { max-width: 1200px; margin: auto; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        .header h1 { margin: 0; color: #2c3e50; }
+        .btn-upload { background: #0984e3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold; }
+        .btn-upload:hover { background: #74b9ff; }
+        .btn-reset { background: #f39c12; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold; margin-right: 15px; }
+        .btn-reset:hover { background: #e67e22; }
         
-        .container { padding: 20px; max-width: 1200px; margin: auto; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 40px; }
+        .stat-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); text-align: center; }
+        .stat-card h3 { margin: 0 0 10px 0; color: #7f8c8d; font-size: 16px; }
+        .stat-card .value { font-size: 28px; font-weight: bold; color: #2c3e50; }
         
-        /* Stats Cards */
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 30px; }
-        .stat-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); text-align: center; }
-        .stat-card h3 { margin: 0; color: #7f8c8d; font-size: 1rem; }
-        .stat-card p { margin: 10px 0 0 0; font-size: 2rem; font-weight: bold; color: #2c3e50; }
-
-        /* Tables for Mobile */
-        .table-responsive { overflow-x: auto; background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 30px; }
-        table { width: 100%; border-collapse: collapse; min-width: 600px; }
-        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #ddd; }
-        th { background-color: #f8f9fa; }
+        .section { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 30px; }
+        .section h2 { margin-top: 0; border-bottom: 2px solid #f4f6f9; padding-bottom: 10px; }
         
-        /* Buttons */
-        .action-btn { padding: 6px 12px; border-radius: 4px; text-decoration: none; font-size: 0.9rem; font-weight: bold; display: inline-block; }
-        .btn-green { background: #27ae60; color: white; }
-        .btn-red { background: #e74c3c; color: white; }
-        .btn-blue { background: #2980b9; color: white; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background: #f8f9fa; color: #2c3e50; }
+        .status-badge { padding: 5px 10px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+        .status-pending { background: #ffeaa7; color: #d35400; }
+        .status-processing { background: #81ecec; color: #00cec9; }
+        .status-completed { background: #55efc4; color: #00b894; }
+        .action-link { color: #d63031; text-decoration: none; font-size: 14px; font-weight: bold; }
+        .action-link:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
-    <div class="navbar">
-        <a href="/" class="home-btn">🏠 View Live Site</a>
-        <span>Admin Dashboard</span>
-        <a href="/logout" style="color: #e74c3c;">Logout</a>
-    </div>
-
     <div class="container">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <h2>Overview</h2>
-            <a href="/admin" class="action-btn btn-blue">+ Upload Movie</a>
+        <div class="header">
+            <h1>Admin Control Panel</h1>
+            <div>
+                <a href="/admin/reset_jobs" class="btn-reset">🔄 Reset Stuck Jobs</a>
+                <a href="/admin" class="btn-upload">➕ Upload Subtitles</a>
+            </div>
         </div>
 
         <div class="stats-grid">
             <div class="stat-card">
                 <h3>Total Visitors</h3>
-                <p>{{ visitors }}</p>
-            </div>
-            <div class="stat-card">
-                <h3>Total Subtitles</h3>
-                <p>{{ total_subtitles }}</p>
+                <div class="value">{{ visitors }}</div>
             </div>
             <div class="stat-card">
                 <h3>Total Downloads</h3>
-                <p>{{ downloads }}</p>
+                <div class="value">{{ downloads }}</div>
             </div>
             <div class="stat-card">
-                <h3>Top Language</h3>
-                <p style="font-size: 1.5rem; margin-top: 15px;">{{ popular_lang[0] | upper if popular_lang else 'None' }}</p>
+                <h3>Total Translations</h3>
+                <div class="value">{{ total_subtitles }}</div>
+            </div>
+            <div class="stat-card">
+                <h3>Most Popular Lang</h3>
+                <div class="value">{{ popular_lang[0].upper() if popular_lang else 'N/A' }}</div>
             </div>
         </div>
 
-        <h3>⚙️ Live Translation Queue</h3>
-        <div class="table-responsive">
+        <div class="section">
+            <h2>Translation Queue & Status</h2>
             <table>
                 <tr>
-                    <th>Movie</th>
-                    <th>Language</th>
+                    <th>Movie / Episode</th>
+                    <th>Target Lang</th>
                     <th>Status</th>
                     <th>Action</th>
                 </tr>
                 {% for job in jobs %}
                 <tr>
-                    <td>{{ job.movie.title }}</td>
-                    <td>{{ job.language | upper }}</td>
+                    <td>{{ job.movie.title }} {% if job.movie.media_type == 'series' %}(S{{ job.movie.season }} E{{ job.movie.episode }}){% endif %}</td>
+                    <td><b>{{ job.language.upper() }}</b></td>
                     <td>
-                        {% if job.status == 'Processing' %}<span style="color: #f39c12; font-weight:bold;">⏳ Processing</span>
-                        {% elif job.status == 'Completed' %}<span style="color: #27ae60; font-weight:bold;">✅ Completed</span>
-                        {% elif job.status == 'Failed' %}<span style="color: #e74c3c; font-weight:bold;">❌ Failed</span>
-                        {% else %}<span style="color: #95a5a6; font-weight:bold;">🕒 Pending</span>{% endif %}
+                        <span class="status-badge 
+                            {% if job.status == 'Pending' %}status-pending
+                            {% elif job.status == 'Processing' %}status-processing
+                            {% else %}status-completed{% endif %}">
+                            {{ job.status }}
+                        </span>
                     </td>
-                    <td>
-                        <a href="/admin/delete_job/{{ job.id }}" class="action-btn btn-red" style="padding: 4px 8px; font-size: 0.8rem;">🗑️ Delete</a>
-                    </td>
+                    <td><a href="/admin/delete_job/{{ job.id }}" class="action-link">Delete Job</a></td>
                 </tr>
                 {% endfor %}
             </table>
         </div>
 
-        <h3>📚 Movie Library</h3>
-        <div class="table-responsive">
+        <div class="section">
+            <h2>Manage Media Database</h2>
             <table>
                 <tr>
                     <th>Title</th>
-                    <th>Category</th>
+                    <th>Type</th>
+                    <th>Season / Ep</th>
                     <th>Views</th>
-                    <th>Actions</th>
+                    <th>Action</th>
                 </tr>
                 {% for media in all_media %}
                 <tr>
                     <td><b>{{ media.title }}</b></td>
-                    <td>{{ media.category }}</td>
+                    <td>{{ media.media_type.capitalize() }}</td>
+                    <td>{% if media.media_type == 'series' %}S{{ media.season }} E{{ media.episode }}{% else %}N/A{% endif %}</td>
                     <td>{{ media.views }}</td>
-                    <td style="display: flex; gap: 10px;">
-                        <a href="/admin/queue_translations/{{ media.id }}" class="action-btn btn-green">🚀 Auto-Translate</a>
-                        <a href="/delete/{{ media.id }}" class="action-btn btn-red">Delete</a>
-                    </td>
+                    <td><a href="/delete/{{ media.id }}" class="action-link">Delete Media & Files</a></td>
                 </tr>
                 {% endfor %}
             </table>
