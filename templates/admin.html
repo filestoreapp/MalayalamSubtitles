@@ -2,55 +2,69 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Admin Dashboard - Upload Subtitles</title>
+    <title>Admin Dashboard - Smart Upload</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 40px; background-color: #f4f4f9; }
-        .upload-box { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); max-width: 600px; }
-        .form-group { margin-bottom: 15px; }
-        label { display: block; font-weight: bold; margin-bottom: 5px; }
-        input[type="text"], input[type="number"], select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
-        .silent-box { background: #ffeaa7; padding: 10px; border-radius: 5px; border: 1px dashed #e1b12c; margin-top: 15px; margin-bottom: 15px; }
-        button { background-color: #0984e3; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 40px; background-color: #f4f6f9; color: #333; }
+        .upload-box { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); max-width: 700px; margin: auto; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; font-weight: bold; margin-bottom: 8px; color: #2c3e50; }
+        input[type="text"], input[type="number"], select, textarea { width: 100%; padding: 12px; border: 1px solid #dcdde1; border-radius: 6px; box-sizing: border-box; font-family: inherit; }
+        .optional-label { color: #7f8c8d; font-weight: normal; font-size: 0.85em; }
+        .silent-box { background: #fff3cd; padding: 15px; border-radius: 6px; border: 1px dashed #ffeaa7; margin: 20px 0; }
+        
+        #series-section { display: none; background: #f8f9fa; padding: 20px; border-radius: 8px; border: 1px solid #e9ecef; margin-bottom: 20px; }
+        .episode-row { display: flex; gap: 15px; margin-bottom: 12px; align-items: center; background: white; padding: 12px; border: 1px solid #dee2e6; border-radius: 6px; }
+        .episode-row input[type="number"] { width: 120px; }
+        
+        button { background-color: #0984e3; color: white; border: none; padding: 14px 20px; border-radius: 6px; cursor: pointer; font-size: 16px; width: 100%; font-weight: bold; transition: background 0.3s; }
         button:hover { background-color: #74b9ff; }
+        .btn-add { background-color: #27ae60; width: auto; font-size: 14px; padding: 10px 20px; margin-top: 10px; }
+        .btn-add:hover { background-color: #2ecc71; }
+        
+        .header-link { display: inline-block; margin-bottom: 20px; color: #0984e3; text-decoration: none; font-weight: bold; }
+        .header-link:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
 
     <div class="upload-box">
-        <h2>🎬 Upload New Subtitle</h2>
+        <a href="/dashboard" class="header-link">← Back to Dashboard</a>
+        <h2 style="margin-top: 0; color: #2c3e50;">🎬 Advanced Smart Upload</h2>
+        
         <form action="/admin" method="POST" enctype="multipart/form-data">
             
             <div class="form-group">
                 <label>Title:</label>
-                <input type="text" name="title" placeholder="e.g., Tell Me Lies" required>
+                <input type="text" name="title" placeholder="e.g., The Matrix" required>
             </div>
 
             <div class="form-group">
                 <label>Media Type:</label>
-                <select name="media_type" required>
+                <select name="media_type" id="media-type-select" required onchange="toggleMediaMode()">
                     <option value="movie">Movie</option>
-                    <option value="series">TV Series</option>
+                    <option value="series">TV Series (Batch Upload)</option>
                 </select>
             </div>
 
             <div class="form-group">
-                <label>Season Number (Leave blank for movies):</label>
-                <input type="number" name="season" placeholder="e.g., 1">
+                <label>Plot Summary <span class="optional-label">(Optional)</span></label>
+                <textarea name="plot" rows="3" placeholder="A brief description of the movie or show..."></textarea>
             </div>
-
-            <div class="form-group">
-                <label>Episode Number (Leave blank for movies):</label>
-                <input type="number" name="episode" placeholder="e.g., 10">
-            </div>
-
-            <div class="form-group">
-                <label>Rating (Out of 10):</label>
-                <input type="text" name="rating" placeholder="e.g., 7.1" required>
+            
+            <div class="form-group" style="display: flex; gap: 15px;">
+                <div style="flex: 1;">
+                    <label>Rating (Out of 10):</label>
+                    <input type="text" name="rating" placeholder="e.g., 8.5" required>
+                </div>
+                <div style="flex: 1;">
+                    <label>Runtime <span class="optional-label">(Optional)</span></label>
+                    <input type="text" name="runtime" placeholder="e.g., 2h 15m">
+                </div>
             </div>
 
             <div class="form-group">
                 <label>Category/Genre (Comma separated):</label>
-                <input type="text" name="category" placeholder="e.g., Drama, Thriller" required>
+                <input type="text" name="category" placeholder="e.g., Action, Sci-Fi" required>
             </div>
 
             <div class="form-group">
@@ -58,21 +72,65 @@
                 <input type="text" name="poster_url" placeholder="https://..." required>
             </div>
 
-            <div class="form-group">
+            <div class="form-group" id="movie-section">
                 <label>Upload English .SRT File:</label>
-                <input type="file" name="file" accept=".srt" required>
+                <input type="file" name="files[]" accept=".srt">
+            </div>
+
+            <div id="series-section">
+                <div class="form-group">
+                    <label>Season Number:</label>
+                    <input type="number" name="season" placeholder="e.g., 1" id="season-input">
+                </div>
+                
+                <label>Episodes & Subtitles:</label>
+                <div id="episode-container">
+                    <div class="episode-row">
+                        <input type="number" name="episodes[]" placeholder="Ep 1">
+                        <input type="file" name="files[]" accept=".srt">
+                    </div>
+                </div>
+                <button type="button" class="btn-add" onclick="addEpisodeRow()">➕ Add Another Episode</button>
             </div>
 
             <div class="form-group silent-box">
-                <label style="color: #d63031; cursor: pointer;">
-                    <input type="checkbox" name="silent_upload" value="yes"> 
-                    🤫 <b>Silent Upload</b> (Check this to translate without posting to Telegram)
+                <label style="color: #d63031; cursor: pointer; margin: 0;">
+                    <input type="checkbox" name="silent_upload" value="yes" style="width: auto;"> 
+                    🤫 <b>Silent Upload</b> (Translate in background without posting to Telegram)
                 </label>
             </div>
 
-            <button type="submit">Upload & Start Translation</button>
+            <button type="submit">Upload & Start Processing</button>
         </form>
     </div>
 
+    <script>
+        function toggleMediaMode() {
+            const mediaType = document.getElementById('media-type-select').value;
+            const movieSection = document.getElementById('movie-section');
+            const seriesSection = document.getElementById('series-section');
+            
+            if (mediaType === 'series') {
+                movieSection.style.display = 'none';
+                seriesSection.style.display = 'block';
+            } else {
+                movieSection.style.display = 'block';
+                seriesSection.style.display = 'none';
+            }
+        }
+
+        function addEpisodeRow() {
+            const container = document.getElementById('episode-container');
+            const rowCount = container.children.length + 1;
+            
+            const newRow = document.createElement('div');
+            newRow.className = 'episode-row';
+            newRow.innerHTML = `
+                <input type="number" name="episodes[]" placeholder="Ep ${rowCount}">
+                <input type="file" name="files[]" accept=".srt">
+            `;
+            container.appendChild(newRow);
+        }
+    </script>
 </body>
 </html>
