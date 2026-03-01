@@ -246,46 +246,56 @@ def admin():
         if silent_upload == 'yes':
             category_string += ", SilentMode"
             
+        # --- BATCH UPLOAD LOGIC FIX ---
         files = request.files.getlist('files[]')
         episodes = request.form.getlist('episodes[]')
         
-        for i, srt_file in enumerate(files):
-            if srt_file and srt_file.filename:
-                content = srt_file.read().decode('utf-8', errors='ignore')
-                storage_data = content 
-                
-                if s3_client and r2_bucket:
-                    safe_title = title.replace(" ", "_").replace("/", "").lower()
-                    ep_tag = f"_s{season}e{episodes[i]}" if media_type == 'series' else ""
-                    r2_filename = f"english_{safe_title}{ep_tag}_{os.urandom(4).hex()}.srt"
-                    try:
-                        s3_client.put_object(
-                            Bucket=r2_bucket, Key=r2_filename,
-                            Body=content.encode('utf-8'), ContentType='application/x-subrip'
-                        )
-                        storage_data = f"{r2_public_url}/{r2_filename}"
-                    except Exception as e:
-                        print(f"R2 Upload Failed: {e}")
+        # 1. CLEAN THE LISTS: Remove hidden empty inputs from the HTML form
+        valid_files = [f for f in files if f and f.filename]
+        valid_episodes = [ep for ep in episodes if ep.strip()]
+        
+        for i, srt_file in enumerate(valid_files):
+            content = srt_file.read().decode('utf-8', errors='ignore')
+            storage_data = content 
+            
+            # 2. SAFELY get the episode number so it never goes out of range
+            ep_str = valid_episodes[i] if i < len(valid_episodes) else str(i+1)
+            
+            # UPLOAD TO CLOUDFLARE R2
+            if s3_client and r2_bucket:
+                safe_title = title.replace(" ", "_").replace("/", "").lower()
+                ep_tag = f"_s{season}e{ep_str}" if media_type == 'series' else ""
+                r2_filename = f"english_{safe_title}{ep_tag}_{os.urandom(4).hex()}.srt"
+                try:
+                    s3_client.put_object(
+                        Bucket=r2_bucket, Key=r2_filename,
+                        Body=content.encode('utf-8'), ContentType='application/x-subrip'
+                    )
+                    storage_data = f"{r2_public_url}/{r2_filename}"
+                except Exception as e:
+                    print(f"R2 Upload Failed: {e}")
 
-                current_ep = int(episodes[i]) if media_type == 'series' and i < len(episodes) and episodes[i] else None
+            current_ep = int(ep_str) if media_type == 'series' else None
 
-                new_media = Movie(
-                    media_type=media_type, title=title, 
-                    season=int(season) if season and media_type == 'series' else None,
-                    episode=current_ep, 
-                    rating=rating, poster_url=poster_url, english_srt=storage_data, 
-                    category=category_string, plot=plot, runtime=runtime
-                )
-                db.session.add(new_media)
-                db.session.commit()
+            new_media = Movie(
+                media_type=media_type, title=title, 
+                season=int(season) if season and media_type == 'series' else None,
+                episode=current_ep, 
+                rating=rating, poster_url=poster_url, english_srt=storage_data, 
+                category=category_string, plot=plot, runtime=runtime
+            )
+            db.session.add(new_media)
+            db.session.commit()
 
-                for lang in ['ml', 'ta', 'hi']:
-                    new_job = TranslationJob(movie_id=new_media.id, language=lang, status='Pending')
-                    db.session.add(new_job)
-                db.session.commit()
+            for lang in ['ml', 'ta', 'hi']:
+                new_job = TranslationJob(movie_id=new_media.id, language=lang, status='Pending')
+                db.session.add(new_job)
+            db.session.commit()
 
-        try: requests.get("https://malayalamsub-malayalamsubs.hf.space/start-worker", timeout=5)
-        except Exception: pass
+        try: 
+            requests.get("https://malayalamsub-malayalamsubs.hf.space/start-worker", timeout=5)
+        except Exception: 
+            pass
 
         return redirect(url_for('dashboard'))
     return render_template('admin.html')
@@ -336,4 +346,4 @@ def trigger_telegram(movie_id):
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
-    
+            
