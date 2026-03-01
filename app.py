@@ -241,12 +241,12 @@ def admin():
         year = request.form.get('year')
         rating = request.form.get('rating')
         poster_url = request.form.get('poster_url') 
-        silent_upload = request.form.get('silent_upload') # <-- NEW: Catch the checkbox
+        silent_upload = request.form.get('silent_upload') 
         
         categories = request.form.getlist('category')
         category_string = ", ".join(categories)
         
-        # --- NEW: THE SECRET TAG TRICK ---
+        # --- THE SECRET TAG TRICK ---
         if silent_upload == 'yes':
             category_string += ", SilentMode"
             
@@ -279,13 +279,13 @@ def admin():
             db.session.add(new_media)
             db.session.commit()
 
-            # --- NEW: AUTO-QUEUE TRANSLATIONS ---
+            # --- AUTO-QUEUE TRANSLATIONS ---
             for lang in ['ml', 'ta', 'hi']:
                 new_job = TranslationJob(movie_id=new_media.id, language=lang, status='Pending')
                 db.session.add(new_job)
             db.session.commit()
 
-            # --- NEW: WAKE UP HUGGING FACE AUTOMATICALLY ---
+            # --- WAKE UP HUGGING FACE AUTOMATICALLY ---
             try:
                 hf_url = "https://malayalamsub-malayalamsubs.hf.space/start-worker"
                 requests.get(hf_url, timeout=10)
@@ -295,7 +295,76 @@ def admin():
             return redirect(url_for('dashboard'))
     return render_template('admin.html')
 
+# =====================================================================
+# --- NEW: THE SECURE RENDER RELAY FOR TELEGRAM ---
+# =====================================================================
+@app.route('/api/trigger_telegram/<int:movie_id>', methods=['POST'])
+def trigger_telegram(movie_id):
+    # 1. SECURITY: Check for the secret password in the URL
+    if request.args.get('secret') != 'malayalam_super_secret_999':
+        return "Unauthorized", 401
+
+    # Grab the Telegram secrets from Render's Environment Variables
+    TELEGRAM_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
+    CHANNEL_ID = os.environ.get('TELEGRAM_CHANNEL_ID')
+
+    movie = Movie.query.get_or_404(movie_id)
+    
+    # 2. SILENT BYPASS
+    if movie.category and "SilentMode" in movie.category:
+        return "Silent Mode Active - No Post", 200
+
+    if not TELEGRAM_TOKEN or not CHANNEL_ID:
+        return "Missing Telegram Secrets on Render", 400
+
+    clean_category = movie.category.replace(", SilentMode", "").replace("SilentMode", "")
+    tags = " ".join([f"#{t.strip().replace(' ', '_')}" for t in clean_category.split(',') if t.strip()]) if clean_category else "#General"
+    
+    website_base_url = "https://malayalamsubtitles.onrender.com"
+    
+    footer = (
+        f"\n\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"📢 **Join Channel:** @malayalam_sub1\n"
+        f"💬 **Request Subtitles:** @Subrequest_bot"
+    )
+    
+    if movie.media_type == 'series':
+        caption = (f"📺 **{movie.title}** - New Episode!\n\n"
+                   f"🔢 **Season {movie.season or 1} - Episode {movie.episode or 1}**\n"
+                   f"⭐️ **Rating:** {movie.rating} / 10\n"
+                   f"🎭 **Category:** {tags}\n\n"
+                   f"✅ **Subtitles Ready:** Malayalam, Tamil, Hindi\n"
+                   f"⚡️ *High-Speed Download*\n\n"
+                   f"👇 **Get the episode here:**{footer}")
+        button_url = f"{website_base_url}/series/{movie.title.replace(' ', '%20')}/{movie.season or 1}"
+    else:
+        caption = (f"🎬 **{movie.title}**\n\n"
+                   f"⭐️ **Rating:** {movie.rating} / 10\n"
+                   f"🎭 **Category:** {tags}\n\n"
+                   f"✅ **Subtitles Ready:** Malayalam, Tamil, Hindi\n"
+                   f"⚡️ *High-Speed Download*\n\n"
+                   f"👇 **Get the movie here:**{footer}")
+        button_url = f"{website_base_url}/movie/{movie.id}"
+
+    try:
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto"
+        payload = {
+            "chat_id": CHANNEL_ID,
+            "photo": movie.poster_url,
+            "caption": caption,
+            "parse_mode": "Markdown",
+            "reply_markup": {"inline_keyboard": [[{"text": "📥 Download Subtitles", "url": button_url}]]}
+        }
+        response = requests.post(url, json=payload)
+        
+        if response.status_code == 200:
+            return "Posted to Telegram Successfully!", 200
+        else:
+            return f"Telegram API Error: {response.text}", 500
+            
+    except Exception as e:
+        return str(e), 500
+
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
-    
