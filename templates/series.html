@@ -2,54 +2,155 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ title }} - Season {{ season }} Subtitles</title>
-    <meta property="og:title" content="📺 Download {{ title }} - Season {{ season }}">
-    <meta property="og:description" content="Get subtitles for all episodes in Season {{ season }} of {{ title }}.">
-    <meta property="og:image" content="{{ show_data.poster_url }}">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     
+    <title>{{ title }} - Season {{ season }} Subtitles | Malayalam Subtitles Hub</title>
+    <meta name="description" content="Download Malayalam subtitles for {{ title }} Season {{ season }}. {{ show_data.plot[:100] + '...' if show_data.plot else 'Complete season subtitle pack.' }}">
+    <meta name="theme-color" content="#090e17">
+
     <style>
-        body { font-family: Arial, sans-serif; background: #141414; color: white; margin: 0; padding: 0; }
-        .navbar { background: #000; padding: 15px 20px; display: flex; align-items: center; position: sticky; top: 0; z-index: 1000; border-bottom: 1px solid #333; }
-        .navbar a { color: white; text-decoration: none; font-weight: bold; }
-        .home-btn { background: #e50914; padding: 8px 15px; border-radius: 5px; }
+        :root {
+            --bg-base: #090e17; 
+            --text-main: #ffffff;
+            --text-muted: #8b96a5;
+            --accent: #3b82f6;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            margin: 0; padding: 0; padding-bottom: 50px;
+        }
+
+        /* --- CINEMATIC HERO --- */
+        .hero-backdrop {
+            position: relative; width: 100%; height: 50vh; min-height: 350px;
+            display: flex; align-items: flex-end;
+        }
+        .hero-backdrop img {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            object-fit: cover; object-position: top; z-index: -2; opacity: 0.5;
+        }
+        .hero-gradient {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(to top, var(--bg-base) 0%, rgba(9, 14, 23, 0.4) 50%, transparent 100%);
+            z-index: -1;
+        }
+
+        .top-nav {
+            position: absolute; top: 20px; left: 20px;
+            z-index: 10;
+        }
+        .back-btn {
+            background: rgba(0,0,0,0.5); backdrop-filter: blur(10px);
+            color: white; text-decoration: none; width: 40px; height: 40px;
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-size: 20px; border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .movie-info { padding: 0 20px; position: relative; z-index: 5; margin-top: -50px; }
         
-        .container { padding: 20px; max-width: 800px; margin: auto; text-align: center; }
-        .poster { width: 100%; max-width: 250px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); margin-bottom: 20px; }
+        .movie-title {
+            font-size: 28px; font-weight: 800; margin: 0 0 5px 0; text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+        }
+        .season-badge {
+            display: inline-block; background: white; color: black; font-weight: 800;
+            padding: 4px 10px; border-radius: 4px; font-size: 12px; margin-bottom: 15px;
+        }
+
+        .meta-row {
+            display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
+            font-size: 13px; color: var(--text-muted); margin-bottom: 15px; font-weight: 600;
+        }
+        .rating-badge { background: rgba(255,255,255,0.1); color: white; padding: 3px 8px; border-radius: 6px; }
+        .star { color: #fbbf24; }
+
+        .plot-section {
+            font-size: 14px; color: #cbd5e1; line-height: 1.6; margin-bottom: 30px;
+            background: rgba(255,255,255,0.02); padding: 15px; border-radius: 12px; border-left: 3px solid var(--accent);
+        }
+
+        /* --- EPISODES LIST --- */
+        .section-title { font-size: 18px; font-weight: 700; margin: 0 0 15px 0; }
+
+        .episode-card {
+            background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 12px; padding: 15px; margin-bottom: 15px;
+        }
         
-        /* Episode List Styling */
-        .ep-list { display: flex; flex-direction: column; gap: 10px; margin-top: 30px; text-align: left; }
-        .ep-card { background: #222; padding: 15px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid #e50914; text-decoration: none; color: white; transition: background 0.2s;}
-        .ep-card:hover { background: #333; }
-        .ep-num { font-size: 1.2rem; font-weight: bold; color: #e50914; width: 50px; }
-        .ep-title { flex: 1; font-weight: bold; }
-        .ep-btn { background: #444; padding: 8px 15px; border-radius: 4px; font-size: 0.85rem; }
+        .ep-header {
+            display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;
+            border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 10px;
+        }
+        .ep-title { font-size: 16px; font-weight: bold; margin: 0; }
+        
+        /* Language Download Pills */
+        .lang-pills { display: flex; flex-wrap: wrap; gap: 8px; }
+        
+        .lang-pill {
+            background: rgba(255,255,255,0.1); color: white; text-decoration: none;
+            padding: 8px 15px; border-radius: 20px; font-size: 13px; font-weight: 600;
+            display: flex; align-items: center; gap: 5px;
+        }
+        .lang-pill.ready { background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.5); }
+        .lang-pill::before { content: '📥'; font-size: 12px; }
+
     </style>
 </head>
 <body>
-    <div class="navbar">
-        <a href="/" class="home-btn">🏠 Home</a>
+
+    <div class="hero-backdrop">
+        <div class="top-nav"><a href="/" class="back-btn">←</a></div>
+        <img src="{{ show_data.poster_url }}" alt="{{ title }}">
+        <div class="hero-gradient"></div>
     </div>
 
-    <div class="container">
-        <h1>{{ title }}</h1>
-        <h2 style="color: #aaa; margin-top: -10px;">Season {{ season }}</h2>
+    <div class="movie-info">
+        <h1 class="movie-title">{{ title }}</h1>
+        <div class="season-badge">SEASON {{ season }}</div>
         
-        <img src="{{ show_data.poster_url }}" alt="Poster" class="poster" loading="lazy">
-        
-        <p style="color: #aaa;">⭐ {{ show_data.rating }} | 🍿 {{ show_data.category }}</p>
-
-        <div class="ep-list">
-            <h3 style="border-bottom: 1px solid #333; padding-bottom: 10px;">All Episodes</h3>
-            
-            {% for ep in episodes %}
-            <a href="/movie/{{ ep.id }}" class="ep-card">
-                <div class="ep-num">E{{ ep.episode }}</div>
-                <div class="ep-title">{{ title }}</div>
-                <div class="ep-btn">Get Subs &rarr;</div>
-            </a>
-            {% endfor %}
+        <div class="meta-row">
+            <span class="rating-badge"><span class="star">★</span> {{ show_data.rating }}</span>
+            <span>{{ show_data.year if show_data.year else 'N/A' }}</span>
+            {% if show_data.runtime %}<span>• &nbsp;⏱ {{ show_data.runtime }}</span>{% endif %}
         </div>
+
+        {% if show_data.plot %}
+        <div class="plot-section">
+            {{ show_data.plot }}
+        </div>
+        {% endif %}
+
+        <h2 class="section-title">Episodes</h2>
+        
+        {% for ep in episodes %}
+        <div class="episode-card">
+            <div class="ep-header">
+                <h3 class="ep-title">Episode {{ ep.episode }}</h3>
+            </div>
+            
+            <div class="lang-pills">
+                <a href="/download/{{ ep.id }}/en" class="lang-pill">English</a>
+                
+                {% set ep_ready_langs = ep.translations|map(attribute='language')|list %}
+                
+                {% if 'ml' in ep_ready_langs %}
+                <a href="/download/{{ ep.id }}/ml" class="lang-pill ready">Malayalam</a>
+                {% endif %}
+                
+                {% if 'ta' in ep_ready_langs %}
+                <a href="/download/{{ ep.id }}/ta" class="lang-pill ready">Tamil</a>
+                {% endif %}
+                
+                {% if 'hi' in ep_ready_langs %}
+                <a href="/download/{{ ep.id }}/hi" class="lang-pill ready">Hindi</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+
     </div>
+
 </body>
 </html>
