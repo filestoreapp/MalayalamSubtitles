@@ -324,6 +324,7 @@ def admin():
     return render_template('admin.html')
 
 # --- SECURE RENDER RELAY FOR TELEGRAM (BULLETPROOF VERSION) ---
+# --- SECURE RENDER RELAY FOR TELEGRAM (BULLETPROOF VERSION) ---
 @app.route('/api/trigger_telegram/<int:movie_id>', methods=['GET', 'POST'])
 def trigger_telegram(movie_id):
     if request.args.get('secret') != 'malayalam_super_secret_999':
@@ -345,20 +346,45 @@ def trigger_telegram(movie_id):
     tags = " ".join([f"#{t.strip().replace(' ', '_')}" for t in clean_category.split(',') if t.strip()]) if clean_category.strip() else "#General"
     
     website_base_url = "https://malayalamsubtitles.onrender.com"
-    footer = f"\n\n━━━━━━━━━━━━━━━━━━━━\n📢 **Join Channel:** @malayalam_sub1\n💬 **Request Subtitles:** @Subrequest_bot"
+    footer = f"\n\n━━━━━━━━━━━━━━━━━━━━\n📢 *Join Channel:* @malayalam\\_sub1\n💬 *Request Subtitles:* @Subrequest\\_bot"
     
     safe_title = movie.title if movie.title else "Unknown Title"
     safe_rating = movie.rating if movie.rating else "N/A"
     
+    # --- NEW: Add Safe Runtime and Plot ---
+    runtime_text = f"⏱ *Runtime:* {movie.runtime}\n" if movie.runtime else ""
+    
+    safe_plot = ""
+    if movie.plot:
+        # Strip markdown characters so they don't crash Telegram
+        clean_plot = movie.plot.replace("*", "").replace("_", "").replace("`", "")
+        # Trim to 250 characters to stay safely under Telegram's caption limit
+        safe_plot = clean_plot[:250] + "..." if len(clean_plot) > 250 else clean_plot
+        safe_plot = f"📖 *Plot:* {safe_plot}\n\n"
+    
+    # --- UPDATED CAPTION LAYOUT ---
     if movie.media_type == 'series':
-        caption = (f"📺 **{safe_title}** - New Episode!\n\n🔢 **Season {movie.season or 1} - Episode {movie.episode or 1}**\n"
-                   f"⭐️ **Rating:** {safe_rating} / 10\n🎭 **Category:** {tags}\n\n✅ **Subtitles Ready:** Malayalam, Tamil, Hindi\n"
-                   f"⚡️ *High-Speed Download*\n\n👇 **Get the episode here:**{footer}")
+        caption = (f"📺 *{safe_title}* - New Episode!\n\n"
+                   f"🔢 *Season {movie.season or 1} - Episode {movie.episode or 1}*\n"
+                   f"⭐️ *Rating:* {safe_rating} / 10\n"
+                   f"{runtime_text}"
+                   f"🎭 *Category:* {tags}\n\n"
+                   f"{safe_plot}"
+                   f"✅ *Subtitles Ready:* Malayalam, Tamil, Hindi\n"
+                   f"⚡️ *High-Speed Download*\n\n"
+                   f"👇 *Get the episode here:*{footer}")
+        import urllib.parse
         encoded_title = urllib.parse.quote(safe_title)
         button_url = f"{website_base_url}/series/{encoded_title}/{movie.season or 1}"
     else:
-        caption = (f"🎬 **{safe_title}**\n\n⭐️ **Rating:** {safe_rating} / 10\n🎭 **Category:** {tags}\n\n"
-                   f"✅ **Subtitles Ready:** Malayalam, Tamil, Hindi\n⚡️ *High-Speed Download*\n\n👇 **Get the movie here:**{footer}")
+        caption = (f"🎬 *{safe_title}*\n\n"
+                   f"⭐️ *Rating:* {safe_rating} / 10\n"
+                   f"{runtime_text}"
+                   f"🎭 *Category:* {tags}\n\n"
+                   f"{safe_plot}"
+                   f"✅ *Subtitles Ready:* Malayalam, Tamil, Hindi\n"
+                   f"⚡️ *High-Speed Download*\n\n"
+                   f"👇 *Get the movie here:*{footer}")
         button_url = f"{website_base_url}/movie/{movie.id}"
 
     try:
@@ -372,7 +398,6 @@ def trigger_telegram(movie_id):
         }
         response = requests.post(url, json=payload)
         
-        # --- FIXED RETURN STATEMENT ---
         if response.status_code == 200:
             return "Posted to Telegram Successfully!", 200
         else:
@@ -380,8 +405,13 @@ def trigger_telegram(movie_id):
             
     except Exception as e:
         return str(e), 500
+        
+        
+        # --- FIXED RETURN STATEMENT ---
+        
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
     
+
