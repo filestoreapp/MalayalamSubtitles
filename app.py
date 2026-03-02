@@ -2,6 +2,7 @@ import os
 import io
 import requests
 import boto3
+import urllib.parse
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, send_file, jsonify, session
 from flask_sqlalchemy import SQLAlchemy
@@ -235,6 +236,7 @@ def admin():
         media_type = request.form.get('media_type')
         title = request.form.get('title')
         season = request.form.get('season')
+        year = request.form.get('year')           
         rating = request.form.get('rating')
         poster_url = request.form.get('poster_url') 
         silent_upload = request.form.get('silent_upload') 
@@ -246,11 +248,10 @@ def admin():
         if silent_upload == 'yes':
             category_string += ", SilentMode"
             
-        # --- BATCH UPLOAD LOGIC FIX ---
+        # --- BATCH UPLOAD LOGIC ---
         files = request.files.getlist('files[]')
         episodes = request.form.getlist('episodes[]')
         
-        # 1. CLEAN THE LISTS: Remove hidden empty inputs from the HTML form
         valid_files = [f for f in files if f and f.filename]
         valid_episodes = [ep for ep in episodes if ep.strip()]
         
@@ -258,10 +259,8 @@ def admin():
             content = srt_file.read().decode('utf-8', errors='ignore')
             storage_data = content 
             
-            # 2. SAFELY get the episode number so it never goes out of range
             ep_str = valid_episodes[i] if i < len(valid_episodes) else str(i+1)
             
-            # UPLOAD TO CLOUDFLARE R2
             if s3_client and r2_bucket:
                 safe_title = title.replace(" ", "_").replace("/", "").lower()
                 ep_tag = f"_s{season}e{ep_str}" if media_type == 'series' else ""
@@ -280,7 +279,7 @@ def admin():
             new_media = Movie(
                 media_type=media_type, title=title, 
                 season=int(season) if season and media_type == 'series' else None,
-                episode=current_ep, 
+                episode=current_ep, year=year, 
                 rating=rating, poster_url=poster_url, english_srt=storage_data, 
                 category=category_string, plot=plot, runtime=runtime
             )
@@ -300,7 +299,7 @@ def admin():
         return redirect(url_for('dashboard'))
     return render_template('admin.html')
 
-# --- NEW: SECURE RENDER RELAY FOR TELEGRAM ---
+# --- SECURE RENDER RELAY FOR TELEGRAM (BULLETPROOF VERSION) ---
 @app.route('/api/trigger_telegram/<int:movie_id>', methods=['POST'])
 def trigger_telegram(movie_id):
     if request.args.get('secret') != 'malayalam_super_secret_999':
@@ -310,40 +309,54 @@ def trigger_telegram(movie_id):
     CHANNEL_ID = os.environ.get('TELEGRAM_CHANNEL_ID')
     movie = Movie.query.get_or_404(movie_id)
     
-    if movie.category and "SilentMode" in movie.category:
+    raw_category = movie.category if movie.category else "General"
+    
+    if "SilentMode" in raw_category:
         return "Silent Mode Active - No Post", 200
 
     if not TELEGRAM_TOKEN or not CHANNEL_ID:
         return "Missing Telegram Secrets on Render", 400
 
-    clean_category = movie.category.replace(", SilentMode", "").replace("SilentMode", "")
-    tags = " ".join([f"#{t.strip().replace(' ', '_')}" for t in clean_category.split(',') if t.strip()]) if clean_category else "#General"
+    clean_category = raw_category.replace(", SilentMode", "").replace("SilentMode", "")
+    tags = " ".join([f"#{t.strip().replace(' ', '_')}" for t in clean_category.split(',') if t.strip()]) if clean_category.strip() else "#General"
     
     website_base_url = "https://malayalamsubtitles.onrender.com"
     footer = f"\n\n━━━━━━━━━━━━━━━━━━━━\n📢 **Join Channel:** @malayalam_sub1\n💬 **Request Subtitles:** @Subrequest_bot"
     
+    safe_title = movie.title if movie.title else "Unknown Title"
+    safe_rating = movie.rating if movie.rating else "N/A"
+    
     if movie.media_type == 'series':
-        caption = (f"📺 **{movie.title}** - New Episode!\n\n🔢 **Season {movie.season or 1} - Episode {movie.episode or 1}**\n"
-                   f"⭐️ **Rating:** {movie.rating} / 10\n🎭 **Category:** {tags}\n\n✅ **Subtitles Ready:** Malayalam, Tamil, Hindi\n"
+        caption = (f"📺 **{safe_title}** - New Episode!\n\n🔢 **Season {movie.season or 1} - Episode {movie.episode or 1}**\n"
+                   f"⭐️ **Rating:** {safe_rating} / 10\n🎭 **Category:** {tags}\n\n✅ **Subtitles Ready:** Malayalam, Tamil, Hindi\n"
                    f"⚡️ *High-Speed Download*\n\n👇 **Get the episode here:**{footer}")
-        button_url = f"{website_base_url}/series/{movie.title.replace(' ', '%20')}/{movie.season or 1}"
+        encoded_title = urllib.parse.quote(safe_title)
+        button_url = f"{website_base_url}/series/{encoded_title}/{movie.season or 1}"
     else:
-        caption = (f"🎬 **{movie.title}**\n\n⭐️ **Rating:** {movie.rating} / 10\n🎭 **Category:** {tags}\n\n"
+        caption = (f"🎬 **{safe_title}**\n\n⭐️ **Rating:** {safe_rating} / 10\n🎭 **Category:** {tags}\n\n"
                    f"✅ **Subtitles Ready:** Malayalam, Tamil, Hindi\n⚡️ *High-Speed Download*\n\n👇 **Get the movie here:**{footer}")
         button_url = f"{website_base_url}/movie/{movie.id}"
 
     try:
         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto"
         payload = {
-            "chat_id": CHANNEL_ID, "photo": movie.poster_url, "caption": caption,
-            "parse_mode": "Markdown", "reply_markup": {"inline_keyboard": [[{"text": "📥 Download Subtitles", "url": button_url}]]}
+            "chat_id": CHANNEL_ID, 
+            "photo": movie.poster_url if movie.poster_url else "https://via.placeholder.com/500x750?text=No+Poster", 
+            "caption": caption,
+            "parse_mode": "Markdown", 
+            "reply_markup": {"inline_keyboard": [[{"text": "📥 Download Subtitles", "url": button_url}]]}
         }
         response = requests.post(url, json=payload)
-        return "Posted to Telegram Successfully!", 200 if response.status_code == 200 else f"Telegram API Error: {response.text}", 500
+        
+        # --- FIXED RETURN STATEMENT ---
+        if response.status_code == 200:
+            return "Posted to Telegram Successfully!", 200
+        else:
+            return f"Telegram API Error: {response.text}", 500
+            
     except Exception as e:
         return str(e), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
-            
