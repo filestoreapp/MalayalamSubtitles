@@ -3,146 +3,359 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    
-    <title>Malayalam Subtitle Hub | Download ML, TA, HI Subs</title>
-    <meta name="description" content="Download high-quality Malayalam, Tamil, and Hindi subtitles for the latest movies and series.">
-    <meta name="keywords" content="Malayalam subtitles, Tamil subtitles, Hindi subtitles, SRT download, movies">
-    <meta property="og:title" content="🎬 Malayalam Subtitle Hub">
-    <meta property="og:description" content="Get the latest subtitles for your favorite movies and TV shows.">
-    
+    <title>Malayalam Subtitles Hub</title>
     <style>
-        body { font-family: Arial, sans-serif; background: #141414; color: white; margin: 0; padding: 0; }
-        .navbar { background: #000; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 1000; border-bottom: 1px solid #333; }
-        .navbar a { color: white; text-decoration: none; font-weight: bold; }
-        .home-btn { background: #e50914; padding: 8px 15px; border-radius: 5px; }
-        
-        .container { padding: 20px; max-width: 1200px; margin: auto; }
-        .search-bar { width: 100%; max-width: 400px; padding: 10px; border-radius: 5px; border: none; margin-bottom: 10px; }
-        .search-btn { padding: 10px 20px; background: #e50914; color: white; border: none; border-radius: 5px; width: 100%; max-width: 120px; cursor: pointer; }
-        
-        .scroll-row { display: flex; overflow-x: auto; gap: 15px; padding-bottom: 15px; -webkit-overflow-scrolling: touch; }
-        .scroll-row::-webkit-scrollbar { height: 6px; }
-        .scroll-row::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
-        
-        /* Mobile-Friendly Cards with Relative Position for Badges */
-        .movie-card { position: relative; flex: 0 0 auto; width: 140px; text-align: center; background: #222; padding: 10px; border-radius: 8px; text-decoration: none; color: white; }
-        .movie-card img { width: 100%; height: 200px; object-fit: cover; border-radius: 5px; }
-        
-        /* Series Badge Styling */
-        .ep-badge { position: absolute; top: 15px; right: 15px; background: #e50914; color: white; padding: 4px 8px; font-size: 0.75rem; font-weight: bold; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.5); }
-        
-        h2 { border-bottom: 2px solid #e50914; display: inline-block; padding-bottom: 5px; font-size: 1.2rem; margin-top: 30px;}
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --star: #fbbf24;
+        }
 
-        @media (max-width: 600px) {
-            .movie-card { width: 120px; }
-            .movie-card img { height: 170px; }
-            .search-form { display: flex; flex-direction: column; gap: 10px; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+
+        /* --- NAVBAR & HEADER --- */
+        header {
+            background-color: rgba(15, 23, 42, 0.9);
+            padding: 20px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #334155;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .search-bar form {
+            display: flex;
+            gap: 10px;
+        }
+
+        .search-bar input {
+            padding: 10px 15px;
+            border-radius: 20px;
+            border: 1px solid #334155;
+            background: #1e293b;
+            color: white;
+            width: 300px;
+            outline: none;
+        }
+
+        .search-bar button {
+            padding: 10px 20px;
+            border-radius: 20px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .search-bar button:hover {
+            background: var(--accent-hover);
+        }
+
+        /* --- MAIN CONTAINER --- */
+        .container {
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+
+        .section-title {
+            font-size: 22px;
+            border-left: 4px solid var(--accent);
+            padding-left: 10px;
+            margin-bottom: 20px;
+            color: white;
+        }
+
+        /* --- MOVIE GRID --- */
+        .movie-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 25px;
+            margin-bottom: 50px;
+        }
+
+        .movie-card {
+            background: var(--card-bg);
+            border-radius: 10px;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            position: relative;
+            text-decoration: none;
+            color: inherit;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .movie-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+        }
+
+        .poster-wrapper {
+            position: relative;
+            height: 330px;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .poster-wrapper img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: opacity 0.3s ease;
+        }
+
+        /* --- HOVER OVERLAY (Displays Plot & Runtime) --- */
+        .hover-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.9);
+            color: white;
+            padding: 20px;
+            box-sizing: border-box;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .movie-card:hover .hover-overlay {
+            opacity: 1;
+        }
+
+        .hover-plot {
+            font-size: 13px;
+            color: #cbd5e1;
+            margin-bottom: 15px;
+            display: -webkit-box;
+            -webkit-line-clamp: 6;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .hover-details {
+            font-size: 12px;
+            color: var(--accent);
+            font-weight: bold;
+        }
+
+        /* --- CARD INFO (Always visible) --- */
+        .card-info {
+            padding: 15px;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .card-title {
+            font-size: 16px;
+            font-weight: bold;
+            margin: 0 0 5px 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .card-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .card-tags {
+            font-size: 11px;
+            color: var(--text-muted);
+            background: #334155;
+            padding: 3px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        /* --- CATEGORY TAGS --- */
+        .category-nav {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 40px;
+        }
+
+        .cat-tag {
+            background: var(--card-bg);
+            color: var(--text-main);
+            padding: 8px 15px;
+            border-radius: 20px;
+            text-decoration: none;
+            font-size: 14px;
+            border: 1px solid #334155;
+            transition: background 0.3s;
+        }
+
+        .cat-tag:hover {
+            background: var(--accent);
+            border-color: var(--accent);
         }
     </style>
 </head>
 <body>
-    <div class="navbar">
-        <a href="/" class="home-btn">🏠 Home</a>
-        <a href="/login" style="color: #aaa; font-size: 0.9rem;">Admin</a>
-    </div>
+
+    <header>
+        <a href="/" class="logo">🎬 Subtitle Hub</a>
+        <div class="search-bar">
+            <form action="/" method="GET">
+                <input type="text" name="q" placeholder="Search movies or series..." value="{{ search_query }}">
+                <button type="submit">Search</button>
+            </form>
+        </div>
+    </header>
 
     <div class="container">
-        <h1>🎬 Subtitle Hub</h1>
+        
+        {% if search_query %}
+            <h2 class="section-title">Search Results for "{{ search_query }}"</h2>
+            {% if search_results %}
+                <div class="movie-grid">
+                    {% for media in search_results %}
+                        <a href="{% if media.media_type == 'series' %}/series/{{ media.title|urlencode }}/{{ media.season or 1 }}{% else %}/movie/{{ media.id }}{% endif %}" class="movie-card">
+                            <div class="poster-wrapper">
+                                <img src="{{ media.poster_url }}" alt="{{ media.title }}">
+                                
+                                <div class="hover-overlay">
+                                    <div class="hover-plot">
+                                        {{ media.plot if media.plot else "No plot summary available for this title." }}
+                                    </div>
+                                    <div class="hover-details">
+                                        {% if media.runtime %}⏱ {{ media.runtime }}<br>{% endif %}
+                                        {% if media.media_type == 'series' %}📺 TV Series - Season {{ media.season }}{% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="card-info">
+                                <div>
+                                    <h3 class="card-title">{{ media.title }}</h3>
+                                    <div class="card-meta">
+                                        <span>{{ media.year if media.year else 'N/A' }}</span>
+                                        <span>⭐ {{ media.rating }}/10</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <span class="card-tags">{{ media.category.split(',')[0] if media.category else 'General' }}</span>
+                                </div>
+                            </div>
+                        </a>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p style="color: var(--text-muted);">No subtitles found for that search. Try another title!</p>
+            {% endif %}
 
-        <form method="GET" class="search-form" style="margin-bottom: 30px;">
-            <input type="text" name="q" class="search-bar" placeholder="Search movies or series..." value="{{ search_query }}">
-            <button type="submit" class="search-btn">Search</button>
-        </form>
-
-        {% if search_results %}
-            <h2>Search Results</h2>
-            <div style="display: flex; flex-wrap: wrap; gap: 15px;">
-            {% for movie in search_results %}
-                <a href="/movie/{{ movie.id }}" class="movie-card">
-                    {% if movie.media_type == 'series' %}<div class="ep-badge">S{{ movie.season }} E{{ movie.episode }}</div>{% endif %}
-                    <img src="{{ movie.poster_url }}" alt="{{ movie.title }}" loading="lazy">
-                    <p style="font-size: 0.9rem;"><b>{{ movie.title }}</b></p>
-                </a>
-            {% endfor %}
-            </div>
         {% else %}
-            <h2>🔥 Latest Uploads</h2>
-            <div class="scroll-row">
-                {% for movie in latest_movies %}
-                <a href="/movie/{{ movie.id }}" class="movie-card">
-                    {% if movie.media_type == 'series' %}<div class="ep-badge">S{{ movie.season }} E{{ movie.episode }}</div>{% endif %}
-                    <img src="{{ movie.poster_url }}" alt="{{ movie.title }}" loading="lazy">
-                    <p style="font-size: 0.9rem;"><b>{{ movie.title }}</b></p>
-                </a>
+            
+            <div class="category-nav">
+                <span style="padding: 8px 0; color: var(--text-muted); font-weight: bold;">Browse:</span>
+                {% for cat in categories %}
+                    <a href="/?q={{ cat }}" class="cat-tag">{{ cat }}</a>
                 {% endfor %}
             </div>
 
-            <h2>⭐ Top Downloaded</h2>
-            <div class="scroll-row">
-                {% for movie in top_movies %}
-                <a href="/movie/{{ movie.id }}" class="movie-card">
-                    {% if movie.media_type == 'series' %}<div class="ep-badge">S{{ movie.season }} E{{ movie.episode }}</div>{% endif %}
-                    <img src="{{ movie.poster_url }}" alt="{{ movie.title }}" loading="lazy">
-                    <p style="font-size: 0.9rem;"><b>{{ movie.title }}</b></p>
-                </a>
-                {% endfor %}
-            </div>
-
-            {% for category in categories %}
-            <h2>🍿 {{ category }}</h2>
-            <div class="scroll-row">
-                {% for movie in all_media %}
-                    {% if movie.category and category in movie.category %}
-                    <a href="/movie/{{ movie.id }}" class="movie-card">
-                        {% if movie.media_type == 'series' %}<div class="ep-badge">S{{ movie.season }} E{{ movie.episode }}</div>{% endif %}
-                        <img src="{{ movie.poster_url }}" alt="{{ movie.title }}" loading="lazy">
-                        <p style="font-size: 0.9rem;"><b>{{ movie.title }}</b></p>
+            <h2 class="section-title">✨ Latest Additions</h2>
+            <div class="movie-grid">
+                {% for media in latest_movies %}
+                    <a href="{% if media.media_type == 'series' %}/series/{{ media.title|urlencode }}/{{ media.season or 1 }}{% else %}/movie/{{ media.id }}{% endif %}" class="movie-card">
+                        <div class="poster-wrapper">
+                            <img src="{{ media.poster_url }}" alt="{{ media.title }}">
+                            <div class="hover-overlay">
+                                <div class="hover-plot">
+                                    {{ media.plot if media.plot else "No plot summary available." }}
+                                </div>
+                                <div class="hover-details">
+                                    {% if media.runtime %}⏱ {{ media.runtime }}<br>{% endif %}
+                                    {% if media.media_type == 'series' %}📺 Season {{ media.season }}{% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-info">
+                            <div>
+                                <h3 class="card-title">{{ media.title }}</h3>
+                                <div class="card-meta">
+                                    <span>{{ media.year if media.year else 'N/A' }}</span>
+                                    <span>⭐ {{ media.rating }}/10</span>
+                                </div>
+                            </div>
+                            <div>
+                                <span class="card-tags">{{ media.category.split(',')[0] if media.category else 'General' }}</span>
+                            </div>
+                        </div>
                     </a>
-                    {% endif %}
                 {% endfor %}
             </div>
-            {% endfor %}
+
+            <h2 class="section-title">🔥 Trending Now</h2>
+            <div class="movie-grid">
+                {% for media in top_movies %}
+                    <a href="{% if media.media_type == 'series' %}/series/{{ media.title|urlencode }}/{{ media.season or 1 }}{% else %}/movie/{{ media.id }}{% endif %}" class="movie-card">
+                        <div class="poster-wrapper">
+                            <img src="{{ media.poster_url }}" alt="{{ media.title }}">
+                            <div class="hover-overlay">
+                                <div class="hover-plot">
+                                    {{ media.plot if media.plot else "No plot summary available." }}
+                                </div>
+                                <div class="hover-details">
+                                    {% if media.runtime %}⏱ {{ media.runtime }}<br>{% endif %}
+                                    {% if media.media_type == 'series' %}📺 Season {{ media.season }}{% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-info">
+                            <div>
+                                <h3 class="card-title">{{ media.title }}</h3>
+                                <div class="card-meta">
+                                    <span>{{ media.year if media.year else 'N/A' }}</span>
+                                    <span>⭐ {{ media.rating }}/10</span>
+                                </div>
+                            </div>
+                            <div>
+                                <span class="card-tags">{{ media.category.split(',')[0] if media.category else 'General' }}</span>
+                            </div>
+                        </div>
+                    </a>
+                {% endfor %}
+            </div>
         {% endif %}
 
-        <div style="margin-top: 50px; padding: 30px; background: #222; border-radius: 8px; border-top: 3px solid #e50914;">
-            <h2 style="font-size: 1.5rem; margin-top: 0; border: none;">Why Use Subtitle Hub?</h2>
-            <p style="color: #ccc; line-height: 1.6; font-size: 0.95rem;">
-                Welcome to the ultimate destination for high-quality movie and TV series subtitles. Whether you are looking for the latest <strong>Malayalam subtitles</strong>, <strong>Tamil subtitle downloads</strong>, or <strong>Hindi SRT files</strong>, we provide instantly translated, perfectly synced text files for your favorite media. 
-            </p>
-            <p style="color: #ccc; line-height: 1.6; font-size: 0.95rem;">
-                Stop searching through ad-heavy, confusing websites. Our platform guarantees secure, one-click subtitle downloads. Simply search for your movie, select your preferred regional language, and load the <code>.srt</code> file directly into VLC Player, MX Player, or your smart TV.
-            </p>
-            
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 20px;">
-                <div style="background: #111; padding: 15px; border-radius: 5px;">
-                    <h3 style="color: #e50914; font-size: 1rem; margin-top: 0;">🚀 Instant Downloads</h3>
-                    <p style="color: #999; font-size: 0.85rem; margin: 0;">No pop-ups, no wait times. Click and download your SRT files instantly.</p>
-                </div>
-                <div style="background: #111; padding: 15px; border-radius: 5px;">
-                    <h3 style="color: #e50914; font-size: 1rem; margin-top: 0;">🌍 Regional Languages</h3>
-                    <p style="color: #999; font-size: 0.85rem; margin: 0;">Specializing in South Indian cinema subtitles: Malayalam, Tamil, and Hindi.</p>
-                </div>
-                <div style="background: #111; padding: 15px; border-radius: 5px;">
-                    <h3 style="color: #e50914; font-size: 1rem; margin-top: 0;">📺 Movies & Series</h3>
-                    <p style="color: #999; font-size: 0.85rem; margin: 0;">From blockbuster Action hits to the latest Anime and Drama series episodes.</p>
-                </div>
-            </div>
-        </div>
     </div>
 
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "WebSite",
-      "name": "Malayalam Subtitle Hub",
-      "url": "https://malayalamsubtitles.onrender.com",
-      "description": "Download free perfectly synced Malayalam, Tamil, and Hindi subtitles for movies and TV series.",
-      "potentialAction": {
-        "@type": "SearchAction",
-        "target": "https://malayalamsubtitles.onrender.com/?q={search_term_string}",
-        "query-input": "required name=search_term_string"
-      }
-    }
-    </script>
 </body>
 </html>
