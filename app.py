@@ -91,25 +91,49 @@ def index():
     stat.total_visitors += 1
     db.session.commit()
     
+    # Grab the specific requests from the buttons
     search_query = request.args.get('q', '')
+    category_query = request.args.get('cat', '')
+    view_all = request.args.get('view', '')
+    
     all_media = Movie.query.order_by(Movie.id.desc()).all()
 
-    if search_query:
-        search_results = Movie.query.filter(Movie.title.ilike(f'%{search_query}%')).order_by(Movie.id.desc()).all()
-        return render_template('index.html', search_results=search_results, search_query=search_query)
-    
-    latest_movies = all_media[:5]
-    top_movies = Movie.query.order_by(Movie.views.desc()).limit(5).all()
-    
+    # Generate the category pill list
     categories_set = set()
     for movie in all_media:
         if movie.category:
             for cat in movie.category.split(','):
                 if cat.strip() and cat.strip() != "SilentMode":
                     categories_set.add(cat.strip())
-    
     categories_list = sorted(list(categories_set))
-    return render_template('index.html', latest_movies=latest_movies, top_movies=top_movies, categories=categories_list, all_media=all_media)
+
+    # Handle standard searches (Titles or Categories)
+    if search_query:
+        search_results = Movie.query.filter(
+            (Movie.title.ilike(f'%{search_query}%')) | 
+            (Movie.category.ilike(f'%{search_query}%'))
+        ).order_by(Movie.id.desc()).all()
+        return render_template('index.html', search_results=search_results, search_query=search_query, categories=categories_list)
+    
+    # Handle Category Pill Clicks
+    if category_query:
+        search_results = Movie.query.filter(Movie.category.ilike(f'%{category_query}%')).order_by(Movie.id.desc()).all()
+        return render_template('index.html', search_results=search_results, search_query=category_query, categories=categories_list)
+
+    # Handle "View All" Clicks
+    if view_all == 'trending':
+        search_results = Movie.query.order_by(Movie.views.desc()).all()
+        return render_template('index.html', search_results=search_results, search_query="All Trending Subtitles", categories=categories_list)
+    elif view_all == 'latest':
+        search_results = Movie.query.order_by(Movie.id.desc()).all()
+        return render_template('index.html', search_results=search_results, search_query="All Latest Additions", categories=categories_list)
+
+    # Default Homepage View
+    latest_movies = all_media[:10] 
+    top_movies = Movie.query.order_by(Movie.views.desc()).limit(10).all()
+    hero_movies = top_movies[:5] # Grabs the Top 5 Most Popular for the top carousel
+    
+    return render_template('index.html', latest_movies=latest_movies, top_movies=top_movies, hero_movies=hero_movies, categories=categories_list)
 
 @app.route('/robots.txt')
 def robots_txt():
@@ -300,7 +324,7 @@ def admin():
     return render_template('admin.html')
 
 # --- SECURE RENDER RELAY FOR TELEGRAM (BULLETPROOF VERSION) ---
-@app.route('/api/trigger_telegram/<int:movie_id>', methods=['POST'])
+@app.route('/api/trigger_telegram/<int:movie_id>', methods=['GET', 'POST'])
 def trigger_telegram(movie_id):
     if request.args.get('secret') != 'malayalam_super_secret_999':
         return "Unauthorized", 401
@@ -360,3 +384,4 @@ def trigger_telegram(movie_id):
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
+    
