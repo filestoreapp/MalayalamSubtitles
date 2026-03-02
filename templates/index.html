@@ -4,9 +4,45 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     
-    <title>Malayalam Subtitles Hub - Download High-Speed Subs</title>
-    <meta name="description" content="Download high-quality Malayalam, Tamil, and Hindi subtitles for the latest movies and TV series. Free, fast, and accurate.">
+    <title>{% if search_query %}{{ search_query }} Subtitles | {% endif %}Malayalam Subtitles Hub - Free Movie & TV Subs</title>
+    <meta name="description" content="Download high-quality Malayalam, Tamil, and Hindi subtitles for the latest movies and TV series. Free, fast, and accurate SRT files.">
+    <meta name="keywords" content="Malayalam subtitles, Tamil subtitles, Hindi subtitles, movie subtitles, TV series subtitles, SRT download, free subtitles, Malayalam subs">
+    <meta name="robots" content="index, follow, max-image-preview:large">
+    <meta name="author" content="Malayalam Subtitles Hub">
     <meta name="theme-color" content="#090e17">
+    
+    <link rel="canonical" href="https://malayalamsubtitles.onrender.com/">
+
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://malayalamsubtitles.onrender.com/">
+    <meta property="og:title" content="Malayalam Subtitles Hub - Free Movie & TV Subs">
+    <meta property="og:description" content="Download high-quality Malayalam, Tamil, and Hindi subtitles for the latest movies and TV series. Free, fast, and accurate.">
+    <meta property="og:image" content="https://via.placeholder.com/1200x630/090e17/3b82f6?text=Malayalam+Subtitles+Hub"> 
+    <meta property="og:locale" content="en_IN">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://malayalamsubtitles.onrender.com/">
+    <meta name="twitter:title" content="Malayalam Subtitles Hub - Free Movie & TV Subs">
+    <meta name="twitter:description" content="Download high-quality Malayalam, Tamil, and Hindi subtitles for the latest movies and TV series.">
+    <meta name="twitter:image" content="https://via.placeholder.com/1200x630/090e17/3b82f6?text=Malayalam+Subtitles+Hub">
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "url": "https://malayalamsubtitles.onrender.com/",
+      "name": "Malayalam Subtitles Hub",
+      "description": "Download high-quality Malayalam, Tamil, and Hindi subtitles for movies and TV shows.",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": {
+          "@type": "EntryPoint",
+          "urlTemplate": "https://malayalamsubtitles.onrender.com/?q={search_term_string}"
+        },
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
 
     <style>
         :root {
@@ -28,6 +64,19 @@
             -webkit-font-smoothing: antialiased;
             padding-bottom: 80px; 
             overflow-x: hidden;
+        }
+
+        /* Visually Hidden H1 for SEO */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border-width: 0;
         }
 
         /* --- APP HEADER --- */
@@ -80,9 +129,9 @@
             overflow-x: auto;
             scroll-snap-type: x mandatory;
             -webkit-overflow-scrolling: touch;
-            scrollbar-width: none; /* Hide scrollbar Firefox */
+            scrollbar-width: none; 
         }
-        .hero-container::-webkit-scrollbar { display: none; } /* Hide scrollbar Safari/Chrome */
+        .hero-container::-webkit-scrollbar { display: none; } 
 
         .hero-slide {
             min-width: 100vw;
@@ -135,7 +184,6 @@
             box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         }
 
-        /* Hero Carousel Indicators */
         .hero-indicators {
             position: absolute;
             bottom: 10px;
@@ -230,7 +278,6 @@
             margin: 0;
         }
 
-        /* Badges */
         .badge-type {
             position: absolute;
             top: 8px; left: 8px;
@@ -251,7 +298,6 @@
 
         .star { color: var(--text-main); font-size: 10px; }
 
-        /* Search Bar Setup */
         .search-page-form { padding: 0 20px; margin-top: 15px; }
         .search-page-form input {
             width: 100%;
@@ -271,6 +317,8 @@
     </style>
 </head>
 <body>
+
+    <h1 class="sr-only">Malayalam Subtitles Hub - Download Free SRT files for Movies and TV Shows</h1>
 
     <header>
         <a href="/" class="profile-pill">🎬 Subtitle Hub</a>
@@ -297,7 +345,7 @@
                 <div class="search-grid">
                     {% for media in search_results %}
                         <a href="{% if media.media_type == 'series' %}/series/{{ media.title|urlencode }}/{{ media.season or 1 }}{% else %}/movie/{{ media.id }}{% endif %}" class="card">
-                            <img src="{{ media.poster_url }}" alt="{{ media.title }} Subtitles">
+                            <img src="{{ media.poster_url }}" alt="{{ media.title }} Malayalam Subtitles Download">
                             <div class="badge-type">{{ 'TV' if media.media_type == 'series' else 'MOVIE' }}</div>
                             <div class="badge-rating"><span class="star">★</span> {{ media.rating }}</div>
                             <div class="card-overlay"><h3 class="card-title">{{ media.title }}</h3></div>
@@ -315,7 +363,7 @@
                 <div class="hero-container" id="heroCarousel">
                     {% for movie in hero_movies %}
                     <div class="hero-slide">
-                        <img src="{{ movie.poster_url }}" alt="{{ movie.title }}" class="hero-bg">
+                        <img src="{{ movie.poster_url }}" alt="{{ movie.title }} Malayalam Subtitles Preview" class="hero-bg">
                         <div class="hero-gradient"></div>
                         <h2 class="hero-title">{{ movie.title }}</h2>
                         <a href="{% if movie.media_type == 'series' %}/series/{{ movie.title|urlencode }}/{{ movie.season or 1 }}{% else %}/movie/{{ movie.id }}{% endif %}" class="hero-btn">
@@ -345,7 +393,7 @@
             <div class="carousel">
                 {% for media in top_movies %}
                 <a href="{% if media.media_type == 'series' %}/series/{{ media.title|urlencode }}/{{ media.season or 1 }}{% else %}/movie/{{ media.id }}{% endif %}" class="card">
-                    <img src="{{ media.poster_url }}" alt="{{ media.title }} Malayalam Subtitles" loading="lazy">
+                    <img src="{{ media.poster_url }}" alt="{{ media.title }} SRT Subtitles" loading="lazy">
                     <div class="badge-type">{{ 'TV' if media.media_type == 'series' else 'MOVIE' }}</div>
                     <div class="badge-rating"><span class="star">★</span> {{ media.rating }}</div>
                     <div class="card-overlay"><h3 class="card-title">{{ media.title }}</h3></div>
@@ -360,7 +408,7 @@
             <div class="carousel">
                 {% for media in latest_movies %}
                 <a href="{% if media.media_type == 'series' %}/series/{{ media.title|urlencode }}/{{ media.season or 1 }}{% else %}/movie/{{ media.id }}{% endif %}" class="card">
-                    <img src="{{ media.poster_url }}" alt="{{ media.title }}" loading="lazy">
+                    <img src="{{ media.poster_url }}" alt="{{ media.title }} Subtitles download" loading="lazy">
                     <div class="badge-type">{{ 'TV' if media.media_type == 'series' else 'MOVIE' }}</div>
                     <div class="badge-rating"><span class="star">★</span> {{ media.rating }}</div>
                     <div class="card-overlay"><h3 class="card-title">{{ media.title }}</h3></div>
@@ -389,22 +437,19 @@
             const dots = document.querySelectorAll('.hero-indicators .dot');
             let scrollAmount = 0;
             
-            // Auto scroll every 3 seconds
             setInterval(() => {
                 scrollAmount += carousel.clientWidth;
                 if (scrollAmount >= carousel.scrollWidth) {
-                    scrollAmount = 0; // Reset to start
+                    scrollAmount = 0; 
                 }
                 carousel.scrollTo({ left: scrollAmount, behavior: 'smooth' });
                 
-                // Update dots
                 let currentIndex = Math.round(scrollAmount / carousel.clientWidth);
                 dots.forEach((dot, index) => {
                     dot.classList.toggle('active', index === currentIndex);
                 });
             }, 3500);
 
-            // Update dots when user swipes manually
             carousel.addEventListener('scroll', () => {
                 let currentIndex = Math.round(carousel.scrollLeft / carousel.clientWidth);
                 dots.forEach((dot, index) => {
