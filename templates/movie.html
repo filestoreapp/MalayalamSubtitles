@@ -2,111 +2,259 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     
-    {% if movie.media_type == 'series' %}
-        <title>{{ movie.title }} S{{ movie.season }}E{{ movie.episode }} Subtitles</title>
-        <meta property="og:title" content="🎬 {{ movie.title }} - Season {{ movie.season }} Episode {{ movie.episode }}">
-        <meta property="og:description" content="Download subtitles for S{{ movie.season }}E{{ movie.episode }} in Malayalam, Tamil, Hindi, and English.">
-    {% else %}
-        <title>{{ movie.title }} Subtitles</title>
-        <meta property="og:title" content="🎬 Download {{ movie.title }} Subtitles">
-        <meta property="og:description" content="Available in Malayalam, Tamil, Hindi, and English.">
-    {% endif %}
+    <title>{{ movie.title }} ({{ movie.year if movie.year else 'N/A' }}) Subtitles Download | Malayalam Subtitles Hub</title>
+    <meta name="description" content="Download free Malayalam, Tamil, and Hindi subtitles for {{ movie.title }}. {{ movie.plot[:100] + '...' if movie.plot else 'High-quality SRT subtitles.' }}">
+    <meta name="theme-color" content="#090e17">
+    
+    <meta property="og:title" content="{{ movie.title }} Subtitles - Download Now">
+    <meta property="og:description" content="{{ movie.plot if movie.plot else 'Download high-quality subtitles.' }}">
     <meta property="og:image" content="{{ movie.poster_url }}">
-    
+    <meta property="og:type" content="video.movie">
+
     <style>
-        body { font-family: Arial, sans-serif; background: #141414; color: white; margin: 0; padding: 0; }
-        .navbar { background: #000; padding: 15px 20px; display: flex; align-items: center; position: sticky; top: 0; z-index: 1000; border-bottom: 1px solid #333; }
-        .navbar a { color: white; text-decoration: none; font-weight: bold; }
-        .home-btn { background: #e50914; padding: 8px 15px; border-radius: 5px; }
-        
-        .container { padding: 20px; max-width: 800px; margin: auto; text-align: center; }
-        .poster { width: 100%; max-width: 300px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); margin-bottom: 10px; }
-        
-        .series-badge { display: inline-block; background: #e50914; color: white; padding: 5px 15px; border-radius: 20px; font-weight: bold; margin-bottom: 15px; font-size: 1.1rem; }
-        
-        .btn { padding: 12px 20px; margin: 8px; background: #e50914; color: white; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold; width: 80%; max-width: 250px; }
-        .btn:hover { background: #f40612; }
-        
-        .related-row { display: flex; justify-content: flex-start; gap: 15px; margin-top: 20px; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 10px; }
-        .movie-card { flex: 0 0 auto; width: 100px; text-decoration: none; color: white; text-align: center; }
-        .movie-card img { width: 100%; height: 150px; object-fit: cover; border-radius: 5px; }
-        
-        @media (max-width: 600px) {
-            .btn { width: 100%; margin: 5px 0; }
+        :root {
+            --bg-base: #090e17; 
+            --text-main: #ffffff;
+            --text-muted: #8b96a5;
+            --accent: #3b82f6;
+            --btn-bg: rgba(255, 255, 255, 0.1);
         }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            margin: 0; padding: 0;
+            padding-bottom: 50px;
+            overflow-x: hidden;
+        }
+
+        /* --- CINEMATIC HERO HEADER --- */
+        .hero-backdrop {
+            position: relative;
+            width: 100%;
+            height: 55vh;
+            min-height: 400px;
+            display: flex;
+            align-items: flex-end;
+        }
+
+        .hero-backdrop img {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            object-fit: cover;
+            object-position: top;
+            z-index: -2;
+            opacity: 0.6;
+        }
+
+        .hero-gradient {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(to top, var(--bg-base) 0%, rgba(9, 14, 23, 0.6) 40%, transparent 100%);
+            z-index: -1;
+        }
+
+        /* Top Navigation Bar */
+        .top-nav {
+            position: absolute;
+            top: 20px; left: 20px; right: 20px;
+            display: flex;
+            justify-content: space-between;
+            z-index: 10;
+        }
+
+        .back-btn {
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(10px);
+            color: white; text-decoration: none;
+            width: 40px; height: 40px;
+            border-radius: 50%; display: flex;
+            align-items: center; justify-content: center;
+            font-size: 20px; border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        /* --- MOVIE INFO SECTION --- */
+        .movie-info {
+            padding: 0 20px;
+            position: relative;
+            z-index: 5;
+            margin-top: -60px; /* Pull text up into the gradient */
+        }
+
+        .movie-title {
+            font-size: 32px;
+            font-weight: 800;
+            margin: 0 0 10px 0;
+            line-height: 1.2;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+        }
+
+        .meta-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 12px;
+            font-size: 14px;
+            color: var(--text-muted);
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .rating-badge {
+            background: rgba(255,255,255,0.1);
+            color: white; padding: 4px 8px;
+            border-radius: 6px; display: flex; align-items: center; gap: 4px;
+        }
+
+        .star { color: #fbbf24; }
+
+        .genre-tags {
+            display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px;
+        }
+
+        .tag {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 4px 12px; border-radius: 20px;
+            font-size: 12px; color: var(--text-muted);
+        }
+
+        /* NEW PLOT SECTION */
+        .plot-section {
+            font-size: 15px;
+            color: #cbd5e1;
+            line-height: 1.6;
+            margin-bottom: 30px;
+            background: rgba(255,255,255,0.02);
+            padding: 15px;
+            border-radius: 12px;
+            border-left: 3px solid var(--accent);
+        }
+
+        /* --- DOWNLOAD BUTTONS --- */
+        .section-title {
+            font-size: 18px; font-weight: 700;
+            margin: 30px 0 15px 0;
+        }
+
+        .download-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 15px;
+        }
+
+        .dl-btn {
+            background: var(--btn-bg);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: white; text-decoration: none;
+            padding: 15px; border-radius: 12px;
+            text-align: center; font-weight: 700;
+            font-size: 15px; display: flex;
+            flex-direction: column; gap: 5px;
+            transition: all 0.2s;
+            backdrop-filter: blur(5px);
+        }
+
+        .dl-btn:active { transform: scale(0.96); }
+        .dl-btn span { font-size: 11px; color: var(--text-muted); font-weight: normal; }
+        
+        /* Highlight Malayalam/Local languages */
+        .dl-btn.ready { background: rgba(59, 130, 246, 0.15); border-color: rgba(59, 130, 246, 0.4); }
+        .dl-btn.en { background: rgba(255,255,255,0.05); }
+
+        /* --- RELATED MOVIES (Horizontal Scroll matching homepage) --- */
+        .carousel {
+            display: flex; gap: 12px;
+            overflow-x: auto; scroll-snap-type: x mandatory;
+            scrollbar-width: none; padding-bottom: 10px;
+        }
+        .carousel::-webkit-scrollbar { display: none; }
+        
+        .card {
+            min-width: 120px; width: 120px; height: 180px;
+            border-radius: 8px; overflow: hidden;
+            scroll-snap-align: start; text-decoration: none; position: relative;
+        }
+        .card img { width: 100%; height: 100%; object-fit: cover; }
+        .card-overlay {
+            position: absolute; bottom: 0; left: 0; right: 0;
+            background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
+            padding: 15px 8px 8px 8px;
+        }
+        .card-title { color: white; font-size: 11px; font-weight: bold; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     </style>
 </head>
 <body>
-    <div class="navbar">
-        <a href="/" class="home-btn">🏠 Home</a>
+
+    <div class="hero-backdrop">
+        <div class="top-nav">
+            <a href="/" class="back-btn">←</a>
+        </div>
+        <img src="{{ movie.poster_url }}" alt="{{ movie.title }} Poster">
+        <div class="hero-gradient"></div>
     </div>
 
-    <div class="container">
-        <h1>{{ movie.title }} ({{ movie.year }})</h1>
+    <div class="movie-info">
+        <h1 class="movie-title">{{ movie.title }}</h1>
         
-        {% if movie.media_type == 'series' %}
-            <div class="series-badge">Season {{ movie.season }} • Episode {{ movie.episode }}</div>
-            <br>
-            <a href="/series/{{ movie.title | urlencode }}/{{ movie.season }}" style="color: #e50914; text-decoration: none; font-weight: bold; font-size: 0.95rem; display: inline-block; margin-bottom: 15px; padding: 10px; border: 1px solid #e50914; border-radius: 5px;">📺 View All Episodes in Season {{ movie.season }} &rarr;</a>
-        {% endif %}
-        <br>
-        
-        <img src="{{ movie.poster_url }}" alt="Poster" class="poster" loading="lazy">
-        <p style="color: #aaa;">⭐ {{ movie.rating }} | 🍿 {{ movie.category }}</p>
-
-        <h3 style="margin-top: 30px;">📥 Download Subtitles</h3>
-        <a href="/download/{{ movie.id }}/en" class="btn">🇬🇧 English (Original)</a>
-        
-        {% if 'ml' in ready_languages %}<a href="/download/{{ movie.id }}/ml" class="btn">🇮🇳 Malayalam</a>{% endif %}
-        {% if 'ta' in ready_languages %}<a href="/download/{{ movie.id }}/ta" class="btn">🇮🇳 Tamil</a>{% endif %}
-        {% if 'hi' in ready_languages %}<a href="/download/{{ movie.id }}/hi" class="btn">🇮🇳 Hindi</a>{% endif %}
-
-        <hr style="border-color: #333; margin-top: 50px;">
-        
-        <div style="margin-top: 40px; text-align: left; background: #1a1a1a; padding: 20px; border-radius: 8px;">
-            <h3 style="color: #e50914; font-size: 1.1rem; margin-top: 0;">About {{ movie.title }} Subtitles</h3>
-            <p style="color: #bbb; font-size: 0.9rem; line-height: 1.5;">
-                Download perfectly synced subtitles for <strong>{{ movie.title }} ({{ movie.year }})</strong>. 
-                {% if movie.media_type == 'series' %}
-                This file is specifically formatted for Season {{ movie.season }}, Episode {{ movie.episode }}.
-                {% endif %}
-                Enhance your viewing experience by downloading the <code>.srt</code> file in your native language. We currently offer verified subtitle tracks in 
-                {% if 'ml' in ready_languages %}Malayalam, {% endif %}
-                {% if 'ta' in ready_languages %}Tamil, {% endif %}
-                {% if 'hi' in ready_languages %}Hindi, {% endif %}
-                and English.
-            </p>
-            <p style="color: #888; font-size: 0.8rem; margin-bottom: 0;">
-                <strong>How to use:</strong> Extract the downloaded file and place it in the same folder as your video file. Ensure both files share the exact same name to allow media players like VLC, MX Player, or Plex to load the subtitles automatically.
-            </p>
+        <div class="meta-row">
+            <span class="rating-badge"><span class="star">★</span> {{ movie.rating }}</span>
+            <span>{{ movie.year if movie.year else 'N/A' }}</span>
+            {% if movie.runtime %}<span>• &nbsp;⏱ {{ movie.runtime }}</span>{% endif %}
         </div>
-        
-        <h2 style="text-align: left; font-size: 1.2rem; margin-top: 40px;">More in {{ movie.category.split(',')[0] if movie.category else 'General' }}</h2>
-        <div class="related-row">
-            {% for rel in related_movies %}
-            <a href="/movie/{{ rel.id }}" class="movie-card">
-                <img src="{{ rel.poster_url }}" loading="lazy">
-                <p style="font-size: 12px; margin-top: 5px;">
-                    {{ rel.title }}
-                    {% if rel.media_type == 'series' %} (S{{ rel.season }}E{{ rel.episode }}) {% endif %}
-                </p>
+
+        <div class="genre-tags">
+            {% if movie.category %}
+                {% for tag in movie.category.split(',') %}
+                    {% if tag.strip() != "SilentMode" %}
+                        <span class="tag">{{ tag.strip() }}</span>
+                    {% endif %}
+                {% endfor %}
+            {% else %}
+                <span class="tag">General</span>
+            {% endif %}
+        </div>
+
+        {% if movie.plot %}
+        <div class="plot-section">
+            {{ movie.plot }}
+        </div>
+        {% endif %}
+
+        <h2 class="section-title">📥 Download Subtitles</h2>
+        <div class="download-grid">
+            <a href="/download/{{ movie.id }}/en" class="dl-btn en">
+                English <span>Subtitle (.srt)</span>
+            </a>
+            
+            {% if 'ml' in ready_languages %}
+            <a href="/download/{{ movie.id }}/ml" class="dl-btn ready">Malayalam <span>Subtitle (.srt)</span></a>
+            {% endif %}
+            
+            {% if 'ta' in ready_languages %}
+            <a href="/download/{{ movie.id }}/ta" class="dl-btn ready">Tamil <span>Subtitle (.srt)</span></a>
+            {% endif %}
+            
+            {% if 'hi' in ready_languages %}
+            <a href="/download/{{ movie.id }}/hi" class="dl-btn ready">Hindi <span>Subtitle (.srt)</span></a>
+            {% endif %}
+        </div>
+
+        {% if related_movies %}
+        <h2 class="section-title" style="margin-top: 40px;">More Like This</h2>
+        <div class="carousel">
+            {% for related in related_movies %}
+            <a href="/movie/{{ related.id }}" class="card">
+                <img src="{{ related.poster_url }}" alt="{{ related.title }}">
+                <div class="card-overlay"><h3 class="card-title">{{ related.title }}</h3></div>
             </a>
             {% endfor %}
         </div>
+        {% endif %}
     </div>
-    
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "{% if movie.media_type == 'series' %}TVEpisode{% else %}Movie{% endif %}",
-      "name": "{{ movie.title }}",
-      "image": "{{ movie.poster_url }}",
-      "dateCreated": "{{ movie.year }}",
-      "genre": "{{ movie.category }}",
-      "description": "Download subtitles for {{ movie.title }} in Malayalam, Tamil, and Hindi."
-    }
-    </script>
+
 </body>
 </html>
