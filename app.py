@@ -3,6 +3,7 @@ import io
 import requests
 import boto3
 import urllib.parse
+import re
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, send_file, jsonify, session
 from flask_sqlalchemy import SQLAlchemy
@@ -167,31 +168,57 @@ def series_page(title, season):
 @app.route('/download/<int:movie_id>/<language>')
 def download(movie_id, language):
     movie = Movie.query.get_or_404(movie_id)
+    
+    # Grab the subtitle data (either raw text or a Cloudflare R2 URL)
     if language == 'en': 
-        srt_text = movie.english_srt
+        srt_data = movie.english_srt
     else:
         cache = TranslationCache.query.filter_by(movie_id=movie_id, language=language).first_or_404()
-        srt_text = cache.translated_srt
+        srt_data = cache.translated_srt
         cache.downloads += 1
         db.session.commit()
         
-    if srt_text.startswith('http'):
-        return redirect(srt_text)
+    # --- FETCH THE FILE INVISIBLY INSTEAD OF REDIRECTING ---
+    if srt_data.startswith('http'):
+        try:
+            # Fetch the text from Cloudflare R2
+            response = requests.get(srt_data)
+            response.raise_for_status() 
+            file_content = response.content
+        except Exception as e:
+            return f"Error fetching subtitle file: {e}", 500
+    else:
+        # It's raw text stored in the Neon database
+        file_content = srt_data.encode('utf-8')
         
-    mem_file = io.BytesIO()
-    mem_file.write(srt_text.encode('utf-8'))
+    # Prepare the file to be sent to the user
+    mem_file = io.BytesIO(file_content)
     mem_file.seek(0)
     
-    s = movie.season or 1
-    e = movie.episode or 1
+    # --- PROFESSIONAL SCENE-STANDARD FILE NAMING ---
+    lang_map = {'en': 'English', 'ml': 'Malayalam', 'ta': 'Tamil', 'hi': 'Hindi'}
+    full_lang = lang_map.get(language, language.upper())
     
-    name = f"{movie.title}_S{s:02d}E{e:02d}_{language}.srt" if movie.media_type == 'series' else f"{movie.title}_{language}.srt"
-    return send_file(mem_file, as_attachment=True, download_name=name.replace(" ", "_"), mimetype='application/x-subrip')
+    # Scrub the title to remove illegal/messy characters and replace spaces with dots
+    safe_title = re.sub(r'[^\w\s-]', '', movie.title) 
+    clean_title = re.sub(r'[-\s]+', '.', safe_title).strip('.') 
+    
+    # Build the final professional file name
+    if movie.media_type == 'series':
+        s = movie.season or 1
+        e = movie.episode or 1
+        final_name = f"{clean_title}.S{s:02d}E{e:02d}.{full_lang}.srt"
+    else:
+        year_str = f".{movie.year}" if movie.year else ""
+        final_name = f"{clean_title}{year_str}.{full_lang}.srt"
+    
+    return send_file(mem_file, as_attachment=True, download_name=final_name, mimetype='application/x-subrip')
 
 # --- ADMIN & DASHBOARD ROUTES ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
+        # Don't forget to change this password later!
         if request.form['username'] == 'admin' and request.form['password'] == 'malayalam123':
             session['logged_in'] = True
             return redirect(url_for('dashboard'))
@@ -324,7 +351,6 @@ def admin():
     return render_template('admin.html')
 
 # --- SECURE RENDER RELAY FOR TELEGRAM (BULLETPROOF VERSION) ---
-# --- SECURE RENDER RELAY FOR TELEGRAM (BULLETPROOF VERSION) ---
 @app.route('/api/trigger_telegram/<int:movie_id>', methods=['GET', 'POST'])
 def trigger_telegram(movie_id):
     if request.args.get('secret') != 'malayalam_super_secret_999':
@@ -351,7 +377,6 @@ def trigger_telegram(movie_id):
     safe_title = movie.title if movie.title else "Unknown Title"
     safe_rating = movie.rating if movie.rating else "N/A"
     
-    # --- NEW: Add Safe Runtime and Plot ---
     runtime_text = f"⏱ *Runtime:* {movie.runtime}\n" if movie.runtime else ""
     
     safe_plot = ""
@@ -362,7 +387,6 @@ def trigger_telegram(movie_id):
         safe_plot = clean_plot[:250] + "..." if len(clean_plot) > 250 else clean_plot
         safe_plot = f"📖 *Plot:* {safe_plot}\n\n"
     
-    # --- UPDATED CAPTION LAYOUT ---
     if movie.media_type == 'series':
         caption = (f"📺 *{safe_title}* - New Episode!\n\n"
                    f"🔢 *Season {movie.season or 1} - Episode {movie.episode or 1}*\n"
@@ -405,13 +429,7 @@ def trigger_telegram(movie_id):
             
     except Exception as e:
         return str(e), 500
-        
-        
-        # --- FIXED RETURN STATEMENT ---
-        
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
-    
-
