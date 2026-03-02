@@ -6,14 +6,7 @@
     
     <title>Malayalam Subtitles Hub - Download High-Speed Subs</title>
     <meta name="description" content="Download high-quality Malayalam, Tamil, and Hindi subtitles for the latest movies and TV series. Free, fast, and accurate.">
-    <meta name="keywords" content="Malayalam subtitles, Malayalam subs, download subtitles, movie subtitles, web series subtitles, SRT download">
-    <meta name="robots" content="index, follow">
     <meta name="theme-color" content="#090e17">
-    
-    <meta property="og:title" content="Malayalam Subtitles Hub">
-    <meta property="og:description" content="Download high-quality Malayalam, Tamil, and Hindi subtitles for the latest movies and TV series.">
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://malayalamsubtitles.onrender.com">
 
     <style>
         :root {
@@ -33,7 +26,8 @@
             padding: 0;
             line-height: 1.5;
             -webkit-font-smoothing: antialiased;
-            padding-bottom: 80px; /* Space for a mobile feel */
+            padding-bottom: 80px; 
+            overflow-x: hidden;
         }
 
         /* --- APP HEADER --- */
@@ -42,53 +36,59 @@
             justify-content: space-between;
             align-items: center;
             padding: 15px 20px;
-            position: sticky;
-            top: 0;
+            position: absolute;
+            top: 0; left: 0; right: 0;
             z-index: 100;
-            background: linear-gradient(to bottom, rgba(9, 14, 23, 1) 40%, rgba(9, 14, 23, 0));
+            background: linear-gradient(to bottom, rgba(9, 14, 23, 0.9) 0%, transparent 100%);
         }
 
         .profile-pill {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.15);
             backdrop-filter: blur(10px);
-            padding: 6px 14px;
+            padding: 8px 16px;
             border-radius: 30px;
             display: flex;
             align-items: center;
             gap: 8px;
             font-size: 14px;
-            font-weight: 600;
+            font-weight: 700;
             color: white;
             text-decoration: none;
-        }
-
-        .header-actions {
-            display: flex;
-            gap: 10px;
+            border: 1px solid rgba(255,255,255,0.1);
         }
 
         .icon-btn {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.15);
             backdrop-filter: blur(10px);
-            border: none;
-            width: 38px;
-            height: 38px;
+            border: 1px solid rgba(255,255,255,0.1);
+            width: 40px; height: 40px;
             border-radius: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
             color: white;
-            font-size: 18px;
-            cursor: pointer;
             text-decoration: none;
+            font-size: 18px;
         }
 
-        /* --- HERO FEATURED SECTION --- */
-        .hero {
-            position: relative;
+        /* --- SWIPEABLE HERO CAROUSEL --- */
+        .hero-container {
             width: 100%;
-            height: 450px;
-            margin-top: -70px; /* Pull up behind header */
+            height: 480px;
+            position: relative;
+            display: flex;
+            overflow-x: auto;
+            scroll-snap-type: x mandatory;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none; /* Hide scrollbar Firefox */
+        }
+        .hero-container::-webkit-scrollbar { display: none; } /* Hide scrollbar Safari/Chrome */
+
+        .hero-slide {
+            min-width: 100vw;
+            height: 100%;
+            position: relative;
+            scroll-snap-align: center;
             display: flex;
             flex-direction: column;
             justify-content: flex-end;
@@ -103,20 +103,28 @@
             object-fit: cover;
             object-position: top;
             z-index: -2;
-            opacity: 0.8;
+            opacity: 0.9;
         }
 
         .hero-gradient {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: linear-gradient(to top, var(--bg-base) 0%, transparent 60%);
+            background: linear-gradient(to top, var(--bg-base) 0%, rgba(9, 14, 23, 0.4) 50%, transparent 100%);
             z-index: -1;
+        }
+        
+        .hero-title {
+            font-size: 24px;
+            font-weight: 800;
+            text-align: center;
+            margin-bottom: 15px;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.8);
         }
 
         .hero-btn {
             background: white;
             color: black;
-            padding: 10px 30px;
+            padding: 12px 35px;
             border-radius: 30px;
             font-weight: bold;
             text-decoration: none;
@@ -125,10 +133,23 @@
             gap: 8px;
             font-size: 15px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-            transition: transform 0.2s;
         }
 
-        .hero-btn:active { transform: scale(0.95); }
+        /* Hero Carousel Indicators */
+        .hero-indicators {
+            position: absolute;
+            bottom: 10px;
+            left: 0; right: 0;
+            display: flex;
+            justify-content: center;
+            gap: 6px;
+        }
+        .dot {
+            width: 6px; height: 6px;
+            background: rgba(255,255,255,0.3);
+            border-radius: 50%;
+        }
+        .dot.active { background: white; width: 18px; border-radius: 10px; }
 
         /* --- SECTION HEADERS --- */
         .section-header {
@@ -149,32 +170,31 @@
         }
 
         .view-all {
-            background: rgba(255, 255, 255, 0.1);
-            color: var(--text-muted);
+            background: rgba(255, 255, 255, 0.08);
+            color: white;
             font-size: 12px;
             font-weight: 600;
-            padding: 5px 12px;
+            padding: 6px 14px;
             border-radius: 20px;
             text-decoration: none;
         }
 
-        /* --- HORIZONTAL SCROLL CAROUSELS --- */
+        /* --- HORIZONTAL SCROLL ROWS --- */
         .carousel {
             display: flex;
-            gap: 15px;
+            gap: 12px;
             padding: 0 20px;
             overflow-x: auto;
             scroll-snap-type: x mandatory;
-            -webkit-overflow-scrolling: touch; /* Smooth iOS scrolling */
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
         }
+        .carousel::-webkit-scrollbar { display: none; }
 
-        .carousel::-webkit-scrollbar { display: none; } /* Hide scrollbar */
-
-        /* --- MOVIE CARDS (EXACT MATCH TO SCREENSHOT) --- */
         .card {
-            min-width: 140px;
-            width: 140px;
-            height: 210px;
+            min-width: 130px;
+            width: 130px;
+            height: 195px;
             position: relative;
             border-radius: 12px;
             overflow: hidden;
@@ -190,7 +210,6 @@
             object-fit: cover;
         }
 
-        /* The Dark Overlay at bottom for title */
         .card-overlay {
             position: absolute;
             bottom: 0; left: 0; right: 0;
@@ -211,63 +230,42 @@
             margin: 0;
         }
 
-        /* Top Left Badge (White) */
+        /* Badges */
         .badge-type {
             position: absolute;
-            top: 8px;
-            left: 8px;
-            background: white;
-            color: black;
-            font-size: 9px;
-            font-weight: 800;
-            padding: 3px 6px;
-            border-radius: 4px;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
+            top: 8px; left: 8px;
+            background: white; color: black;
+            font-size: 9px; font-weight: 800;
+            padding: 3px 6px; border-radius: 4px;
         }
 
-        /* Top Right Badge (Star Rating) */
         .badge-rating {
             position: absolute;
-            top: 8px;
-            right: 8px;
-            background: var(--badge-bg);
-            backdrop-filter: blur(5px);
-            color: white;
-            font-size: 10px;
-            font-weight: 700;
-            padding: 3px 6px;
-            border-radius: 4px;
-            display: flex;
-            align-items: center;
-            gap: 3px;
+            top: 8px; right: 8px;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(4px);
+            color: white; font-size: 10px; font-weight: 700;
+            padding: 3px 6px; border-radius: 4px;
+            display: flex; align-items: center; gap: 3px;
         }
 
         .star { color: var(--text-main); font-size: 10px; }
 
-        /* --- SEARCH GRID (For when users search) --- */
-        .search-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-            gap: 15px;
-            padding: 20px;
-        }
-
-        /* Full page search form styling */
-        .search-page-form {
-            padding: 0 20px;
-            margin-top: 10px;
-        }
+        /* Search Bar Setup */
+        .search-page-form { padding: 0 20px; margin-top: 15px; }
         .search-page-form input {
             width: 100%;
             background: rgba(255,255,255,0.08);
             border: 1px solid rgba(255,255,255,0.1);
-            color: white;
-            padding: 12px 20px;
-            border-radius: 30px;
-            font-size: 16px;
-            box-sizing: border-box;
-            outline: none;
+            color: white; padding: 14px 20px;
+            border-radius: 30px; font-size: 15px;
+            box-sizing: border-box; outline: none;
+        }
+        
+        .search-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            gap: 15px; padding: 20px;
         }
 
     </style>
@@ -275,17 +273,15 @@
 <body>
 
     <header>
-        <a href="/" class="profile-pill">
-            🎬 Subtitle Hub
-        </a>
+        <a href="/" class="profile-pill">🎬 Subtitle Hub</a>
         <div class="header-actions">
             <a href="#search-box" class="icon-btn">🔍</a>
         </div>
     </header>
 
     <main>
-        
         {% if search_query %}
+            <div style="height: 80px;"></div>
             
             <div class="search-page-form" id="search-box">
                 <form action="/" method="GET">
@@ -294,14 +290,14 @@
             </div>
 
             <div class="section-header">
-                <h2 class="section-title">Results for "{{ search_query }}"</h2>
+                <h2 class="section-title">{{ search_query }}</h2>
             </div>
             
             {% if search_results %}
                 <div class="search-grid">
                     {% for media in search_results %}
                         <a href="{% if media.media_type == 'series' %}/series/{{ media.title|urlencode }}/{{ media.season or 1 }}{% else %}/movie/{{ media.id }}{% endif %}" class="card">
-                            <img src="{{ media.poster_url }}" alt="{{ media.title }} Malayalam Subtitles">
+                            <img src="{{ media.poster_url }}" alt="{{ media.title }} Subtitles">
                             <div class="badge-type">{{ 'TV' if media.media_type == 'series' else 'MOVIE' }}</div>
                             <div class="badge-rating"><span class="star">★</span> {{ media.rating }}</div>
                             <div class="card-overlay"><h3 class="card-title">{{ media.title }}</h3></div>
@@ -314,13 +310,25 @@
 
         {% else %}
             
-            {% if latest_movies %}
-            <div class="hero">
-                <img src="{{ latest_movies[0].poster_url }}" alt="Featured Movie" class="hero-bg">
-                <div class="hero-gradient"></div>
-                <a href="{% if latest_movies[0].media_type == 'series' %}/series/{{ latest_movies[0].title|urlencode }}/{{ latest_movies[0].season or 1 }}{% else %}/movie/{{ latest_movies[0].id }}{% endif %}" class="hero-btn">
-                    ▶ Download Subs
-                </a>
+            {% if hero_movies %}
+            <div style="position: relative;">
+                <div class="hero-container" id="heroCarousel">
+                    {% for movie in hero_movies %}
+                    <div class="hero-slide">
+                        <img src="{{ movie.poster_url }}" alt="{{ movie.title }}" class="hero-bg">
+                        <div class="hero-gradient"></div>
+                        <h2 class="hero-title">{{ movie.title }}</h2>
+                        <a href="{% if movie.media_type == 'series' %}/series/{{ movie.title|urlencode }}/{{ movie.season or 1 }}{% else %}/movie/{{ movie.id }}{% endif %}" class="hero-btn">
+                            ▶ Download Subs
+                        </a>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="hero-indicators">
+                    {% for movie in hero_movies %}
+                        <div class="dot {% if loop.index == 1 %}active{% endif %}"></div>
+                    {% endfor %}
+                </div>
             </div>
             {% endif %}
 
@@ -332,7 +340,7 @@
 
             <div class="section-header">
                 <h2 class="section-title">🔥 Trending Subtitles</h2>
-                <a href="/?q=" class="view-all">View All →</a>
+                <a href="/?view=trending" class="view-all">View All →</a>
             </div>
             <div class="carousel">
                 {% for media in top_movies %}
@@ -347,11 +355,12 @@
 
             <div class="section-header">
                 <h2 class="section-title">✨ Latest Additions</h2>
+                <a href="/?view=latest" class="view-all">View All →</a>
             </div>
             <div class="carousel">
                 {% for media in latest_movies %}
                 <a href="{% if media.media_type == 'series' %}/series/{{ media.title|urlencode }}/{{ media.season or 1 }}{% else %}/movie/{{ media.id }}{% endif %}" class="card">
-                    <img src="{{ media.poster_url }}" alt="{{ media.title }} Subtitles download" loading="lazy">
+                    <img src="{{ media.poster_url }}" alt="{{ media.title }}" loading="lazy">
                     <div class="badge-type">{{ 'TV' if media.media_type == 'series' else 'MOVIE' }}</div>
                     <div class="badge-rating"><span class="star">★</span> {{ media.rating }}</div>
                     <div class="card-overlay"><h3 class="card-title">{{ media.title }}</h3></div>
@@ -362,9 +371,9 @@
             <div class="section-header">
                 <h2 class="section-title">🧭 Browse Genres</h2>
             </div>
-            <div class="carousel" style="padding-bottom: 20px;">
+            <div class="carousel" style="padding-bottom: 30px;">
                 {% for cat in categories %}
-                <a href="/?q={{ cat }}" style="background: rgba(255,255,255,0.08); padding: 10px 20px; border-radius: 30px; color: white; text-decoration: none; font-size: 14px; white-space: nowrap; border: 1px solid rgba(255,255,255,0.1);">
+                <a href="/?cat={{ cat|urlencode }}" style="background: rgba(255,255,255,0.08); padding: 10px 20px; border-radius: 30px; color: white; text-decoration: none; font-size: 14px; white-space: nowrap; border: 1px solid rgba(255,255,255,0.1);">
                     {{ cat }}
                 </a>
                 {% endfor %}
@@ -373,5 +382,36 @@
         {% endif %}
     </main>
 
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const carousel = document.getElementById('heroCarousel');
+            if(!carousel) return;
+            const dots = document.querySelectorAll('.hero-indicators .dot');
+            let scrollAmount = 0;
+            
+            // Auto scroll every 3 seconds
+            setInterval(() => {
+                scrollAmount += carousel.clientWidth;
+                if (scrollAmount >= carousel.scrollWidth) {
+                    scrollAmount = 0; // Reset to start
+                }
+                carousel.scrollTo({ left: scrollAmount, behavior: 'smooth' });
+                
+                // Update dots
+                let currentIndex = Math.round(scrollAmount / carousel.clientWidth);
+                dots.forEach((dot, index) => {
+                    dot.classList.toggle('active', index === currentIndex);
+                });
+            }, 3500);
+
+            // Update dots when user swipes manually
+            carousel.addEventListener('scroll', () => {
+                let currentIndex = Math.round(carousel.scrollLeft / carousel.clientWidth);
+                dots.forEach((dot, index) => {
+                    dot.classList.toggle('active', index === currentIndex);
+                });
+            });
+        });
+    </script>
 </body>
 </html>
