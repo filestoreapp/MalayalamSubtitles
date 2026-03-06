@@ -22,11 +22,16 @@
         .btn-add { background-color: #27ae60; width: auto; font-size: 14px; padding: 10px 20px; margin-top: 10px; }
         .btn-add:hover { background-color: #2ecc71; }
         
-        /* NEW: AUTO-FILL BUTTON */
-        .btn-autofill { background-color: #6c5ce7; width: auto; font-size: 14px; padding: 12px 20px; margin-top: 10px; }
+        /* MAGIC AUTO-FILL BUTTON */
+        .btn-autofill { background-color: #6c5ce7; width: auto; font-size: 14px; padding: 12px 20px; }
         .btn-autofill:hover { background-color: #a29bfe; }
         
         .header-link { display: inline-block; margin-bottom: 20px; color: #0984e3; text-decoration: none; font-weight: bold; }
+        
+        /* TMDB RESULTS STYLING */
+        #tmdb-results { margin-top: 10px; display: flex; flex-direction: column; gap: 5px; }
+        .tmdb-result-btn { background: #f1f2f6; color: #2f3640; border: 1px solid #dcdde1; padding: 8px 12px; border-radius: 5px; text-align: left; cursor: pointer; font-weight: bold; font-size: 13px; transition: 0.2s; }
+        .tmdb-result-btn:hover { background: #dfe4ea; border-color: #ced6e0; }
     </style>
 </head>
 <body>
@@ -51,7 +56,10 @@
                     <input type="text" name="title" id="media-title" placeholder="e.g., The Matrix" required>
                     <button type="button" class="btn-autofill" onclick="fetchTMDB()">✨ Auto-Fill</button>
                 </div>
-                <small style="color: #7f8c8d;">Type the title and click Auto-Fill to grab all data from TMDB instantly!</small>
+                
+                <div id="tmdb-results"></div>
+                
+                <small style="color: #7f8c8d; display: block; margin-top: 8px;">Type the title and click Auto-Fill to grab all data from TMDB instantly!</small>
             </div>
 
             <div class="form-group">
@@ -117,17 +125,16 @@
     </div>
 
     <script>
-        // !!!!!!!! IMPORTANT !!!!!!!!
-        // GET YOUR FREE API KEY FROM THEMOVIEDB.ORG AND PASTE IT BETWEEN THE QUOTES BELOW:
         const TMDB_API_KEY = "4f702e8358a2849df9d2aa4f6496a9e9"; 
 
         async function fetchTMDB() {
             const title = document.getElementById('media-title').value;
             const type = document.getElementById('media-type-select').value;
+            const resultsBox = document.getElementById('tmdb-results');
             
             if(!title) { alert("Please type a movie or series title first!"); return; }
-            if(TMDB_API_KEY === "PASTE_YOUR_TMDB_API_KEY_HERE") { alert("You forgot to add your TMDB API Key in the admin.html file!"); return; }
             
+            resultsBox.innerHTML = '<span style="color: #0984e3; margin-top: 10px; display: inline-block;">Searching TMDB...</span>';
             const tmdbType = type === 'series' ? 'tv' : 'movie';
             const url = `https://api.themoviedb.org/3/search/${tmdbType}?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(title)}`;
             
@@ -136,38 +143,71 @@
                 const data = await res.json();
                 
                 if(data.results && data.results.length > 0) {
-                    const item = data.results[0]; // Grabs the best match
+                    resultsBox.innerHTML = ''; // Clear searching text
                     
-                    // Fetch deeper details to get exact Runtime and Genres
-                    const detailRes = await fetch(`https://api.themoviedb.org/3/${tmdbType}/${item.id}?api_key=${TMDB_API_KEY}`);
-                    const details = await detailRes.json();
-                    
-                    // Auto-Fill all fields!
-                    document.querySelector('textarea[name="plot"]').value = details.overview || '';
-                    document.querySelector('input[name="year"]').value = (details.release_date || details.first_air_date || '').substring(0, 4);
-                    document.querySelector('input[name="rating"]').value = (details.vote_average || 0).toFixed(1);
-                    document.querySelector('input[name="poster_url"]').value = `https://image.tmdb.org/t/p/w500${details.poster_path}`;
-                    
-                    // Convert Runtime
-                    if (type === 'movie' && details.runtime) {
-                        const hours = Math.floor(details.runtime / 60);
-                        const mins = details.runtime % 60;
-                        document.querySelector('input[name="runtime"]').value = `${hours}h ${mins}m`;
-                    } else if (type === 'series' && details.episode_run_time && details.episode_run_time.length > 0) {
-                        document.querySelector('input[name="runtime"]').value = `${details.episode_run_time[0]}m`;
-                    }
-                    
-                    // Convert Genres
-                    if(details.genres) {
-                        const genres = details.genres.map(g => g.name).join(', ');
-                        document.querySelector('input[name="category"]').value = genres;
-                    }
-                    alert("✅ TMDB Auto-Fill Complete!");
+                    // Show the top 5 matches as clickable buttons
+                    data.results.slice(0, 5).forEach(item => {
+                        const year = (item.release_date || item.first_air_date || 'N/A').substring(0, 4);
+                        const displayTitle = item.title || item.name;
+                        
+                        const btn = document.createElement('button');
+                        btn.type = 'button';
+                        btn.className = 'tmdb-result-btn';
+                        btn.innerHTML = `📌 ${displayTitle} (${year})`;
+                        
+                        // When clicked, grab the specific details for THIS movie
+                        btn.onclick = () => fetchSpecificDetails(item.id, tmdbType, displayTitle);
+                        resultsBox.appendChild(btn);
+                    });
                 } else {
-                    alert("No results found on TMDB. Check spelling!");
+                    resultsBox.innerHTML = '<span style="color: #e74c3c; margin-top: 10px; display: inline-block;">No results found. Try checking the spelling!</span>';
                 }
             } catch (e) {
-                alert("Error connecting to TMDB.");
+                resultsBox.innerHTML = '<span style="color: #e74c3c; margin-top: 10px; display: inline-block;">Error connecting to TMDB.</span>';
+            }
+        }
+
+        async function fetchSpecificDetails(tmdbId, tmdbType, exactTitle) {
+            const resultsBox = document.getElementById('tmdb-results');
+            resultsBox.innerHTML = '<span style="color: #0984e3; margin-top: 10px; display: inline-block;">Fetching details...</span>';
+            
+            try {
+                const detailRes = await fetch(`https://api.themoviedb.org/3/${tmdbType}/${tmdbId}?api_key=${TMDB_API_KEY}`);
+                const details = await detailRes.json();
+                
+                // Set the title box to the exact official title
+                document.getElementById('media-title').value = exactTitle;
+                
+                // Auto-Fill all fields
+                document.querySelector('textarea[name="plot"]').value = details.overview || '';
+                document.querySelector('input[name="year"]').value = (details.release_date || details.first_air_date || '').substring(0, 4);
+                document.querySelector('input[name="rating"]').value = (details.vote_average || 0).toFixed(1);
+                
+                if (details.poster_path) {
+                    document.querySelector('input[name="poster_url"]').value = `https://image.tmdb.org/t/p/w500${details.poster_path}`;
+                }
+                
+                // Convert Runtime
+                const type = document.getElementById('media-type-select').value;
+                if (type === 'movie' && details.runtime) {
+                    const hours = Math.floor(details.runtime / 60);
+                    const mins = details.runtime % 60;
+                    document.querySelector('input[name="runtime"]').value = `${hours}h ${mins}m`;
+                } else if (type === 'series' && details.episode_run_time && details.episode_run_time.length > 0) {
+                    document.querySelector('input[name="runtime"]').value = `${details.episode_run_time[0]}m`;
+                }
+                
+                // Convert Genres
+                if(details.genres) {
+                    const genres = details.genres.map(g => g.name).join(', ');
+                    document.querySelector('input[name="category"]').value = genres;
+                }
+                
+                resultsBox.innerHTML = '<span style="color: #27ae60; font-weight: bold; margin-top: 10px; display: inline-block;">✅ Auto-Fill Complete!</span>';
+                setTimeout(() => { resultsBox.innerHTML = ''; }, 3000); // Hide the success message after 3 seconds
+                
+            } catch (e) {
+                resultsBox.innerHTML = '<span style="color: #e74c3c; margin-top: 10px; display: inline-block;">Error fetching details.</span>';
             }
         }
 
