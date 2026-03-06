@@ -18,11 +18,15 @@
         
         button { background-color: #0984e3; color: white; border: none; padding: 14px 20px; border-radius: 6px; cursor: pointer; font-size: 16px; width: 100%; font-weight: bold; transition: background 0.3s; }
         button:hover { background-color: #74b9ff; }
+        
         .btn-add { background-color: #27ae60; width: auto; font-size: 14px; padding: 10px 20px; margin-top: 10px; }
         .btn-add:hover { background-color: #2ecc71; }
         
+        /* NEW: AUTO-FILL BUTTON */
+        .btn-autofill { background-color: #6c5ce7; width: auto; font-size: 14px; padding: 12px 20px; margin-top: 10px; }
+        .btn-autofill:hover { background-color: #a29bfe; }
+        
         .header-link { display: inline-block; margin-bottom: 20px; color: #0984e3; text-decoration: none; font-weight: bold; }
-        .header-link:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
@@ -34,16 +38,20 @@
         <form action="/admin" method="POST" enctype="multipart/form-data">
             
             <div class="form-group">
-                <label>Title:</label>
-                <input type="text" name="title" placeholder="e.g., The Matrix" required>
-            </div>
-
-            <div class="form-group">
                 <label>Media Type:</label>
                 <select name="media_type" id="media-type-select" required onchange="toggleMediaMode()">
                     <option value="movie">Movie</option>
                     <option value="series">TV Series (Batch Upload)</option>
                 </select>
+            </div>
+
+            <div class="form-group">
+                <label>Title:</label>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" name="title" id="media-title" placeholder="e.g., The Matrix" required>
+                    <button type="button" class="btn-autofill" onclick="fetchTMDB()">✨ Auto-Fill</button>
+                </div>
+                <small style="color: #7f8c8d;">Type the title and click Auto-Fill to grab all data from TMDB instantly!</small>
             </div>
 
             <div class="form-group">
@@ -109,30 +117,72 @@
     </div>
 
     <script>
+        // !!!!!!!! IMPORTANT !!!!!!!!
+        // GET YOUR FREE API KEY FROM THEMOVIEDB.ORG AND PASTE IT BETWEEN THE QUOTES BELOW:
+        const TMDB_API_KEY = "4f702e8358a2849df9d2aa4f6496a9e9"; 
+
+        async function fetchTMDB() {
+            const title = document.getElementById('media-title').value;
+            const type = document.getElementById('media-type-select').value;
+            
+            if(!title) { alert("Please type a movie or series title first!"); return; }
+            if(TMDB_API_KEY === "PASTE_YOUR_TMDB_API_KEY_HERE") { alert("You forgot to add your TMDB API Key in the admin.html file!"); return; }
+            
+            const tmdbType = type === 'series' ? 'tv' : 'movie';
+            const url = `https://api.themoviedb.org/3/search/${tmdbType}?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(title)}`;
+            
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+                
+                if(data.results && data.results.length > 0) {
+                    const item = data.results[0]; // Grabs the best match
+                    
+                    // Fetch deeper details to get exact Runtime and Genres
+                    const detailRes = await fetch(`https://api.themoviedb.org/3/${tmdbType}/${item.id}?api_key=${TMDB_API_KEY}`);
+                    const details = await detailRes.json();
+                    
+                    // Auto-Fill all fields!
+                    document.querySelector('textarea[name="plot"]').value = details.overview || '';
+                    document.querySelector('input[name="year"]').value = (details.release_date || details.first_air_date || '').substring(0, 4);
+                    document.querySelector('input[name="rating"]').value = (details.vote_average || 0).toFixed(1);
+                    document.querySelector('input[name="poster_url"]').value = `https://image.tmdb.org/t/p/w500${details.poster_path}`;
+                    
+                    // Convert Runtime
+                    if (type === 'movie' && details.runtime) {
+                        const hours = Math.floor(details.runtime / 60);
+                        const mins = details.runtime % 60;
+                        document.querySelector('input[name="runtime"]').value = `${hours}h ${mins}m`;
+                    } else if (type === 'series' && details.episode_run_time && details.episode_run_time.length > 0) {
+                        document.querySelector('input[name="runtime"]').value = `${details.episode_run_time[0]}m`;
+                    }
+                    
+                    // Convert Genres
+                    if(details.genres) {
+                        const genres = details.genres.map(g => g.name).join(', ');
+                        document.querySelector('input[name="category"]').value = genres;
+                    }
+                    alert("✅ TMDB Auto-Fill Complete!");
+                } else {
+                    alert("No results found on TMDB. Check spelling!");
+                }
+            } catch (e) {
+                alert("Error connecting to TMDB.");
+            }
+        }
+
+        // Standard Upload scripts
         function toggleMediaMode() {
             const mediaType = document.getElementById('media-type-select').value;
-            const movieSection = document.getElementById('movie-section');
-            const seriesSection = document.getElementById('series-section');
-            
-            if (mediaType === 'series') {
-                movieSection.style.display = 'none';
-                seriesSection.style.display = 'block';
-            } else {
-                movieSection.style.display = 'block';
-                seriesSection.style.display = 'none';
-            }
+            document.getElementById('movie-section').style.display = mediaType === 'series' ? 'none' : 'block';
+            document.getElementById('series-section').style.display = mediaType === 'series' ? 'block' : 'none';
         }
 
         function addEpisodeRow() {
             const container = document.getElementById('episode-container');
-            const rowCount = container.children.length + 1;
-            
             const newRow = document.createElement('div');
             newRow.className = 'episode-row';
-            newRow.innerHTML = `
-                <input type="number" name="episodes[]" placeholder="Ep ${rowCount}">
-                <input type="file" name="files[]" accept=".srt">
-            `;
+            newRow.innerHTML = `<input type="number" name="episodes[]" placeholder="Ep ${container.children.length + 1}"> <input type="file" name="files[]" accept=".srt">`;
             container.appendChild(newRow);
         }
     </script>
