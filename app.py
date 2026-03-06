@@ -430,6 +430,55 @@ def trigger_telegram(movie_id):
     except Exception as e:
         return str(e), 500
 
+# --- 1. DYNAMIC SITEMAP FOR GOOGLE SEO ---
+@app.route('/sitemap.xml')
+def sitemap():
+    base_url = "https://malayalamsubtitles.onrender.com"
+    xml = ['<?xml version="1.0" encoding="UTF-8"?>']
+    xml.append('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')
+    
+    # Add homepage
+    xml.append(f'<url><loc>{base_url}/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>')
+    
+    # Add all media pages dynamically
+    all_media = Movie.query.order_by(Movie.id.desc()).all()
+    for media in all_media:
+        if media.media_type == 'series':
+            encoded_title = urllib.parse.quote(media.title)
+            url = f"{base_url}/series/{encoded_title}/{media.season or 1}"
+        else:
+            url = f"{base_url}/movie/{media.id}"
+        xml.append(f'<url><loc>{url}</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>')
+        
+    xml.append('</urlset>')
+    return app.response_class('\n'.join(xml), mimetype='application/xml')
+
+# --- 2. RECEIVE SUBTITLE REQUESTS FROM USERS ---
+@app.route('/api/request_sub', methods=['POST'])
+def request_sub():
+    data = request.json
+    title = data.get('title')
+    details = data.get('details', 'No extra details provided.')
+    
+    TELEGRAM_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
+    CHANNEL_ID = os.environ.get('TELEGRAM_CHANNEL_ID')
+    
+    if not TELEGRAM_TOKEN or not CHANNEL_ID:
+        return jsonify({"error": "Telegram not configured"}), 500
+        
+    # Formats the message nicely for your Telegram Channel
+    msg = f"🔔 *New Subtitle Request from Website*\n\n🎬 *Title:* {title}\n📝 *Details:* {details}\n\n_Admin, add this to your upload list!_"
+    
+    try:
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+        payload = {"chat_id": CHANNEL_ID, "text": msg, "parse_mode": "Markdown"}
+        requests.post(url, json=payload)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+        
+
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
+
