@@ -95,42 +95,51 @@ def index():
     
     search_query = request.args.get('q', '')
     category_query = request.args.get('cat', '')
-    view_all = request.args.get('view', '')
     
-    all_media = Movie.query.order_by(Movie.id.desc()).all()
-
+    # 1. Grab the current page number from the URL (default is page 1)
+    page = request.args.get('page', 1, type=int)
+    
+    # 2. Build the Category List for the dropdown
+    all_media_unpaginated = Movie.query.order_by(Movie.id.desc()).all()
     categories_set = set()
-    for movie in all_media:
+    for movie in all_media_unpaginated:
         if movie.category:
             for cat in movie.category.split(','):
                 if cat.strip() and cat.strip() != "SilentMode":
                     categories_set.add(cat.strip())
     categories_list = sorted(list(categories_set))
 
+    # --- SCENARIO A: User is Searching ---
     if search_query:
-        search_results = Movie.query.filter(
+        pagination = Movie.query.filter(
             (Movie.title.ilike(f'%{search_query}%')) | 
             (Movie.category.ilike(f'%{search_query}%'))
-        ).order_by(Movie.id.desc()).all()
-        return render_template('index.html', search_results=search_results, search_query=search_query, categories=categories_list)
+        ).order_by(Movie.id.desc()).paginate(page=page, per_page=12, error_out=False)
+        return render_template('index.html', pagination=pagination, search_query=search_query, categories=categories_list, mode="search")
     
+    # --- SCENARIO B: User Clicked a Category ---
     if category_query:
-        search_results = Movie.query.filter(Movie.category.ilike(f'%{category_query}%')).order_by(Movie.id.desc()).all()
-        return render_template('index.html', search_results=search_results, search_query=category_query, categories=categories_list)
+        pagination = Movie.query.filter(Movie.category.ilike(f'%{category_query}%')).order_by(Movie.id.desc()).paginate(page=page, per_page=12, error_out=False)
+        return render_template('index.html', pagination=pagination, search_query=category_query, categories=categories_list, mode="search")
 
-    if view_all == 'trending':
-        search_results = Movie.query.order_by(Movie.views.desc()).all()
-        return render_template('index.html', search_results=search_results, search_query="All Trending Subtitles", categories=categories_list)
-    elif view_all == 'latest':
-        search_results = Movie.query.order_by(Movie.id.desc()).all()
-        return render_template('index.html', search_results=search_results, search_query="All Latest Additions", categories=categories_list)
-
-    latest_movies = all_media[:10] 
-    top_movies = Movie.query.order_by(Movie.views.desc()).limit(10).all()
-    hero_movies = top_movies[:5] 
+    # --- SCENARIO C: The Standard Homepage (3 Rows) ---
     
-    return render_template('index.html', latest_movies=latest_movies, top_movies=top_movies, hero_movies=hero_movies, categories=categories_list)
-
+    # Row 1: Latest Releases (Paginated - 12 per page)
+    latest_pagination = Movie.query.order_by(Movie.id.desc()).paginate(page=page, per_page=12, error_out=False)
+    
+    # Row 2: Top Downloaded (Top 12 most viewed)
+    top_downloaded = Movie.query.order_by(Movie.views.desc()).limit(12).all()
+    
+    # Row 3: Random Picks (12 completely random movies from the Postgres DB)
+    random_picks = Movie.query.order_by(func.random()).limit(12).all()
+    
+    return render_template('index.html', 
+                           latest_pagination=latest_pagination, 
+                           top_downloaded=top_downloaded, 
+                           random_picks=random_picks, 
+                           categories=categories_list,
+                           mode="home")
+    
 @app.route('/robots.txt')
 def robots_txt():
     rules = "User-agent: *\nDisallow: /admin\nDisallow: /login\nDisallow: /delete/\nAllow: /\n"
@@ -609,3 +618,4 @@ def request_sub():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
+
