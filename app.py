@@ -211,13 +211,60 @@ def login():
 @app.route('/dashboard')
 @login_required
 def dashboard():
+    # 1. AUTO-CLEANUP: Delete jobs that are completely finished
+    TranslationJob.query.filter(TranslationJob.status.in_(['Completed', 'Success'])).delete(synchronize_session=False)
+    db.session.commit()
+
     stat = SiteStat.query.first()
     total_dl = db.session.query(func.sum(TranslationCache.downloads)).scalar() or 0
     total_subs = TranslationCache.query.count()
-    all_media = Movie.query.order_by(Movie.id.desc()).all()
+    
+    # 2. PAGINATION: Limit to 15 items per page
+    page = request.args.get('page', 1, type=int)
+    all_media_paginated = Movie.query.order_by(Movie.id.desc()).paginate(page=page, per_page=15, error_out=False)
+    
     pop_lang = db.session.query(TranslationCache.language, func.count(TranslationCache.id)).group_by(TranslationCache.language).order_by(func.count(TranslationCache.id).desc()).first()
     recent_jobs = TranslationJob.query.order_by(TranslationJob.id.desc()).limit(15).all()
-    return render_template('dashboard.html', visitors=stat.total_visitors, downloads=total_dl, total_subtitles=total_subs, popular_lang=pop_lang, all_media=all_media, jobs=recent_jobs)
+
+    # 3. GET POSTGRESQL DATABASE SIZE
+    try:
+        db_size_query = db.session.execute(db.text("SELECT pg_size_pretty(pg_database_size(current_database()))")).scalar()
+        db_size = db_size_query if db_size_query else "Unknown"
+    except:
+        db_size = "Error reading DB"
+
+    # 4. GET CLOUDFLARE R2 STORAGE SIZE
+    r2_size_str = "Not Connected"
+    r2_file_count = 0
+    if s3_client and r2_bucket:
+        try:
+            total_bytes = 0
+            paginator = s3_client.get_paginator('list_objects_v2')
+            for page_obj in paginator.paginate(Bucket=r2_bucket):
+                if 'Contents' in page_obj:
+                    for obj in page_obj['Contents']:
+                        total_bytes += obj['Size']
+                        r2_file_count += 1
+            
+            if total_bytes < 1024 * 1024:
+                r2_size_str = f"{total_bytes / 1024:.2f} KB"
+            elif total_bytes < 1024 * 1024 * 1024:
+                r2_size_str = f"{total_bytes / (1024 * 1024):.2f} MB"
+            else:
+                r2_size_str = f"{total_bytes / (1024 * 1024 * 1024):.2f} GB"
+        except Exception as e:
+            r2_size_str = "Read Error"
+
+    return render_template('dashboard.html', 
+                           visitors=stat.total_visitors, 
+                           downloads=total_dl, 
+                           total_subtitles=total_subs, 
+                           popular_lang=pop_lang, 
+                           all_media=all_media_paginated, 
+                           jobs=recent_jobs,
+                           db_size=db_size,
+                           r2_size_str=r2_size_str,
+                           r2_file_count=r2_file_count)
 
 @app.route('/admin/reset_jobs')
 @login_required
@@ -342,7 +389,6 @@ def tmdb_details():
         return jsonify({"error": str(e)}), 500
 
 # --- DUAL-ENGINE AUTO FETCHER (Subdl + OpenSubtitles + ZIP Extractor) ---
-# --- DUAL-ENGINE AUTO FETCHER (Subdl + OpenSubtitles + ZIP Extractor) ---
 @app.route('/api/auto_fetch_srt', methods=['POST'])
 @login_required
 def auto_fetch_srt():
@@ -371,7 +417,6 @@ def auto_fetch_srt():
     # --- ENGINE 1: SUBDL ---
     if SUBDL_API_KEY:
         try:
-            # FIX 1: Put the API Key back into the URL!
             if media_type == 'series':
                 url = f"https://api.subdl.com/api/v1/subtitles?api_key={SUBDL_API_KEY}&imdb_id={imdb_id}&type=tv&season_number={season}&episode_number={episode}&languages=EN"
             else:
@@ -379,7 +424,6 @@ def auto_fetch_srt():
                 
             res_raw = requests.get(url, headers=custom_headers)
             
-            # FIX 2: Stop Python from crashing if it receives an HTML page
             if res_raw.status_code == 200:
                 res = res_raw.json()
                 if res.get('status') and res.get('subtitles'):
@@ -411,7 +455,7 @@ def auto_fetch_srt():
             os_headers = {
                 "Api-Key": OS_API_KEY, 
                 "Content-Type": "application/json",
-                "User-Agent": "malayalamsubtitles_app v1.0" # OpenSubtitles requires a custom agent name, not a fake Chrome one!
+                "User-Agent": "malayalamsubtitles_app v1.0" 
             }
             
             if media_type == 'series':
@@ -664,5 +708,3 @@ def request_sub():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
-
-
