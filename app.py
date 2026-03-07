@@ -314,6 +314,33 @@ def edit_media(movie_id):
 
     return render_template('edit.html', media=media)
 
+# --- PRIVATE TMDB PROXY (Bypasses ISP Blocks) ---
+@app.route('/api/tmdb_search')
+@login_required
+def tmdb_search():
+    query = request.args.get('query')
+    tmdb_type = request.args.get('type')
+    api_key = "4f702e8358a2849df9d2aa4f6496a9e9"
+    url = f"https://api.themoviedb.org/3/search/{tmdb_type}?api_key={api_key}&query={urllib.parse.quote(query)}"
+    try:
+        res = requests.get(url).json()
+        return jsonify(res)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/tmdb_details')
+@login_required
+def tmdb_details():
+    tmdb_id = request.args.get('id')
+    tmdb_type = request.args.get('type')
+    api_key = "4f702e8358a2849df9d2aa4f6496a9e9"
+    url = f"https://api.themoviedb.org/3/{tmdb_type}/{tmdb_id}?api_key={api_key}&append_to_response=external_ids"
+    try:
+        res = requests.get(url).json()
+        return jsonify(res)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 # --- DUAL-ENGINE AUTO FETCHER (Subdl + OpenSubtitles + ZIP Extractor) ---
 @app.route('/api/auto_fetch_srt', methods=['POST'])
 @login_required
@@ -372,7 +399,7 @@ def auto_fetch_srt():
             os_headers = {
                 "Api-Key": OS_API_KEY, 
                 "Content-Type": "application/json",
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
             }
             
             if media_type == 'series':
