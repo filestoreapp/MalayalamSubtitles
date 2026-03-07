@@ -12,7 +12,6 @@
         .optional-label { color: #7f8c8d; font-weight: normal; font-size: 0.85em; }
         .silent-box { background: #fff3cd; padding: 15px; border-radius: 6px; border: 1px dashed #ffeaa7; margin: 20px 0; }
         
-        #series-section { display: none; background: #f8f9fa; padding: 20px; border-radius: 8px; border: 1px solid #e9ecef; margin-bottom: 20px; }
         .episode-row { display: flex; gap: 15px; margin-bottom: 12px; align-items: center; background: white; padding: 12px; border: 1px solid #dee2e6; border-radius: 6px; }
         .episode-row input[type="number"] { width: 120px; }
         
@@ -22,13 +21,11 @@
         .btn-add { background-color: #27ae60; width: auto; font-size: 14px; padding: 10px 20px; margin-top: 10px; }
         .btn-add:hover { background-color: #2ecc71; }
         
-        /* MAGIC AUTO-FILL BUTTON */
         .btn-autofill { background-color: #6c5ce7; width: auto; font-size: 14px; padding: 12px 20px; }
         .btn-autofill:hover { background-color: #a29bfe; }
         
         .header-link { display: inline-block; margin-bottom: 20px; color: #0984e3; text-decoration: none; font-weight: bold; }
         
-        /* TMDB RESULTS STYLING */
         #tmdb-results { margin-top: 10px; display: flex; flex-direction: column; gap: 5px; }
         .tmdb-result-btn { background: #f1f2f6; color: #2f3640; border: 1px solid #dcdde1; padding: 8px 12px; border-radius: 5px; text-align: left; cursor: pointer; font-weight: bold; font-size: 13px; transition: 0.2s; }
         .tmdb-result-btn:hover { background: #dfe4ea; border-color: #ced6e0; }
@@ -58,7 +55,6 @@
                 </div>
                 
                 <div id="tmdb-results"></div>
-                
                 <small style="color: #7f8c8d; display: block; margin-top: 8px;">Type the title and click Auto-Fill to grab all data from TMDB instantly!</small>
             </div>
 
@@ -92,25 +88,40 @@
                 <input type="text" name="poster_url" placeholder="https://..." required>
             </div>
 
-            <div class="form-group" id="movie-section">
-                <label>Upload English .SRT File:</label>
-                <input type="file" name="files[]" accept=".srt">
-            </div>
-
-            <div id="series-section">
-                <div class="form-group">
-                    <label>Season Number:</label>
-                    <input type="number" name="season" placeholder="e.g., 1" id="season-input">
-                </div>
+            <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; border: 1px solid #e9ecef; margin-bottom: 20px;">
+                <h3 style="margin-top:0; color: #2c3e50;">📥 Subtitle Source</h3>
                 
-                <label>Episodes & Subtitles:</label>
-                <div id="episode-container">
+                <div id="series-meta" style="display: none; gap: 15px; margin-bottom: 15px;">
+                    <div style="flex: 1;">
+                        <label>Season Number:</label>
+                        <input type="number" name="season" id="season-input" placeholder="e.g., 1">
+                    </div>
+                    <div style="flex: 1;">
+                        <label>Total Episodes to Fetch:</label>
+                        <input type="number" id="total-eps-input" placeholder="e.g., 10">
+                    </div>
+                </div>
+
+                <div id="fetched-srts-container"></div>
+                <input type="hidden" id="hidden-imdb-id">
+
+                <button type="button" id="fetch-srt-btn" onclick="autoFetchSRT()" style="background: #6c5ce7; margin-bottom: 15px;">✨ Auto-Fetch English Subtitles</button>
+                <div id="fetch-status" style="font-size: 13px; margin-bottom: 20px; line-height: 1.6;"></div>
+
+                <hr style="border: 0; border-top: 1px dashed #ced4da; margin: 20px 0;">
+
+                <label style="color: #7f8c8d; font-size: 14px; margin-bottom: 10px;"><b>OR</b> Upload Manually (If API Fails):</label>
+                <div id="episode-container" style="display: none;">
                     <div class="episode-row">
                         <input type="number" name="episodes[]" placeholder="Ep 1">
                         <input type="file" name="files[]" accept=".srt">
                     </div>
                 </div>
-                <button type="button" class="btn-add" onclick="addEpisodeRow()">➕ Add Another Episode</button>
+                <div id="movie-manual-container">
+                    <input type="file" name="files[]" accept=".srt">
+                </div>
+                
+                <button type="button" id="add-ep-btn" class="btn-add" onclick="addEpisodeRow()" style="display: none;">➕ Add Another Manual Episode</button>
             </div>
 
             <div class="form-group silent-box">
@@ -143,9 +154,8 @@
                 const data = await res.json();
                 
                 if(data.results && data.results.length > 0) {
-                    resultsBox.innerHTML = ''; // Clear searching text
+                    resultsBox.innerHTML = ''; 
                     
-                    // Show the top 5 matches as clickable buttons
                     data.results.slice(0, 5).forEach(item => {
                         const year = (item.release_date || item.first_air_date || 'N/A').substring(0, 4);
                         const displayTitle = item.title || item.name;
@@ -155,7 +165,6 @@
                         btn.className = 'tmdb-result-btn';
                         btn.innerHTML = `📌 ${displayTitle} (${year})`;
                         
-                        // When clicked, grab the specific details for THIS movie
                         btn.onclick = () => fetchSpecificDetails(item.id, tmdbType, displayTitle);
                         resultsBox.appendChild(btn);
                     });
@@ -175,10 +184,9 @@
                 const detailRes = await fetch(`https://api.themoviedb.org/3/${tmdbType}/${tmdbId}?api_key=${TMDB_API_KEY}`);
                 const details = await detailRes.json();
                 
-                // Set the title box to the exact official title
                 document.getElementById('media-title').value = exactTitle;
+                document.getElementById('hidden-imdb-id').value = details.imdb_id;
                 
-                // Auto-Fill all fields
                 document.querySelector('textarea[name="plot"]').value = details.overview || '';
                 document.querySelector('input[name="year"]').value = (details.release_date || details.first_air_date || '').substring(0, 4);
                 document.querySelector('input[name="rating"]').value = (details.vote_average || 0).toFixed(1);
@@ -187,7 +195,6 @@
                     document.querySelector('input[name="poster_url"]').value = `https://image.tmdb.org/t/p/w500${details.poster_path}`;
                 }
                 
-                // Convert Runtime
                 const type = document.getElementById('media-type-select').value;
                 if (type === 'movie' && details.runtime) {
                     const hours = Math.floor(details.runtime / 60);
@@ -197,25 +204,25 @@
                     document.querySelector('input[name="runtime"]').value = `${details.episode_run_time[0]}m`;
                 }
                 
-                // Convert Genres
                 if(details.genres) {
                     const genres = details.genres.map(g => g.name).join(', ');
                     document.querySelector('input[name="category"]').value = genres;
                 }
                 
                 resultsBox.innerHTML = '<span style="color: #27ae60; font-weight: bold; margin-top: 10px; display: inline-block;">✅ Auto-Fill Complete!</span>';
-                setTimeout(() => { resultsBox.innerHTML = ''; }, 3000); // Hide the success message after 3 seconds
+                setTimeout(() => { resultsBox.innerHTML = ''; }, 3000); 
                 
             } catch (e) {
                 resultsBox.innerHTML = '<span style="color: #e74c3c; margin-top: 10px; display: inline-block;">Error fetching details.</span>';
             }
         }
 
-        // Standard Upload scripts
         function toggleMediaMode() {
-            const mediaType = document.getElementById('media-type-select').value;
-            document.getElementById('movie-section').style.display = mediaType === 'series' ? 'none' : 'block';
-            document.getElementById('series-section').style.display = mediaType === 'series' ? 'block' : 'none';
+            const isSeries = document.getElementById('media-type-select').value === 'series';
+            document.getElementById('series-meta').style.display = isSeries ? 'flex' : 'none';
+            document.getElementById('add-ep-btn').style.display = isSeries ? 'block' : 'none';
+            document.getElementById('episode-container').style.display = isSeries ? 'block' : 'none';
+            document.getElementById('movie-manual-container').style.display = isSeries ? 'none' : 'block';
         }
 
         function addEpisodeRow() {
@@ -224,6 +231,80 @@
             newRow.className = 'episode-row';
             newRow.innerHTML = `<input type="number" name="episodes[]" placeholder="Ep ${container.children.length + 1}"> <input type="file" name="files[]" accept=".srt">`;
             container.appendChild(newRow);
+        }
+
+        async function autoFetchSRT() {
+            const imdbId = document.getElementById('hidden-imdb-id').value;
+            const mediaType = document.getElementById('media-type-select').value;
+            const btn = document.getElementById('fetch-srt-btn');
+            const statusBox = document.getElementById('fetch-status');
+            const container = document.getElementById('fetched-srts-container');
+            
+            if (!imdbId) return alert("Please use the TMDB Auto-Fill first so we have the IMDb ID!");
+
+            container.innerHTML = ''; 
+            btn.disabled = true;
+
+            if (mediaType === 'movie') {
+                btn.innerText = "⏳ Fetching Movie...";
+                statusBox.innerHTML = '<span style="color: #0984e3;">Searching databases (Subdl -> OpenSubtitles)...</span>';
+                try {
+                    const res = await fetch('/api/auto_fetch_srt', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({imdb_id: imdbId, media_type: 'movie'})
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        container.innerHTML = `<textarea name="fetched_srts[]" style="display:none;">${data.srt_text}</textarea>
+                                               <input type="hidden" name="fetched_episodes[]" value="1">`;
+                        statusBox.innerHTML = `<span style="color: #27ae60; font-weight: bold;">✅ Captured from ${data.source}! Click "Upload & Start Processing" below.</span>`;
+                        btn.innerText = "✅ Fetch Complete!";
+                    } else {
+                        statusBox.innerHTML = `<span style="color: #e74c3c;">❌ Error: ${data.error}</span>`;
+                        btn.innerText = "✨ Auto-Fetch English Subtitles";
+                    }
+                } catch (e) {
+                    statusBox.innerHTML = '<span style="color: #e74c3c;">❌ Network error.</span>';
+                    btn.innerText = "✨ Auto-Fetch English Subtitles";
+                }
+            } else {
+                const season = document.getElementById('season-input').value;
+                const totalEps = document.getElementById('total-eps-input').value;
+                
+                if (!season || !totalEps) {
+                    btn.disabled = false;
+                    return alert("Please enter the Season and Total Episodes to Fetch!");
+                }
+                
+                btn.innerText = `⏳ Fetching ${totalEps} Episodes...`;
+                statusBox.innerHTML = '<b>Starting Batch Fetch...</b><br>';
+                
+                for (let i = 1; i <= totalEps; i++) {
+                    statusBox.innerHTML += `<span style="color: #0984e3;">Fetching Ep ${i}... </span>`;
+                    try {
+                        const res = await fetch('/api/auto_fetch_srt', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({imdb_id: imdbId, media_type: 'series', season: season, episode: i})
+                        });
+                        const data = await res.json();
+                        
+                        if (data.success) {
+                            statusBox.innerHTML += `<span style="color: #27ae60;">✅ Found (${data.source})</span><br>`;
+                            container.innerHTML += `<textarea name="fetched_srts[]" style="display:none;">${data.srt_text}</textarea>
+                                                   <input type="hidden" name="fetched_episodes[]" value="${i}">`;
+                        } else {
+                            statusBox.innerHTML += `<span style="color: #e74c3c;">❌ Failed</span><br>`;
+                        }
+                    } catch (e) {
+                        statusBox.innerHTML += `<span style="color: #e74c3c;">❌ Network Error</span><br>`;
+                    }
+                }
+                statusBox.innerHTML += `<br><span style="color: #27ae60; font-weight: bold;">🎉 Batch Process Complete! Click "Upload & Start Processing" below.</span>`;
+                btn.innerText = "✅ Batch Fetch Complete!";
+            }
+            btn.disabled = false;
         }
     </script>
 </body>
