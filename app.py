@@ -478,4 +478,98 @@ def trigger_telegram(movie_id):
     
     runtime_text = f"⏱ *Runtime:* {movie.runtime}\n" if movie.runtime else ""
     
-    safe_plot = 
+    safe_plot = ""
+    if movie.plot:
+        clean_plot = movie.plot.replace("*", "").replace("_", "").replace("`", "")
+        safe_plot = clean_plot[:250] + "..." if len(clean_plot) > 250 else clean_plot
+        safe_plot = f"📖 *Plot:* {safe_plot}\n\n"
+    
+    if movie.media_type == 'series':
+        caption = (f"📺 *{safe_title}* - New Episode!\n\n"
+                   f"🔢 *Season {movie.season or 1} - Episode {movie.episode or 1}*\n"
+                   f"⭐️ *Rating:* {safe_rating} / 10\n"
+                   f"{runtime_text}"
+                   f"🎭 *Category:* {tags}\n\n"
+                   f"{safe_plot}"
+                   f"✅ *Subtitles Ready:* Malayalam, Tamil, Hindi\n"
+                   f"⚡️ *High-Speed Download*\n\n"
+                   f"👇 *Get the episode here:*{footer}")
+        import urllib.parse
+        encoded_title = urllib.parse.quote(safe_title)
+        button_url = f"{website_base_url}/series/{encoded_title}/{movie.season or 1}"
+    else:
+        caption = (f"🎬 *{safe_title}*\n\n"
+                   f"⭐️ *Rating:* {safe_rating} / 10\n"
+                   f"{runtime_text}"
+                   f"🎭 *Category:* {tags}\n\n"
+                   f"{safe_plot}"
+                   f"✅ *Subtitles Ready:* Malayalam, Tamil, Hindi\n"
+                   f"⚡️ *High-Speed Download*\n\n"
+                   f"👇 *Get the movie here:*{footer}")
+        button_url = f"{website_base_url}/movie/{movie.id}"
+
+    try:
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto"
+        payload = {
+            "chat_id": CHANNEL_ID, 
+            "photo": movie.poster_url if movie.poster_url else "https://via.placeholder.com/500x750?text=No+Poster", 
+            "caption": caption,
+            "parse_mode": "Markdown", 
+            "reply_markup": {"inline_keyboard": [[{"text": "📥 Download Subtitles", "url": button_url}]]}
+        }
+        response = requests.post(url, json=payload)
+        
+        if response.status_code == 200:
+            return "Posted to Telegram Successfully!", 200
+        else:
+            return f"Telegram API Error: {response.text}", 500
+            
+    except Exception as e:
+        return str(e), 500
+
+# --- SITEMAP & REQUESTS ---
+@app.route('/sitemap.xml')
+def sitemap():
+    base_url = "https://malayalamsubtitles.onrender.com"
+    xml = ['<?xml version="1.0" encoding="UTF-8"?>']
+    xml.append('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')
+    
+    xml.append(f'<url><loc>{base_url}/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>')
+    
+    all_media = Movie.query.order_by(Movie.id.desc()).all()
+    for media in all_media:
+        if media.media_type == 'series':
+            encoded_title = urllib.parse.quote(media.title)
+            url = f"{base_url}/series/{encoded_title}/{media.season or 1}"
+        else:
+            url = f"{base_url}/movie/{media.id}"
+        xml.append(f'<url><loc>{url}</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>')
+        
+    xml.append('</urlset>')
+    return app.response_class('\n'.join(xml), mimetype='application/xml')
+
+@app.route('/api/request_sub', methods=['POST'])
+def request_sub():
+    data = request.json
+    title = data.get('title')
+    details = data.get('details', 'No extra details provided.')
+    
+    TELEGRAM_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
+    CHANNEL_ID = os.environ.get('TELEGRAM_CHANNEL_ID') 
+    
+    if not TELEGRAM_TOKEN or not CHANNEL_ID:
+        return jsonify({"error": "Telegram not configured"}), 500
+        
+    msg = f"🔔 *New Subtitle Request from Website*\n\n🎬 *Title:* {title}\n📝 *Details:* {details}\n\n_Admin, add this to your upload list!_"
+    
+    try:
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+        payload = {"chat_id": CHANNEL_ID, "text": msg, "parse_mode": "Markdown"}
+        requests.post(url, json=payload)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
