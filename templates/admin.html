@@ -136,8 +136,6 @@
     </div>
 
     <script>
-        const TMDB_API_KEY = "4f702e8358a2849df9d2aa4f6496a9e9"; 
-
         async function fetchTMDB() {
             const title = document.getElementById('media-title').value;
             const type = document.getElementById('media-type-select').value;
@@ -145,15 +143,12 @@
             
             if(!title) { alert("Please type a movie or series title first!"); return; }
             
-            resultsBox.innerHTML = '<span style="color: #0984e3; margin-top: 10px; display: inline-block;">Searching TMDB...</span>';
+            resultsBox.innerHTML = '<span style="color: #0984e3; margin-top: 10px; display: inline-block;">Searching TMDB securely...</span>';
             const tmdbType = type === 'series' ? 'tv' : 'movie';
             
-            // TMDB URL using AllOrigins proxy to bypass ISP blocking
-            const targetUrl = `https://api.themoviedb.org/3/search/${tmdbType}?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(title)}`;
-            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
-            
             try {
-                const res = await fetch(proxyUrl);
+                // Fetching securely via Render backend private proxy
+                const res = await fetch(`/api/tmdb_search?type=${tmdbType}&query=${encodeURIComponent(title)}`);
                 const data = await res.json();
                 
                 if(data.results && data.results.length > 0) {
@@ -175,7 +170,7 @@
                     resultsBox.innerHTML = '<span style="color: #e74c3c; margin-top: 10px; display: inline-block;">No results found. Try checking the spelling!</span>';
                 }
             } catch (e) {
-                resultsBox.innerHTML = '<span style="color: #e74c3c; margin-top: 10px; display: inline-block;">Error connecting to TMDB. Try turning on a VPN!</span>';
+                resultsBox.innerHTML = '<span style="color: #e74c3c; margin-top: 10px; display: inline-block;">Error connecting to Render backend.</span>';
             }
         }
 
@@ -183,12 +178,9 @@
             const resultsBox = document.getElementById('tmdb-results');
             resultsBox.innerHTML = '<span style="color: #0984e3; margin-top: 10px; display: inline-block;">Fetching details...</span>';
             
-            // Appending external_ids to ensure we capture TV Show IMDb IDs, using a timestamp to bypass caching
-            const targetDetailUrl = `https://api.themoviedb.org/3/${tmdbType}/${tmdbId}?api_key=${TMDB_API_KEY}&append_to_response=external_ids`;
-            const detailProxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetDetailUrl)}&t=${Date.now()}`;
-            
             try {
-                const detailRes = await fetch(detailProxyUrl);
+                // Fetching securely via Render backend private proxy
+                const detailRes = await fetch(`/api/tmdb_details?type=${tmdbType}&id=${tmdbId}`);
                 const details = await detailRes.json();
                 
                 document.getElementById('media-title').value = exactTitle;
