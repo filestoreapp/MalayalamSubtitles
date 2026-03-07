@@ -92,14 +92,12 @@ def index():
     stat.total_visitors += 1
     db.session.commit()
     
-    # Grab the specific requests from the buttons
     search_query = request.args.get('q', '')
     category_query = request.args.get('cat', '')
     view_all = request.args.get('view', '')
     
     all_media = Movie.query.order_by(Movie.id.desc()).all()
 
-    # Generate the category pill list
     categories_set = set()
     for movie in all_media:
         if movie.category:
@@ -108,7 +106,6 @@ def index():
                     categories_set.add(cat.strip())
     categories_list = sorted(list(categories_set))
 
-    # Handle standard searches (Titles or Categories)
     if search_query:
         search_results = Movie.query.filter(
             (Movie.title.ilike(f'%{search_query}%')) | 
@@ -116,12 +113,10 @@ def index():
         ).order_by(Movie.id.desc()).all()
         return render_template('index.html', search_results=search_results, search_query=search_query, categories=categories_list)
     
-    # Handle Category Pill Clicks
     if category_query:
         search_results = Movie.query.filter(Movie.category.ilike(f'%{category_query}%')).order_by(Movie.id.desc()).all()
         return render_template('index.html', search_results=search_results, search_query=category_query, categories=categories_list)
 
-    # Handle "View All" Clicks
     if view_all == 'trending':
         search_results = Movie.query.order_by(Movie.views.desc()).all()
         return render_template('index.html', search_results=search_results, search_query="All Trending Subtitles", categories=categories_list)
@@ -129,10 +124,9 @@ def index():
         search_results = Movie.query.order_by(Movie.id.desc()).all()
         return render_template('index.html', search_results=search_results, search_query="All Latest Additions", categories=categories_list)
 
-    # Default Homepage View
     latest_movies = all_media[:10] 
     top_movies = Movie.query.order_by(Movie.views.desc()).limit(10).all()
-    hero_movies = top_movies[:5] # Grabs the Top 5 Most Popular for the top carousel
+    hero_movies = top_movies[:5] 
     
     return render_template('index.html', latest_movies=latest_movies, top_movies=top_movies, hero_movies=hero_movies, categories=categories_list)
 
@@ -169,7 +163,6 @@ def series_page(title, season):
 def download(movie_id, language):
     movie = Movie.query.get_or_404(movie_id)
     
-    # Grab the subtitle data (either raw text or a Cloudflare R2 URL)
     if language == 'en': 
         srt_data = movie.english_srt
     else:
@@ -178,32 +171,25 @@ def download(movie_id, language):
         cache.downloads += 1
         db.session.commit()
         
-    # --- FETCH THE FILE INVISIBLY INSTEAD OF REDIRECTING ---
     if srt_data.startswith('http'):
         try:
-            # Fetch the text from Cloudflare R2
             response = requests.get(srt_data)
             response.raise_for_status() 
             file_content = response.content
         except Exception as e:
             return f"Error fetching subtitle file: {e}", 500
     else:
-        # It's raw text stored in the Neon database
         file_content = srt_data.encode('utf-8')
         
-    # Prepare the file to be sent to the user
     mem_file = io.BytesIO(file_content)
     mem_file.seek(0)
     
-    # --- PROFESSIONAL SCENE-STANDARD FILE NAMING ---
     lang_map = {'en': 'English', 'ml': 'Malayalam', 'ta': 'Tamil', 'hi': 'Hindi'}
     full_lang = lang_map.get(language, language.upper())
     
-    # Scrub the title to remove illegal/messy characters and replace spaces with dots
     safe_title = re.sub(r'[^\w\s-]', '', movie.title) 
     clean_title = re.sub(r'[-\s]+', '.', safe_title).strip('.') 
     
-    # Build the final professional file name
     if movie.media_type == 'series':
         s = movie.season or 1
         e = movie.episode or 1
@@ -218,7 +204,6 @@ def download(movie_id, language):
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        # Don't forget to change this password later!
         if request.form['username'] == 'admin' and request.form['password'] == 'malayalam123':
             session['logged_in'] = True
             return redirect(url_for('dashboard'))
@@ -239,12 +224,10 @@ def dashboard():
 @app.route('/admin/reset_jobs')
 @login_required
 def reset_jobs():
-    """Finds crashed 'Processing' jobs and resets them to 'Pending'."""
     stuck_jobs = TranslationJob.query.filter_by(status='Processing').all()
     for job in stuck_jobs:
         job.status = 'Pending'
     db.session.commit()
-    
     try:
         requests.get("https://malayalamsub-malayalamsubs.hf.space/start-worker", timeout=5)
     except Exception: pass
@@ -280,6 +263,112 @@ def delete_media(movie_id):
     db.session.commit()
     return redirect(url_for('dashboard'))
 
+@app.route('/admin/edit/<int:movie_id>', methods=['GET', 'POST'])
+@login_required
+def edit_media(movie_id):
+    media = Movie.query.get_or_404(movie_id)
+
+    if request.method == 'POST':
+        media.title = request.form.get('title')
+        media.year = request.form.get('year')
+        media.rating = request.form.get('rating')
+        media.poster_url = request.form.get('poster_url')
+        media.category = request.form.get('category')
+        media.plot = request.form.get('plot')
+        media.runtime = request.form.get('runtime')
+
+        if media.media_type == 'series':
+            media.season = request.form.get('season')
+            media.episode = request.form.get('episode')
+
+        new_srt = request.files.get('new_srt')
+        if new_srt and new_srt.filename:
+            content = new_srt.read().decode('utf-8', errors='ignore')
+            storage_data = content 
+            
+            if s3_client and r2_bucket:
+                safe_title = media.title.replace(" ", "_").replace("/", "").lower()
+                ep_tag = f"_s{media.season}e{media.episode}" if media.media_type == 'series' else ""
+                r2_filename = f"english_{safe_title}{ep_tag}_edit_{os.urandom(4).hex()}.srt"
+                try:
+                    s3_client.put_object(
+                        Bucket=r2_bucket, Key=r2_filename,
+                        Body=content.encode('utf-8'), ContentType='application/x-subrip'
+                    )
+                    storage_data = f"{r2_public_url}/{r2_filename}"
+                except Exception as e:
+                    print(f"R2 Upload Failed on Edit: {e}")
+
+            media.english_srt = storage_data
+
+            TranslationCache.query.filter_by(movie_id=media.id).delete()
+            TranslationJob.query.filter_by(movie_id=media.id).delete()
+            
+            for lang in ['ml', 'ta', 'hi']:
+                db.session.add(TranslationJob(movie_id=media.id, language=lang, status='Pending'))
+            
+            try:
+                requests.get("https://malayalamsub-malayalamsubs.hf.space/start-worker", timeout=5)
+            except Exception: pass
+
+        db.session.commit()
+        return redirect(url_for('dashboard'))
+
+    return render_template('edit.html', media=media)
+
+# --- DUAL-ENGINE AUTO FETCHER (Subdl + OpenSubtitles) ---
+@app.route('/api/auto_fetch_srt', methods=['POST'])
+@login_required
+def auto_fetch_srt():
+    data = request.json
+    imdb_id = data.get('imdb_id')
+    media_type = data.get('media_type', 'movie')
+    season = data.get('season')
+    episode = data.get('episode')
+
+    SUBDL_API_KEY = "Fj3xMg24eTEfVxBSWOfx04kP55CHGtvB"
+    OS_API_KEY = "9AnWofHGkYabMMjKUhXpeDdwqrLvss2n"
+
+    if not str(imdb_id).startswith('tt'):
+        imdb_id = f"tt{imdb_id}"
+
+    # --- ENGINE 1: SUBDL ---
+    if SUBDL_API_KEY:
+        try:
+            url = f"https://api.subdl.com/api/v1/subtitles?imdb_id={imdb_id}&languages=EN&api_key={SUBDL_API_KEY}"
+            if media_type == 'series':
+                url += f"&season_number={season}&episode_number={episode}"
+                
+            res = requests.get(url).json()
+            if res.get('status') and res.get('subtitles'):
+                dl_url = "https://dl.subdl.com" + res['subtitles'][0]['url']
+                srt_text = requests.get(dl_url).text
+                return jsonify({"success": True, "srt_text": srt_text, "source": "Subdl"})
+        except Exception as e:
+            print("Subdl Failed:", e)
+
+    # --- ENGINE 2: OPENSUBTITLES ---
+    if OS_API_KEY:
+        try:
+            headers = {"Api-Key": OS_API_KEY, "Content-Type": "application/json"}
+            url = f"https://api.opensubtitles.com/api/v1/subtitles?imdb_id={imdb_id}&languages=en"
+            if media_type == 'series':
+                url += f"&season_number={season}&episode_number={episode}"
+
+            search_res = requests.get(url, headers=headers).json()
+            if search_res.get('data'):
+                file_id = search_res['data'][0]['attributes']['files'][0]['file_id']
+                dl_res = requests.post("https://api.opensubtitles.com/api/v1/download", headers=headers, json={"file_id": file_id}).json()
+                link = dl_res.get('link')
+                if link:
+                    srt_text = requests.get(link).text
+                    return jsonify({"success": True, "srt_text": srt_text, "source": "OpenSubtitles"})
+        except Exception as e:
+            print("OpenSubtitles Failed:", e)
+
+    return jsonify({"error": "Failed to find English subtitles on both databases."}), 404
+
+# --- MASTER UPLOAD ROUTE ---
 @app.route('/admin', methods=['GET', 'POST'])
 @login_required
 def admin():
@@ -298,19 +387,30 @@ def admin():
         category_string = ", ".join(categories)
         if silent_upload == 'yes':
             category_string += ", SilentMode"
-            
-        # --- BATCH UPLOAD LOGIC ---
+
+        fetched_srts = request.form.getlist('fetched_srts[]')
+        fetched_episodes = request.form.getlist('fetched_episodes[]')
+
         files = request.files.getlist('files[]')
-        episodes = request.form.getlist('episodes[]')
+        manual_episodes = request.form.getlist('episodes[]')
         
         valid_files = [f for f in files if f and f.filename]
-        valid_episodes = [ep for ep in episodes if ep.strip()]
+        valid_manual_eps = [ep for ep in manual_episodes if ep.strip()]
+
+        items_to_process = []
         
+        for i, text in enumerate(fetched_srts):
+            if text.strip():
+                ep = fetched_episodes[i] if i < len(fetched_episodes) else str(i+1)
+                items_to_process.append((text, ep))
+                
         for i, srt_file in enumerate(valid_files):
             content = srt_file.read().decode('utf-8', errors='ignore')
+            ep = valid_manual_eps[i] if i < len(valid_manual_eps) else str(i+1)
+            items_to_process.append((content, ep))
+
+        for content, ep_str in items_to_process:
             storage_data = content 
-            
-            ep_str = valid_episodes[i] if i < len(valid_episodes) else str(i+1)
             
             if s3_client and r2_bucket:
                 safe_title = title.replace(" ", "_").replace("/", "").lower()
@@ -326,7 +426,7 @@ def admin():
                     print(f"R2 Upload Failed: {e}")
 
             current_ep = int(ep_str) if media_type == 'series' else None
-
+            
             new_media = Movie(
                 media_type=media_type, title=title, 
                 season=int(season) if season and media_type == 'series' else None,
@@ -338,19 +438,18 @@ def admin():
             db.session.commit()
 
             for lang in ['ml', 'ta', 'hi']:
-                new_job = TranslationJob(movie_id=new_media.id, language=lang, status='Pending')
-                db.session.add(new_job)
+                db.session.add(TranslationJob(movie_id=new_media.id, language=lang, status='Pending'))
             db.session.commit()
 
         try: 
             requests.get("https://malayalamsub-malayalamsubs.hf.space/start-worker", timeout=5)
-        except Exception: 
-            pass
+        except Exception: pass
 
         return redirect(url_for('dashboard'))
+
     return render_template('admin.html')
 
-# --- SECURE RENDER RELAY FOR TELEGRAM (BULLETPROOF VERSION) ---
+# --- SECURE RENDER RELAY FOR TELEGRAM ---
 @app.route('/api/trigger_telegram/<int:movie_id>', methods=['GET', 'POST'])
 def trigger_telegram(movie_id):
     if request.args.get('secret') != 'malayalam_super_secret_999':
@@ -379,106 +478,4 @@ def trigger_telegram(movie_id):
     
     runtime_text = f"⏱ *Runtime:* {movie.runtime}\n" if movie.runtime else ""
     
-    safe_plot = ""
-    if movie.plot:
-        # Strip markdown characters so they don't crash Telegram
-        clean_plot = movie.plot.replace("*", "").replace("_", "").replace("`", "")
-        # Trim to 250 characters to stay safely under Telegram's caption limit
-        safe_plot = clean_plot[:250] + "..." if len(clean_plot) > 250 else clean_plot
-        safe_plot = f"📖 *Plot:* {safe_plot}\n\n"
-    
-    if movie.media_type == 'series':
-        caption = (f"📺 *{safe_title}* - New Episode!\n\n"
-                   f"🔢 *Season {movie.season or 1} - Episode {movie.episode or 1}*\n"
-                   f"⭐️ *Rating:* {safe_rating} / 10\n"
-                   f"{runtime_text}"
-                   f"🎭 *Category:* {tags}\n\n"
-                   f"{safe_plot}"
-                   f"✅ *Subtitles Ready:* Malayalam, Tamil, Hindi\n"
-                   f"⚡️ *High-Speed Download*\n\n"
-                   f"👇 *Get the episode here:*{footer}")
-        import urllib.parse
-        encoded_title = urllib.parse.quote(safe_title)
-        button_url = f"{website_base_url}/series/{encoded_title}/{movie.season or 1}"
-    else:
-        caption = (f"🎬 *{safe_title}*\n\n"
-                   f"⭐️ *Rating:* {safe_rating} / 10\n"
-                   f"{runtime_text}"
-                   f"🎭 *Category:* {tags}\n\n"
-                   f"{safe_plot}"
-                   f"✅ *Subtitles Ready:* Malayalam, Tamil, Hindi\n"
-                   f"⚡️ *High-Speed Download*\n\n"
-                   f"👇 *Get the movie here:*{footer}")
-        button_url = f"{website_base_url}/movie/{movie.id}"
-
-    try:
-        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto"
-        payload = {
-            "chat_id": CHANNEL_ID, 
-            "photo": movie.poster_url if movie.poster_url else "https://via.placeholder.com/500x750?text=No+Poster", 
-            "caption": caption,
-            "parse_mode": "Markdown", 
-            "reply_markup": {"inline_keyboard": [[{"text": "📥 Download Subtitles", "url": button_url}]]}
-        }
-        response = requests.post(url, json=payload)
-        
-        if response.status_code == 200:
-            return "Posted to Telegram Successfully!", 200
-        else:
-            return f"Telegram API Error: {response.text}", 500
-            
-    except Exception as e:
-        return str(e), 500
-
-# --- 1. DYNAMIC SITEMAP FOR GOOGLE SEO ---
-@app.route('/sitemap.xml')
-def sitemap():
-    base_url = "https://malayalamsubtitles.onrender.com"
-    xml = ['<?xml version="1.0" encoding="UTF-8"?>']
-    xml.append('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')
-    
-    # Add homepage
-    xml.append(f'<url><loc>{base_url}/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>')
-    
-    # Add all media pages dynamically
-    all_media = Movie.query.order_by(Movie.id.desc()).all()
-    for media in all_media:
-        if media.media_type == 'series':
-            encoded_title = urllib.parse.quote(media.title)
-            url = f"{base_url}/series/{encoded_title}/{media.season or 1}"
-        else:
-            url = f"{base_url}/movie/{media.id}"
-        xml.append(f'<url><loc>{url}</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>')
-        
-    xml.append('</urlset>')
-    return app.response_class('\n'.join(xml), mimetype='application/xml')
-
-# --- 2. RECEIVE SUBTITLE REQUESTS FROM USERS ---
-@app.route('/api/request_sub', methods=['POST'])
-def request_sub():
-    data = request.json
-    title = data.get('title')
-    details = data.get('details', 'No extra details provided.')
-    
-    TELEGRAM_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
-    CHANNEL_ID = os.environ.get('TELEGRAM_CHANNEL_ID')
-    
-    if not TELEGRAM_TOKEN or not CHANNEL_ID:
-        return jsonify({"error": "Telegram not configured"}), 500
-        
-    # Formats the message nicely for your Telegram Channel
-    msg = f"🔔 *New Subtitle Request from Website*\n\n🎬 *Title:* {title}\n📝 *Details:* {details}\n\n_Admin, add this to your upload list!_"
-    
-    try:
-        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-        payload = {"chat_id": CHANNEL_ID, "text": msg, "parse_mode": "Markdown"}
-        requests.post(url, json=payload)
-        return jsonify({"success": True})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-        
-
-if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
-
+    safe_plot = 
