@@ -86,7 +86,7 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-# --- USER ROUTES ---
+# --- USER ROUTES (WITH PAGINATION) ---
 @app.route('/')
 def index():
     stat = SiteStat.query.first()
@@ -95,11 +95,8 @@ def index():
     
     search_query = request.args.get('q', '')
     category_query = request.args.get('cat', '')
-    
-    # 1. Grab the current page number from the URL (default is page 1)
     page = request.args.get('page', 1, type=int)
     
-    # 2. Build the Category List for the dropdown
     all_media_unpaginated = Movie.query.order_by(Movie.id.desc()).all()
     categories_set = set()
     for movie in all_media_unpaginated:
@@ -109,7 +106,6 @@ def index():
                     categories_set.add(cat.strip())
     categories_list = sorted(list(categories_set))
 
-    # --- SCENARIO A: User is Searching ---
     if search_query:
         pagination = Movie.query.filter(
             (Movie.title.ilike(f'%{search_query}%')) | 
@@ -117,20 +113,12 @@ def index():
         ).order_by(Movie.id.desc()).paginate(page=page, per_page=12, error_out=False)
         return render_template('index.html', pagination=pagination, search_query=search_query, categories=categories_list, mode="search")
     
-    # --- SCENARIO B: User Clicked a Category ---
     if category_query:
         pagination = Movie.query.filter(Movie.category.ilike(f'%{category_query}%')).order_by(Movie.id.desc()).paginate(page=page, per_page=12, error_out=False)
         return render_template('index.html', pagination=pagination, search_query=category_query, categories=categories_list, mode="search")
 
-    # --- SCENARIO C: The Standard Homepage (3 Rows) ---
-    
-    # Row 1: Latest Releases (Paginated - 12 per page)
     latest_pagination = Movie.query.order_by(Movie.id.desc()).paginate(page=page, per_page=12, error_out=False)
-    
-    # Row 2: Top Downloaded (Top 12 most viewed)
     top_downloaded = Movie.query.order_by(Movie.views.desc()).limit(12).all()
-    
-    # Row 3: Random Picks (12 completely random movies from the Postgres DB)
     random_picks = Movie.query.order_by(func.random()).limit(12).all()
     
     return render_template('index.html', 
@@ -139,7 +127,7 @@ def index():
                            random_picks=random_picks, 
                            categories=categories_list,
                            mode="home")
-    
+
 @app.route('/robots.txt')
 def robots_txt():
     rules = "User-agent: *\nDisallow: /admin\nDisallow: /login\nDisallow: /delete/\nAllow: /\n"
@@ -340,10 +328,11 @@ def auto_fetch_srt():
     OS_API_KEY = "9AnWofHGkYabMMjKUhXpeDdwqrLvss2n"
 
     if not imdb_id or imdb_id == 'undefined':
-        return jsonify({"error": "Missing IMDb ID. Please click Auto-Fill again!"}), 400
+        return jsonify({"error": "Missing IMDb ID. TMDB did not provide one for this title."}), 400
 
     if not str(imdb_id).startswith('tt'):
         imdb_id = f"tt{imdb_id}"
+    clean_imdb = str(imdb_id).replace('tt', '')
 
     custom_headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
@@ -352,9 +341,10 @@ def auto_fetch_srt():
     # --- ENGINE 1: SUBDL ---
     if SUBDL_API_KEY:
         try:
-            url = f"https://api.subdl.com/api/v1/subtitles?imdb_id={imdb_id}&languages=EN&api_key={SUBDL_API_KEY}"
             if media_type == 'series':
-                url += f"&season_number={season}&episode_number={episode}"
+                url = f"https://api.subdl.com/api/v1/subtitles?imdb_id={imdb_id}&type=tv&season_number={season}&episode_number={episode}&languages=EN"
+            else:
+                url = f"https://api.subdl.com/api/v1/subtitles?imdb_id={imdb_id}&type=movie&languages=EN"
                 
             res = requests.get(url, headers=custom_headers).json()
             if res.get('status') and res.get('subtitles'):
@@ -382,11 +372,13 @@ def auto_fetch_srt():
             os_headers = {
                 "Api-Key": OS_API_KEY, 
                 "Content-Type": "application/json",
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
             }
-            url = f"https://api.opensubtitles.com/api/v1/subtitles?imdb_id={imdb_id}&languages=en"
+            
             if media_type == 'series':
-                url += f"&season_number={season}&episode_number={episode}"
+                url = f"https://api.opensubtitles.com/api/v1/subtitles?parent_imdb_id={clean_imdb}&season_number={season}&episode_number={episode}&languages=en"
+            else:
+                url = f"https://api.opensubtitles.com/api/v1/subtitles?imdb_id={clean_imdb}&languages=en"
 
             search_res = requests.get(url, headers=os_headers).json()
             if search_res.get('data'):
@@ -618,4 +610,3 @@ def request_sub():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
-
