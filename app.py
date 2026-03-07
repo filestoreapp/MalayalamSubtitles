@@ -4,6 +4,7 @@ import requests
 import boto3
 import urllib.parse
 import re
+import zipfile
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, send_file, jsonify, session
 from flask_sqlalchemy import SQLAlchemy
@@ -316,7 +317,7 @@ def edit_media(movie_id):
 
     return render_template('edit.html', media=media)
 
-# --- DUAL-ENGINE AUTO FETCHER (Subdl + OpenSubtitles) ---
+# --- DUAL-ENGINE AUTO FETCHER (Subdl + OpenSubtitles + ZIP Extractor) ---
 @app.route('/api/auto_fetch_srt', methods=['POST'])
 @login_required
 def auto_fetch_srt():
@@ -329,8 +330,15 @@ def auto_fetch_srt():
     SUBDL_API_KEY = "Fj3xMg24eTEfVxBSWOfx04kP55CHGtvB"
     OS_API_KEY = "9AnWofHGkYabMMjKUhXpeDdwqrLvss2n"
 
+    if not imdb_id or imdb_id == 'undefined':
+        return jsonify({"error": "Missing IMDb ID. Please click Auto-Fill again!"}), 400
+
     if not str(imdb_id).startswith('tt'):
         imdb_id = f"tt{imdb_id}"
+
+    custom_headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
+    }
 
     # --- ENGINE 1: SUBDL ---
     if SUBDL_API_KEY:
@@ -339,34 +347,62 @@ def auto_fetch_srt():
             if media_type == 'series':
                 url += f"&season_number={season}&episode_number={episode}"
                 
-            res = requests.get(url).json()
+            res = requests.get(url, headers=custom_headers).json()
             if res.get('status') and res.get('subtitles'):
                 dl_url = "https://dl.subdl.com" + res['subtitles'][0]['url']
-                srt_text = requests.get(dl_url).text
-                return jsonify({"success": True, "srt_text": srt_text, "source": "Subdl"})
+                dl_res = requests.get(dl_url, headers=custom_headers)
+                
+                srt_text = ""
+                if dl_url.endswith('.zip') or b'PK\x03\x04' in dl_res.content[:4]:
+                    with zipfile.ZipFile(io.BytesIO(dl_res.content)) as z:
+                        for filename in z.namelist():
+                            if filename.endswith('.srt'):
+                                srt_text = z.read(filename).decode('utf-8', errors='ignore')
+                                break
+                else:
+                    srt_text = dl_res.text
+                    
+                if srt_text:
+                    return jsonify({"success": True, "srt_text": srt_text, "source": "Subdl"})
         except Exception as e:
             print("Subdl Failed:", e)
 
     # --- ENGINE 2: OPENSUBTITLES ---
     if OS_API_KEY:
         try:
-            headers = {"Api-Key": OS_API_KEY, "Content-Type": "application/json"}
+            os_headers = {
+                "Api-Key": OS_API_KEY, 
+                "Content-Type": "application/json",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
+            }
             url = f"https://api.opensubtitles.com/api/v1/subtitles?imdb_id={imdb_id}&languages=en"
             if media_type == 'series':
                 url += f"&season_number={season}&episode_number={episode}"
 
-            search_res = requests.get(url, headers=headers).json()
+            search_res = requests.get(url, headers=os_headers).json()
             if search_res.get('data'):
                 file_id = search_res['data'][0]['attributes']['files'][0]['file_id']
-                dl_res = requests.post("https://api.opensubtitles.com/api/v1/download", headers=headers, json={"file_id": file_id}).json()
+                dl_res = requests.post("https://api.opensubtitles.com/api/v1/download", headers=os_headers, json={"file_id": file_id}).json()
                 link = dl_res.get('link')
                 if link:
-                    srt_text = requests.get(link).text
-                    return jsonify({"success": True, "srt_text": srt_text, "source": "OpenSubtitles"})
+                    os_dl = requests.get(link, headers=custom_headers)
+                    srt_text = ""
+                    
+                    if link.endswith('.zip') or b'PK\x03\x04' in os_dl.content[:4]:
+                        with zipfile.ZipFile(io.BytesIO(os_dl.content)) as z:
+                            for filename in z.namelist():
+                                if filename.endswith('.srt'):
+                                    srt_text = z.read(filename).decode('utf-8', errors='ignore')
+                                    break
+                    else:
+                        srt_text = os_dl.text
+
+                    if srt_text:
+                        return jsonify({"success": True, "srt_text": srt_text, "source": "OpenSubtitles"})
         except Exception as e:
             print("OpenSubtitles Failed:", e)
 
-    return jsonify({"error": "Failed to find English subtitles on both databases."}), 404
+    return jsonify({"error": "Failed to extract English subtitles."}), 404
 
 # --- MASTER UPLOAD ROUTE ---
 @app.route('/admin', methods=['GET', 'POST'])
