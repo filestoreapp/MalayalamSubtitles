@@ -342,6 +342,7 @@ def tmdb_details():
         return jsonify({"error": str(e)}), 500
 
 # --- DUAL-ENGINE AUTO FETCHER (Subdl + OpenSubtitles + ZIP Extractor) ---
+# --- DUAL-ENGINE AUTO FETCHER (Subdl + OpenSubtitles + ZIP Extractor) ---
 @app.route('/api/auto_fetch_srt', methods=['POST'])
 @login_required
 def auto_fetch_srt():
@@ -364,14 +365,16 @@ def auto_fetch_srt():
     custom_headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
     }
+    
+    error_log = []
 
     # --- ENGINE 1: SUBDL ---
     if SUBDL_API_KEY:
         try:
+            # FIX: Removed the 'type=tv' tag so Subdl stops rejecting the search!
+            url = f"https://api.subdl.com/api/v1/subtitles?imdb_id={imdb_id}&languages=EN"
             if media_type == 'series':
-                url = f"https://api.subdl.com/api/v1/subtitles?imdb_id={imdb_id}&type=tv&season_number={season}&episode_number={episode}&languages=EN"
-            else:
-                url = f"https://api.subdl.com/api/v1/subtitles?imdb_id={imdb_id}&type=movie&languages=EN"
+                url += f"&season_number={season}&episode_number={episode}"
                 
             res = requests.get(url, headers=custom_headers).json()
             if res.get('status') and res.get('subtitles'):
@@ -390,8 +393,10 @@ def auto_fetch_srt():
                     
                 if srt_text:
                     return jsonify({"success": True, "srt_text": srt_text, "source": "Subdl"})
+            else:
+                error_log.append("Subdl: No file found")
         except Exception as e:
-            print("Subdl Failed:", e)
+            error_log.append(f"Subdl Error: {str(e)}")
 
     # --- ENGINE 2: OPENSUBTITLES ---
     if OS_API_KEY:
@@ -399,7 +404,7 @@ def auto_fetch_srt():
             os_headers = {
                 "Api-Key": OS_API_KEY, 
                 "Content-Type": "application/json",
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
             }
             
             if media_type == 'series':
@@ -410,8 +415,9 @@ def auto_fetch_srt():
             search_res = requests.get(url, headers=os_headers).json()
             if search_res.get('data'):
                 file_id = search_res['data'][0]['attributes']['files'][0]['file_id']
-                dl_res = requests.post("https://api.opensubtitles.com/api/v1/download", headers=os_headers, json={"file_id": file_id}).json()
-                link = dl_res.get('link')
+                dl_response = requests.post("https://api.opensubtitles.com/api/v1/download", headers=os_headers, json={"file_id": file_id}).json()
+                link = dl_response.get('link')
+                
                 if link:
                     os_dl = requests.get(link, headers=custom_headers)
                     srt_text = ""
@@ -427,10 +433,14 @@ def auto_fetch_srt():
 
                     if srt_text:
                         return jsonify({"success": True, "srt_text": srt_text, "source": "OpenSubtitles"})
+                else:
+                    error_log.append(f"OS Blocked Download: {dl_response.get('message', 'Limit Reached')}")
+            else:
+                error_log.append("OS: No file found")
         except Exception as e:
-            print("OpenSubtitles Failed:", e)
+            error_log.append(f"OS Error: {str(e)}")
 
-    return jsonify({"error": "Failed to extract English subtitles."}), 404
+    return jsonify({"error": f"Failed: {' | '.join(error_log)}"}), 404
 
 # --- MASTER UPLOAD ROUTE ---
 @app.route('/admin', methods=['GET', 'POST'])
@@ -637,3 +647,4 @@ def request_sub():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
+
