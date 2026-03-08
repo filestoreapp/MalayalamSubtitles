@@ -118,9 +118,10 @@
                 {% set ta_ready = false %}
                 {% set hi_ready = false %}
                 {% for trans in ep.translations %}
-                    {% if trans.language == 'ml' %}{% set ml_ready = true %}{% endif %}
-                    {% if trans.language == 'ta' %}{% set ta_ready = true %}{% endif %}
-                    {% if trans.language == 'hi' %}{% set hi_ready = true %}{% endif %}
+                    {% set lang = trans.language | lower | trim %}
+                    {% if lang == 'ml' %}{% set ml_ready = true %}{% endif %}
+                    {% if lang == 'ta' %}{% set ta_ready = true %}{% endif %}
+                    {% if lang == 'hi' %}{% set hi_ready = true %}{% endif %}
                 {% endfor %}
 
                 <div class="episode-row">
