@@ -114,14 +114,13 @@
             <h3>📺 Episodes</h3>
             
             {% for ep in episodes %}
-                {% set ml_ready = false %}
-                {% set ta_ready = false %}
-                {% set hi_ready = false %}
+                {% set status = namespace(ml=false, ta=false, hi=false) %}
+                
                 {% for trans in ep.translations %}
                     {% set lang = trans.language | lower | trim %}
-                    {% if lang == 'ml' %}{% set ml_ready = true %}{% endif %}
-                    {% if lang == 'ta' %}{% set ta_ready = true %}{% endif %}
-                    {% if lang == 'hi' %}{% set hi_ready = true %}{% endif %}
+                    {% if lang == 'ml' %}{% set status.ml = true %}{% endif %}
+                    {% if lang == 'ta' %}{% set status.ta = true %}{% endif %}
+                    {% if lang == 'hi' %}{% set status.hi = true %}{% endif %}
                 {% endfor %}
 
                 <div class="episode-row">
@@ -130,19 +129,19 @@
                     <div class="dl-grid">
                         <a href="/download/{{ ep.id }}/en" class="dl-btn">🇺🇸 EN</a>
                         
-                        {% if ml_ready %}
+                        {% if status.ml %}
                             <a href="/download/{{ ep.id }}/ml" class="dl-btn" style="background:#f59e0b; color:#000;">🇮🇳 ML</a>
                         {% else %}
                             <span class="dl-btn disabled">⏳ ML</span>
                         {% endif %}
                         
-                        {% if ta_ready %}
+                        {% if status.ta %}
                             <a href="/download/{{ ep.id }}/ta" class="dl-btn">🇮🇳 TA</a>
                         {% else %}
                             <span class="dl-btn disabled">⏳ TA</span>
                         {% endif %}
                         
-                        {% if hi_ready %}
+                        {% if status.hi %}
                             <a href="/download/{{ ep.id }}/hi" class="dl-btn">🇮🇳 HI</a>
                         {% else %}
                             <span class="dl-btn disabled">⏳ HI</span>
