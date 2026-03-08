@@ -504,19 +504,20 @@ def auto_fetch_srt():
     return jsonify({"error": f"{' | '.join(error_log)}"}), 404
 
 # --- MASTER UPLOAD ROUTE ---
+# --- MASTER UPLOAD ROUTE ---
 @app.route('/admin', methods=['GET', 'POST'])
 @login_required
 def admin():
     if request.method == 'POST':
-        media_type = request.form.get('media_type')
-        title = request.form.get('title')
-        season = request.form.get('season')
-        year = request.form.get('year')           
-        rating = request.form.get('rating')
-        poster_url = request.form.get('poster_url') 
+        media_type = request.form.get('media_type', 'movie')
+        title = request.form.get('title', 'Unknown Title')
+        season_raw = request.form.get('season', '')
+        year = request.form.get('year', '')           
+        rating = request.form.get('rating', '0')
+        poster_url = request.form.get('poster_url', '') 
         silent_upload = request.form.get('silent_upload') 
-        plot = request.form.get('plot')
-        runtime = request.form.get('runtime')
+        plot = request.form.get('plot', '')
+        runtime = request.form.get('runtime', '')
         
         categories = request.form.getlist('category')
         category_string = ", ".join(categories)
@@ -544,37 +545,60 @@ def admin():
             ep = valid_manual_eps[i] if i < len(valid_manual_eps) else str(i+1)
             items_to_process.append((content, ep))
 
+        # FIX 1: Crash-Proof Season Parsing
+        try:
+            safe_season = int(season_raw) if season_raw and str(season_raw).strip() else None
+        except ValueError:
+            safe_season = 1
+
         for content, ep_str in items_to_process:
-            storage_data = content 
+            
+            # FIX 2: Sanitize Subtitles (Strips Postgres-crashing \x00 Null Bytes)
+            safe_content = content.replace('\x00', '')
+            storage_data = safe_content 
+            
+            # FIX 3: Crash-Proof Episode Parsing
+            try:
+                current_ep = int(ep_str) if media_type == 'series' and ep_str and str(ep_str).strip() else None
+            except ValueError:
+                current_ep = 1
             
             if s3_client and r2_bucket:
-                safe_title = title.replace(" ", "_").replace("/", "").lower()
-                ep_tag = f"_s{season}e{ep_str}" if media_type == 'series' else ""
-                r2_filename = f"english_{safe_title}{ep_tag}_{os.urandom(4).hex()}.srt"
+                safe_title_str = title.replace(" ", "_").replace("/", "").lower()
+                ep_tag = f"_s{safe_season}e{current_ep}" if media_type == 'series' else ""
+                r2_filename = f"english_{safe_title_str}{ep_tag}_{os.urandom(4).hex()}.srt"
                 try:
                     s3_client.put_object(
                         Bucket=r2_bucket, Key=r2_filename,
-                        Body=content.encode('utf-8'), ContentType='application/x-subrip'
+                        Body=safe_content.encode('utf-8'), ContentType='application/x-subrip'
                     )
                     storage_data = f"{r2_public_url}/{r2_filename}"
                 except Exception as e:
                     print(f"R2 Upload Failed: {e}")
 
-            current_ep = int(ep_str) if media_type == 'series' else None
-            
             new_media = Movie(
                 media_type=media_type, title=title, 
-                season=int(season) if season and media_type == 'series' else None,
+                season=safe_season if media_type == 'series' else None,
                 episode=current_ep, year=year, 
                 rating=rating, poster_url=poster_url, english_srt=storage_data, 
                 category=category_string, plot=plot, runtime=runtime
             )
             db.session.add(new_media)
-            db.session.commit()
+            
+            # FIX 4: DB Try-Catch to prevent 500 errors on screen
+            try:
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                return f"Database Error during Movie Insert: {str(e)}", 500
 
             for lang in ['ml', 'ta', 'hi']:
                 db.session.add(TranslationJob(movie_id=new_media.id, language=lang, status='Pending'))
-            db.session.commit()
+            
+            try:
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
 
         try: 
             requests.get("https://malayalamsub-malayalamsubs.hf.space/start-worker", timeout=5)
@@ -708,3 +732,4 @@ def request_sub():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
+
