@@ -731,37 +731,50 @@ def request_sub():
 
 @app.route('/secret-db-upgrade')
 def upgrade_database():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
     try:
+        # Moved inside the try-block so any connection error is caught!
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
         # 1. Add new columns
         cursor.execute("ALTER TABLE media ADD COLUMN IF NOT EXISTS tmdb_id VARCHAR(50);")
         cursor.execute("ALTER TABLE media ADD COLUMN IF NOT EXISTS release_version VARCHAR(100) DEFAULT 'Standard';")
         
-        # 2. Clean out any old duplicates safely
+        # 2. Clean out any old duplicates safely (casting to VARCHAR to prevent type crashes)
         cursor.execute("""
             DELETE FROM media a USING media b
             WHERE a.id > b.id 
               AND a.tmdb_id = b.tmdb_id 
               AND a.type = b.type 
-              AND COALESCE(a.season, 0) = COALESCE(b.season, 0) 
-              AND COALESCE(a.episode, 0) = COALESCE(b.episode, 0);
+              AND COALESCE(CAST(a.season AS VARCHAR), '0') = COALESCE(CAST(b.season AS VARCHAR), '0') 
+              AND COALESCE(CAST(a.episode AS VARCHAR), '0') = COALESCE(CAST(b.episode AS VARCHAR), '0');
         """)
         
-        # 3. Apply the strict lock
-        cursor.execute("ALTER TABLE media ADD CONSTRAINT unique_movie UNIQUE (tmdb_id, type, season, episode);")
+        # 3. Apply the strict lock ONLY if it doesn't exist yet
+        cursor.execute("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'unique_movie') THEN
+                    ALTER TABLE media ADD CONSTRAINT unique_movie UNIQUE (tmdb_id, type, season, episode);
+                END IF;
+            END
+            $$;
+        """)
         
         conn.commit()
         return "✅ DATABASE UPGRADED SUCCESSFULLY! You can now delete this route from your code."
         
     except Exception as e:
-        conn.rollback()
-        return f"❌ Error: {e}"
+        if 'conn' in locals() and conn:
+            conn.rollback()
+        # This will now safely print the exact database error on your screen instead of a 500 error!
+        return f"❌ Error Details: {str(e)}"
         
     finally:
-        cursor.close()
-        conn.close()
+        if 'cursor' in locals() and cursor:
+            cursor.close()
+        if 'conn' in locals() and conn:
+            conn.close()
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
