@@ -729,6 +729,40 @@ def request_sub():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/secret-db-upgrade')
+def upgrade_database():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # 1. Add new columns
+        cursor.execute("ALTER TABLE media ADD COLUMN IF NOT EXISTS tmdb_id VARCHAR(50);")
+        cursor.execute("ALTER TABLE media ADD COLUMN IF NOT EXISTS release_version VARCHAR(100) DEFAULT 'Standard';")
+        
+        # 2. Clean out any old duplicates safely
+        cursor.execute("""
+            DELETE FROM media a USING media b
+            WHERE a.id > b.id 
+              AND a.tmdb_id = b.tmdb_id 
+              AND a.type = b.type 
+              AND COALESCE(a.season, 0) = COALESCE(b.season, 0) 
+              AND COALESCE(a.episode, 0) = COALESCE(b.episode, 0);
+        """)
+        
+        # 3. Apply the strict lock
+        cursor.execute("ALTER TABLE media ADD CONSTRAINT unique_movie UNIQUE (tmdb_id, type, season, episode);")
+        
+        conn.commit()
+        return "✅ DATABASE UPGRADED SUCCESSFULLY! You can now delete this route from your code."
+        
+    except Exception as e:
+        conn.rollback()
+        return f"❌ Error: {e}"
+        
+    finally:
+        cursor.close()
+        conn.close()
+
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
