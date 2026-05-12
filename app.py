@@ -6,14 +6,16 @@ import urllib.parse
 import re
 import zipfile
 import time
+import threading
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, send_file, jsonify, session
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, or_, cast, Float
 
+# ========== INITIALISATION ==========
 app = Flask(__name__)
 
-# --- DATABASE CONNECTION (from environment) ---
+# --- DATABASE (from env) ---
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'pool_pre_ping': True, 'pool_recycle': 300}
@@ -21,7 +23,7 @@ app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-change-me')
 
 db = SQLAlchemy(app)
 
-# --- CLOUDFLARE R2 SETUP ---
+# --- CLOUDFLARE R2 ---
 r2_endpoint = os.environ.get('R2_ENDPOINT_URL')
 r2_access_key = os.environ.get('R2_ACCESS_KEY_ID')
 r2_secret_key = os.environ.get('R2_SECRET_ACCESS_KEY')
@@ -37,10 +39,10 @@ if r2_endpoint and r2_access_key and r2_secret_key:
 else:
     s3_client = None
 
-# --- DATABASE MODELS ---
+# ========== MODELS ==========
 class Movie(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    media_type = db.Column(db.String(10))
+    media_type = db.Column(db.String(10))          # 'movie' or 'series'
     title = db.Column(db.String(200))
     season = db.Column(db.Integer, nullable=True)
     episode = db.Column(db.Integer, nullable=True)
@@ -52,12 +54,12 @@ class Movie(db.Model):
     category = db.Column(db.String(200), default='General')
     plot = db.Column(db.Text, nullable=True)
     runtime = db.Column(db.String(50), nullable=True)
-    imdb_id = db.Column(db.String(20))          # <-- NEW for advanced search
+    imdb_id = db.Column(db.String(20))             # NEW for advanced search
 
 class TranslationCache(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     movie_id = db.Column(db.Integer, db.ForeignKey('movie.id', ondelete='CASCADE'))
-    language = db.Column(db.String(10))
+    language = db.Column(db.String(10))            # 'ml', 'ta', 'hi'
     translated_srt = db.Column(db.Text)
     downloads = db.Column(db.Integer, default=0)
     movie = db.relationship('Movie', backref=db.backref('translations', cascade='all, delete-orphan'))
@@ -79,12 +81,12 @@ with app.app_context():
         db.session.add(SiteStat(total_visitors=0))
         db.session.commit()
 
-# --- CACHED CATEGORIES (avoids heavy DB query every request) ---
+# ========== CATEGORIES CACHE ==========
 _categories_cache = {'data': [], 'last_update': 0}
 
 def get_categories_list():
     now = time.time()
-    if now - _categories_cache['last_update'] > 3600:  # refresh every hour
+    if now - _categories_cache['last_update'] > 3600:  # refresh hourly
         all_cats = set()
         for m in Movie.query.with_entities(Movie.category).all():
             if m.category:
@@ -96,7 +98,87 @@ def get_categories_list():
         _categories_cache['last_update'] = now
     return _categories_cache['data']
 
-# --- ADMIN PROTECTION ---
+# ========== TRANSLATION FUNCTIONS ==========
+import pysrt
+
+def call_indic_trans2(text: str, target_lang: str) -> str:
+    """Translate text via Hugging Face IndicTrans2 API (free)."""
+    API_URL = "https://api-inference.huggingface.co/models/ai4bharat/indictrans2-en-indic-dist-320M"
+    HF_TOKEN = os.environ.get("HF_API_TOKEN")
+    if not HF_TOKEN:
+        raise Exception("HF_API_TOKEN missing")
+    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+    lang_map = {
+        'ml': 'mal_Mlym',
+        'ta': 'tam_Taml',
+        'hi': 'hin_Deva'
+    }
+    payload = {
+        "inputs": text,
+        "parameters": {
+            "src_lang": "eng_Latn",
+            "tgt_lang": lang_map.get(target_lang, 'mal_Mlym')
+        }
+    }
+    r = requests.post(API_URL, headers=headers, json=payload)
+    r.raise_for_status()
+    result = r.json()
+    if isinstance(result, list) and len(result) > 0:
+        return result[0].get('translation_text', text)
+    return text
+
+def translate_srt_file(english_srt_content: str, target_lang: str) -> str:
+    """Translate English SRT content to target language, preserving timestamps."""
+    subs = pysrt.from_string(english_srt_content)
+    if not subs:
+        return english_srt_content
+    # Join texts with unique delimiter
+    texts = [sub.text for sub in subs]
+    batch = " ||| ".join(texts)
+    translated_batch = call_indic_trans2(batch, target_lang)
+    translated_texts = translated_batch.split(" ||| ")
+    for i, sub in enumerate(subs):
+        sub.text = translated_texts[i] if i < len(translated_texts) else sub.text
+    return "\n".join(str(sub) for sub in subs)
+
+def process_translation(app_instance, movie_id, lang):
+    """Run translation in background thread (safe for Render free tier)."""
+    with app_instance.app_context():
+        movie = Movie.query.get(movie_id)
+        if not movie or not movie.english_srt:
+            return
+        try:
+            # Download English SRT if it's a URL
+            if movie.english_srt.startswith('http'):
+                r = requests.get(movie.english_srt)
+                r.raise_for_status()
+                english_srt = r.text
+            else:
+                english_srt = movie.english_srt
+
+            translated = translate_srt_file(english_srt, lang)
+
+            # Save to TranslationCache
+            cache = TranslationCache.query.filter_by(movie_id=movie.id, language=lang).first()
+            if not cache:
+                cache = TranslationCache(movie_id=movie.id, language=lang)
+                db.session.add(cache)
+            cache.translated_srt = translated
+
+            # Mark job as Completed
+            job = TranslationJob.query.filter_by(movie_id=movie.id, language=lang).first()
+            if job:
+                job.status = 'Completed'
+            db.session.commit()
+        except Exception as e:
+            print(f"❌ Translation error movie {movie_id} ({lang}): {e}")
+            # Mark as Failed so you can retry later
+            job = TranslationJob.query.filter_by(movie_id=movie.id, language=lang).first()
+            if job:
+                job.status = 'Failed'
+                db.session.commit()
+
+# ========== AUTH ==========
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -105,9 +187,7 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-# -------------------------------
-#          USER ROUTES
-# -------------------------------
+# ========== USER ROUTES ==========
 @app.route('/')
 def index():
     stat = SiteStat.query.first()
@@ -118,7 +198,7 @@ def index():
     category_query = request.args.get('cat', '')
     page = request.args.get('page', 1, type=int)
 
-    # We still calculate categories manually for the homepage, but can switch to get_categories_list() later
+    # Use cached categories (optional, you can switch fully later)
     all_media_unpaginated = Movie.query.order_by(Movie.id.desc()).all()
     categories_set = set()
     for movie in all_media_unpaginated:
@@ -220,12 +300,9 @@ def download(movie_id, language):
 
     return send_file(mem_file, as_attachment=True, download_name=final_name, mimetype='application/x-subrip')
 
-# -------------------------------
-#     ADVANCED SEARCH ROUTE
-# -------------------------------
+# ========== ADVANCED SEARCH ==========
 @app.route('/search')
 def advanced_search():
-    # --- Filter parameters from URL ---
     q = request.args.get('q', '').strip()
     media_type = request.args.get('type', '')
     year_from = request.args.get('year_from', type=int)
@@ -238,10 +315,8 @@ def advanced_search():
     sort = request.args.get('sort', 'newest')
     page = request.args.get('page', 1, type=int)
 
-    # Base query
     base_q = Movie.query
 
-    # Text search across title, plot, and imdb_id
     if q:
         search_filters = [Movie.title.ilike(f'%{q}%'), Movie.plot.ilike(f'%{q}%')]
         if hasattr(Movie, 'imdb_id'):
@@ -268,14 +343,12 @@ def advanced_search():
         if hasattr(Movie, 'imdb_id'):
             base_q = base_q.filter(Movie.imdb_id.ilike(f'%{imdb}%'))
 
-    # Language filter
     if lang:
         if lang == 'en':
             base_q = base_q.filter(Movie.english_srt.isnot(None), Movie.english_srt != '')
         else:
             base_q = base_q.filter(Movie.translations.any(TranslationCache.language == lang))
 
-    # Sorting
     sort_mapping = {
         'newest': Movie.id.desc(),
         'oldest': Movie.id.asc(),
@@ -289,8 +362,6 @@ def advanced_search():
     base_q = base_q.order_by(order)
 
     pagination = base_q.paginate(page=page, per_page=12, error_out=False)
-
-    # Use the cached categories for the sidebar dropdown
     categories_list = get_categories_list()
 
     return render_template('search.html',
@@ -304,9 +375,7 @@ def advanced_search():
                                'imdb': imdb, 'sort': sort
                            })
 
-# -------------------------------
-#       ADMIN & DASHBOARD
-# -------------------------------
+# ========== ADMIN & DASHBOARD ==========
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -320,7 +389,7 @@ def login():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    # 1. AUTO-CLEANUP: Delete jobs that are completely finished
+    # Clean up completed jobs
     TranslationJob.query.filter(TranslationJob.status.in_(['Completed', 'Success'])).delete(synchronize_session=False)
     db.session.commit()
 
@@ -328,21 +397,18 @@ def dashboard():
     total_dl = db.session.query(func.sum(TranslationCache.downloads)).scalar() or 0
     total_subs = TranslationCache.query.count()
 
-    # 2. PAGINATION: Limit to 15 items per page
     page = request.args.get('page', 1, type=int)
     all_media_paginated = Movie.query.order_by(Movie.id.desc()).paginate(page=page, per_page=15, error_out=False)
 
     pop_lang = db.session.query(TranslationCache.language, func.count(TranslationCache.id)).group_by(TranslationCache.language).order_by(func.count(TranslationCache.id).desc()).first()
     recent_jobs = TranslationJob.query.order_by(TranslationJob.id.desc()).limit(15).all()
 
-    # 3. GET POSTGRESQL DATABASE SIZE
     try:
         db_size_query = db.session.execute(db.text("SELECT pg_size_pretty(pg_database_size(current_database()))")).scalar()
         db_size = db_size_query if db_size_query else "Unknown"
     except:
         db_size = "Error reading DB"
 
-    # 4. GET CLOUDFLARE R2 STORAGE SIZE
     r2_size_str = "Not Connected"
     r2_file_count = 0
     if s3_client and r2_bucket:
@@ -354,7 +420,6 @@ def dashboard():
                     for obj in page_obj['Contents']:
                         total_bytes += obj['Size']
                         r2_file_count += 1
-
             if total_bytes < 1024 * 1024:
                 r2_size_str = f"{total_bytes / 1024:.2f} KB"
             elif total_bytes < 1024 * 1024 * 1024:
@@ -382,10 +447,7 @@ def reset_jobs():
     for job in stuck_jobs:
         job.status = 'Pending'
     db.session.commit()
-    try:
-        requests.get("https://malayalamsub-malayalamsubs.hf.space/start-worker", timeout=5)
-    except Exception:
-        pass
+    # No more Hugging Face Space wake-up call – jobs will be picked up by manual upload only
     return redirect(url_for('dashboard'))
 
 @app.route('/admin/queue_translations/<int:movie_id>')
@@ -396,11 +458,9 @@ def queue_translations(movie_id):
            not TranslationJob.query.filter_by(movie_id=movie_id, language=lang).first():
             new_job = TranslationJob(movie_id=movie_id, language=lang)
             db.session.add(new_job)
-    db.session.commit()
-    try:
-        requests.get("https://malayalamsub-malayalamsubs.hf.space/start-worker", timeout=5)
-    except Exception:
-        pass
+            db.session.commit()
+            # Start background translation
+            threading.Thread(target=process_translation, args=(app, movie_id, lang)).start()
     return redirect(url_for('dashboard'))
 
 @app.route('/admin/delete_job/<int:job_id>')
@@ -457,23 +517,23 @@ def edit_media(movie_id):
 
             media.english_srt = storage_data
 
+            # Clear old translations and re-queue
             TranslationCache.query.filter_by(movie_id=media.id).delete()
             TranslationJob.query.filter_by(movie_id=media.id).delete()
+            db.session.commit()
 
             for lang in ['ml', 'ta', 'hi']:
-                db.session.add(TranslationJob(movie_id=media.id, language=lang, status='Pending'))
-
-            try:
-                requests.get("https://malayalamsub-malayalamsubs.hf.space/start-worker", timeout=5)
-            except Exception:
-                pass
+                job = TranslationJob(movie_id=media.id, language=lang, status='Pending')
+                db.session.add(job)
+                db.session.commit()
+                threading.Thread(target=process_translation, args=(app, media.id, lang)).start()
 
         db.session.commit()
         return redirect(url_for('dashboard'))
 
     return render_template('edit.html', media=media)
 
-# --- PRIVATE TMDB PROXY (Bypasses ISP Blocks) ---
+# --- TMDB PROXY ---
 @app.route('/api/tmdb_search')
 @login_required
 def tmdb_search():
@@ -500,7 +560,7 @@ def tmdb_details():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# --- DUAL-ENGINE AUTO FETCHER (Subdl + OpenSubtitles + ZIP Extractor) ---
+# --- DUAL-ENGINE AUTO FETCHER (unchanged, but keys from env) ---
 @app.route('/api/auto_fetch_srt', methods=['POST'])
 @login_required
 def auto_fetch_srt():
@@ -514,19 +574,16 @@ def auto_fetch_srt():
     OS_API_KEY = os.environ.get('OS_API_KEY')
 
     if not imdb_id or imdb_id == 'undefined':
-        return jsonify({"error": "Missing IMDb ID. TMDB did not provide one for this title."}), 400
+        return jsonify({"error": "Missing IMDb ID"}), 400
 
     if not str(imdb_id).startswith('tt'):
         imdb_id = f"tt{imdb_id}"
     clean_imdb = str(imdb_id).replace('tt', '')
 
-    custom_headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
-    }
-
+    custom_headers = {"User-Agent": "Mozilla/5.0 ... Chrome/114.0.0.0 Safari/537.36"}
     error_log = []
 
-    # --- ENGINE 1: SUBDL ---
+    # --- SUBDL ---
     if SUBDL_API_KEY:
         try:
             if media_type == 'series':
@@ -535,13 +592,11 @@ def auto_fetch_srt():
                 url = f"https://api.subdl.com/api/v1/subtitles?api_key={SUBDL_API_KEY}&imdb_id={imdb_id}&type=movie&languages=EN"
 
             res_raw = requests.get(url, headers=custom_headers)
-
             if res_raw.status_code == 200:
                 res = res_raw.json()
                 if res.get('status') and res.get('subtitles'):
                     dl_url = "https://dl.subdl.com" + res['subtitles'][0]['url']
                     dl_res = requests.get(dl_url, headers=custom_headers)
-
                     srt_text = ""
                     if dl_url.endswith('.zip') or b'PK\x03\x04' in dl_res.content[:4]:
                         with zipfile.ZipFile(io.BytesIO(dl_res.content)) as z:
@@ -551,46 +606,36 @@ def auto_fetch_srt():
                                     break
                     else:
                         srt_text = dl_res.text
-
                     if srt_text:
                         return jsonify({"success": True, "srt_text": srt_text, "source": "Subdl"})
                 else:
-                    error_log.append("Subdl: No subtitles found for this episode.")
+                    error_log.append("Subdl: No subtitles found")
             else:
-                error_log.append(f"Subdl blocked connection (HTTP {res_raw.status_code})")
+                error_log.append(f"Subdl HTTP {res_raw.status_code}")
         except Exception as e:
             error_log.append(f"Subdl Crash: {str(e)}")
 
-    # --- ENGINE 2: OPENSUBTITLES ---
+    # --- OPENSUBTITLES ---
     if OS_API_KEY:
         try:
-            os_headers = {
-                "Api-Key": OS_API_KEY,
-                "Content-Type": "application/json",
-                "User-Agent": "malayalamsubtitles_app v1.0"
-            }
-
+            os_headers = {"Api-Key": OS_API_KEY, "Content-Type": "application/json", "User-Agent": "malayalamsubtitles_app v1.0"}
             if media_type == 'series':
                 url = f"https://api.opensubtitles.com/api/v1/subtitles?parent_imdb_id={clean_imdb}&season_number={season}&episode_number={episode}&languages=en"
             else:
                 url = f"https://api.opensubtitles.com/api/v1/subtitles?imdb_id={clean_imdb}&languages=en"
 
             search_res_raw = requests.get(url, headers=os_headers)
-
             if search_res_raw.status_code == 200:
                 search_res = search_res_raw.json()
                 if search_res.get('data'):
                     file_id = search_res['data'][0]['attributes']['files'][0]['file_id']
                     dl_response_raw = requests.post("https://api.opensubtitles.com/api/v1/download", headers=os_headers, json={"file_id": file_id})
-
                     if dl_response_raw.status_code == 200:
                         dl_response = dl_response_raw.json()
                         link = dl_response.get('link')
-
                         if link:
                             os_dl = requests.get(link, headers=custom_headers)
                             srt_text = ""
-
                             if link.endswith('.zip') or b'PK\x03\x04' in os_dl.content[:4]:
                                 with zipfile.ZipFile(io.BytesIO(os_dl.content)) as z:
                                     for filename in z.namelist():
@@ -599,11 +644,10 @@ def auto_fetch_srt():
                                             break
                             else:
                                 srt_text = os_dl.text
-
                             if srt_text:
                                 return jsonify({"success": True, "srt_text": srt_text, "source": "OpenSubtitles"})
                         else:
-                            error_log.append(f"OS Blocked Download: {dl_response.get('message', 'Limit Reached')}")
+                            error_log.append("OS: Download blocked")
                     else:
                         error_log.append(f"OS Download HTTP {dl_response_raw.status_code}")
                 else:
@@ -615,7 +659,7 @@ def auto_fetch_srt():
 
     return jsonify({"error": f"{' | '.join(error_log)}"}), 404
 
-# --- MASTER UPLOAD ROUTE ---
+# --- MASTER UPLOAD ROUTE (with auto-translation) ---
 @app.route('/admin', methods=['GET', 'POST'])
 @login_required
 def admin():
@@ -656,19 +700,15 @@ def admin():
             ep = valid_manual_eps[i] if i < len(valid_manual_eps) else str(i+1)
             items_to_process.append((content, ep))
 
-        # FIX 1: Crash-Proof Season Parsing
         try:
             safe_season = int(season_raw) if season_raw and str(season_raw).strip() else None
         except ValueError:
             safe_season = 1
 
         for content, ep_str in items_to_process:
-
-            # FIX 2: Sanitize Subtitles (Strips Postgres-crashing \x00 Null Bytes)
             safe_content = content.replace('\x00', '')
             storage_data = safe_content
 
-            # FIX 3: Crash-Proof Episode Parsing
             try:
                 current_ep = int(ep_str) if media_type == 'series' and ep_str and str(ep_str).strip() else None
             except ValueError:
@@ -696,25 +736,22 @@ def admin():
             )
             db.session.add(new_media)
 
-            # FIX 4: DB Try-Catch to prevent 500 errors on screen
             try:
                 db.session.commit()
             except Exception as e:
                 db.session.rollback()
                 return f"Database Error during Movie Insert: {str(e)}", 500
 
+            # Queue and start translation for each language
             for lang in ['ml', 'ta', 'hi']:
-                db.session.add(TranslationJob(movie_id=new_media.id, language=lang, status='Pending'))
+                # Create job if not exists
+                if not TranslationJob.query.filter_by(movie_id=new_media.id, language=lang).first():
+                    job = TranslationJob(movie_id=new_media.id, language=lang, status='Pending')
+                    db.session.add(job)
+                    db.session.commit()
 
-            try:
-                db.session.commit()
-            except Exception as e:
-                db.session.rollback()
-
-        try:
-            requests.get("https://malayalamsub-malayalamsubs.hf.space/start-worker", timeout=5)
-        except Exception:
-            pass
+                # Start background translation
+                threading.Thread(target=process_translation, args=(app, new_media.id, lang)).start()
 
         return redirect(url_for('dashboard'))
 
@@ -731,7 +768,6 @@ def trigger_telegram(movie_id):
     movie = Movie.query.get_or_404(movie_id)
 
     raw_category = movie.category if movie.category else "General"
-
     if "SilentMode" in raw_category:
         return "Silent Mode Active - No Post", 200
 
@@ -789,12 +825,10 @@ def trigger_telegram(movie_id):
             "reply_markup": {"inline_keyboard": [[{"text": "📥 Download Subtitles", "url": button_url}]]}
         }
         response = requests.post(url, json=payload)
-
         if response.status_code == 200:
             return "Posted to Telegram Successfully!", 200
         else:
             return f"Telegram API Error: {response.text}", 500
-
     except Exception as e:
         return str(e), 500
 
@@ -804,7 +838,6 @@ def sitemap():
     base_url = "https://malayalamsubtitles.onrender.com"
     xml = ['<?xml version="1.0" encoding="UTF-8"?>']
     xml.append('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')
-
     xml.append(f'<url><loc>{base_url}/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>')
 
     all_media = Movie.query.order_by(Movie.id.desc()).all()
@@ -827,7 +860,6 @@ def request_sub():
 
     TELEGRAM_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
     CHANNEL_ID = os.environ.get('TELEGRAM_CHANNEL_ID')
-
     if not TELEGRAM_TOKEN or not CHANNEL_ID:
         return jsonify({"error": "Telegram not configured"}), 500
 
@@ -840,8 +872,6 @@ def request_sub():
         return jsonify({"success": True})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
-# Removed the secret-db-upgrade route for security
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
