@@ -104,30 +104,32 @@ def trigger_hf_translation(movie_id: int, english_srt_url: str):
         print("⚠️ HF_WORKER_URL not set")
         return
 
-    # Create a pending job for Malayalam
-    job = TranslationJob.query.filter_by(movie_id=movie_id, language='ml').first()
-    if not job:
-        job = TranslationJob(movie_id=movie_id, language='ml', status='Pending')
-        db.session.add(job)
-        db.session.commit()
-
-    try:
-        resp = requests.post(HF_WORKER_URL, json={
-            "movie_id": movie_id,
-            "english_srt_url": english_srt_url
-        }, timeout=30)
-        if resp.status_code == 200:
-            job.status = 'Processing'
+    # All database operations must happen inside an app context
+    with app.app_context():
+        # Create a pending job for Malayalam
+        job = TranslationJob.query.filter_by(movie_id=movie_id, language='ml').first()
+        if not job:
+            job = TranslationJob(movie_id=movie_id, language='ml', status='Pending')
+            db.session.add(job)
             db.session.commit()
-            print(f"✅ Translation started for movie {movie_id}")
-        else:
+
+        try:
+            resp = requests.post(HF_WORKER_URL, json={
+                "movie_id": movie_id,
+                "english_srt_url": english_srt_url
+            }, timeout=30)
+            if resp.status_code == 200:
+                job.status = 'Processing'
+                db.session.commit()
+                print(f"✅ Translation started for movie {movie_id}")
+            else:
+                job.status = 'Failed'
+                db.session.commit()
+                print(f"❌ HF worker returned {resp.status_code}: {resp.text}")
+        except Exception as e:
+            print(f"❌ HF trigger error: {e}")
             job.status = 'Failed'
             db.session.commit()
-            print(f"❌ HF worker returned {resp.status_code}: {resp.text}")
-    except Exception as e:
-        print(f"❌ HF trigger error: {e}")
-        job.status = 'Failed'
-        db.session.commit()
 
 # Webhook from HF Space when translation is done
 @app.route('/api/translation_callback', methods=['POST'])
