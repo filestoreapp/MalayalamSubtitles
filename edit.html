@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Edit Media</title>
+    <style>
+        body { background: #0f172a; color: white; font-family: sans-serif; padding: 20px; }
+        form { max-width: 600px; margin: 0 auto; }
+        label { display: block; margin-top: 15px; }
+        input, select, textarea { width: 100%; padding: 8px; margin-top: 5px; border-radius: 4px; border: none; background: #1e293b; color: white; }
+        button { margin-top: 20px; padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; }
+        a { color: #60a5fa; }
+    </style>
+</head>
+<body>
+    <h1>Edit: {{ media.title }}</h1>
+    <form method="POST" enctype="multipart/form-data">
+        <label>Title</label>
+        <input type="text" name="title" value="{{ media.title }}">
+
+        <label>Year</label>
+        <input type="text" name="year" value="{{ media.year }}">
+
+        <label>Rating</label>
+        <input type="text" name="rating" value="{{ media.rating }}">
+
+        <label>Poster URL</label>
+        <input type="text" name="poster_url" value="{{ media.poster_url }}">
+
+        <label>Category</label>
+        <input type="text" name="category" value="{{ media.category }}">
+
+        <label>Plot</label>
+        <textarea name="plot" rows="4">{{ media.plot }}</textarea>
+
+        <label>Runtime</label>
+        <input type="text" name="runtime" value="{{ media.runtime }}">
+
+        {% if media.media_type == 'series' %}
+        <label>Season</label>
+        <input type="number" name="season" value="{{ media.season }}">
+        <label>Episode</label>
+        <input type="number" name="episode" value="{{ media.episode }}">
+        {% endif %}
+
+        <label>Replace English SRT (optional)</label>
+        <input type="file" name="new_srt" accept=".srt">
+
+        <button type="submit">Save Changes</button>
+        <a href="{{ url_for('dashboard') }}">Cancel</a>
+    </form>
+</body>
+</html>
