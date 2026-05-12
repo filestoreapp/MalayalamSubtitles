@@ -9,6 +9,7 @@ from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, send_file, jsonify, session
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func
+from sqlalchemy import or_, and_, cast, Float
 
 app = Flask(__name__)
 
@@ -85,6 +86,102 @@ def login_required(f):
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
+
+@app.route('/search')
+def advanced_search():
+    # --- Filter parameters from URL ---
+    query = request.args.get('q', '').strip()
+    media_type = request.args.get('type', '')         # 'movie' or 'series'
+    year_from = request.args.get('year_from', type=int)
+    year_to = request.args.get('year_to', type=int)
+    rating_min = request.args.get('rating_min', type=float)
+    rating_max = request.args.get('rating_max', type=float)
+    category = request.args.get('category', '')       # exact match or list?
+    lang = request.args.get('lang', '')               # 'ml', 'en', 'ta', 'hi'
+    imdb = request.args.get('imdb', '').strip()
+    sort = request.args.get('sort', 'newest')         # newest, oldest, downloads, rating, title_asc
+    page = request.args.get('page', 1, type=int)
+
+    # Base query
+    base_q = Movie.query
+
+    # --- Text search (title, plot, imdb_id) ---
+    if query:
+        base_q = base_q.filter(
+            or_(
+                Movie.title.ilike(f'%{query}%'),
+                Movie.plot.ilike(f'%{query}%'),
+                Movie.imdb_id.ilike(f'%{query}%')
+            )
+        )
+
+    # --- Filters ---
+    if media_type:
+        base_q = base_q.filter(Movie.media_type == media_type)
+
+    if category:
+        # Assuming comma-separated categories – use exact match or LIKE
+        base_q = base_q.filter(Movie.category.ilike(f'%{category}%'))
+
+    if year_from:
+        base_q = base_q.filter(Movie.year >= str(year_from))
+    if year_to:
+        base_q = base_q.filter(Movie.year <= str(year_to))
+
+    if rating_min is not None:
+        base_q = base_q.filter(cast(Movie.rating, Float) >= rating_min)
+    if rating_max is not None:
+        base_q = base_q.filter(cast(Movie.rating, Float) <= rating_max)
+
+    if imdb:
+        base_q = base_q.filter(Movie.imdb_id.ilike(f'%{imdb}%'))
+
+    # --- Language availability (join with TranslationCache) ---
+    if lang:
+        if lang == 'en':
+            # Movies that have an English subtitle file (english_srt not empty)
+            base_q = base_q.filter(Movie.english_srt.isnot(None), Movie.english_srt != '')
+        else:
+            # Subquery existence
+            base_q = base_q.join(TranslationCache).filter(
+                TranslationCache.language == lang
+            )
+
+    # --- Sorting ---
+    sort_mapping = {
+        'newest': Movie.id.desc(),
+        'oldest': Movie.id.asc(),
+        'downloads': Movie.views.desc(),
+        'rating_desc': cast(Movie.rating, Float).desc(),
+        'rating_asc': cast(Movie.rating, Float).asc(),
+        'title_asc': Movie.title.asc(),
+        'title_desc': Movie.title.desc()
+    }
+    order = sort_mapping.get(sort, Movie.id.desc())
+    base_q = base_q.order_by(order)
+
+    # --- Pagination ---
+    pagination = base_q.paginate(page=page, per_page=12, error_out=False)
+
+    # --- Keep categories list for sidebar (cache this) ---
+    # (move categories fetch to a helper function)
+    categories_list = get_categories_list()  # implement a cached version
+
+    return render_template('search.html',
+                           pagination=pagination,
+                           query=query,
+                           categories=categories_list,
+                           current_filters={
+                               'type': media_type,
+                               'year_from': year_from,
+                               'year_to': year_to,
+                               'rating_min': rating_min,
+                               'rating_max': rating_max,
+                               'category': category,
+                               'lang': lang,
+                               'imdb': imdb,
+                               'sort': sort
+                           })
 
 # --- USER ROUTES (WITH PAGINATION) ---
 @app.route('/')
