@@ -98,40 +98,39 @@ def get_categories_list():
 HF_WORKER_URL = os.environ.get('HF_WORKER_URL', '')
 HF_SECRET = os.environ.get('HF_SECRET', 'shared-secret')
 
+from gradio_client import Client
+
 def trigger_hf_translation(movie_id: int, english_srt_url: str):
-    """Send translation request to Hugging Face Space using movie_id."""
+    """Send translation request to Hugging Face Space using Gradio client."""
     if not HF_WORKER_URL:
         print("⚠️ HF_WORKER_URL not set")
         return
 
-    # All DB operations must be inside an application context
-    with app.app_context():
-        print(f"DEBUG: inside trigger_hf_translation for movie {movie_id}")
-        print(f"DEBUG: HF_WORKER_URL = {HF_WORKER_URL}")
+    space_url = HF_WORKER_URL.rstrip('/api/translate')  # e.g., https://malayalamsub-malayalamsubs.hf.space
 
-        # Create a pending job for Malayalam (only the first time)
+    with app.app_context():
+        print(f"DEBUG: Triggering translation for movie {movie_id} via Gradio API")
+
+        # Create a pending job for Malayalam
         job = TranslationJob.query.filter_by(movie_id=movie_id, language='ml').first()
         if not job:
             job = TranslationJob(movie_id=movie_id, language='ml', status='Pending')
             db.session.add(job)
             db.session.commit()
-            print(f"DEBUG: Created Pending job for movie {movie_id}")
 
         try:
-            resp = requests.post(HF_WORKER_URL, json={
-                "movie_id": movie_id,
-                "english_srt_url": english_srt_url
-            }, timeout=30)
-            if resp.status_code == 200:
-                job.status = 'Processing'
-                db.session.commit()
-                print(f"✅ Translation started for movie {movie_id}")
-            else:
-                job.status = 'Failed'
-                db.session.commit()
-                print(f"❌ HF worker returned {resp.status_code}: {resp.text}")
+            client = Client(space_url)
+            result = client.predict(
+                file=None,           # no file upload
+                file_url=english_srt_url,
+                movie_id=str(movie_id),
+                api_name="/predict"
+            )
+            job.status = 'Processing'
+            db.session.commit()
+            print(f"✅ Translation started for movie {movie_id}: {result}")
         except Exception as e:
-            print(f"❌ HF trigger error: {e}")
+            print(f"❌ Gradio trigger error: {e}")
             job.status = 'Failed'
             db.session.commit()
 
