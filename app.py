@@ -6,6 +6,7 @@ import urllib.parse
 import re
 import zipfile
 import time
+import pysrt
 import threading
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, send_file, jsonify, session
