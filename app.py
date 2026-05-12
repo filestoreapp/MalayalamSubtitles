@@ -50,7 +50,7 @@ class Movie(db.Model):
     category = db.Column(db.String(200), default='General')
     plot = db.Column(db.Text, nullable=True)
     runtime = db.Column(db.String(50), nullable=True)
-    imdb_id = db.Column(db.String(20))             # still available for search, not needed for translation
+    imdb_id = db.Column(db.String(20))
 
 class TranslationCache(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -104,14 +104,18 @@ def trigger_hf_translation(movie_id: int, english_srt_url: str):
         print("⚠️ HF_WORKER_URL not set")
         return
 
-    # All database operations must happen inside an app context
+    # All DB operations must be inside an application context
     with app.app_context():
-        # Create a pending job for Malayalam
+        print(f"DEBUG: inside trigger_hf_translation for movie {movie_id}")
+        print(f"DEBUG: HF_WORKER_URL = {HF_WORKER_URL}")
+
+        # Create a pending job for Malayalam (only the first time)
         job = TranslationJob.query.filter_by(movie_id=movie_id, language='ml').first()
         if not job:
             job = TranslationJob(movie_id=movie_id, language='ml', status='Pending')
             db.session.add(job)
             db.session.commit()
+            print(f"DEBUG: Created Pending job for movie {movie_id}")
 
         try:
             resp = requests.post(HF_WORKER_URL, json={
@@ -415,6 +419,7 @@ def reset_jobs():
     for job in pending:
         movie = Movie.query.get(job.movie_id)
         if movie and movie.english_srt:
+            print(f"DEBUG: Re-triggering translation for movie {movie.id}")
             threading.Thread(target=trigger_hf_translation, args=(movie.id, movie.english_srt)).start()
     return redirect(url_for('dashboard'))
 
@@ -423,7 +428,8 @@ def reset_jobs():
 def queue_translations(movie_id):
     movie = Movie.query.get_or_404(movie_id)
     if movie.english_srt:
-        trigger_hf_translation(movie.id, movie.english_srt)
+        print(f"DEBUG: Manually queuing translation for movie {movie.id}")
+        threading.Thread(target=trigger_hf_translation, args=(movie.id, movie.english_srt)).start()
     return redirect(url_for('dashboard'))
 
 @app.route('/admin/delete_job/<int:job_id>')
@@ -485,7 +491,7 @@ def edit_media(movie_id):
             TranslationJob.query.filter_by(movie_id=media.id).delete()
             db.session.commit()
 
-            # Trigger translation immediately
+            print(f"DEBUG: Re-triggering translation after edit for movie {media.id}")
             threading.Thread(target=trigger_hf_translation, args=(media.id, storage_data)).start()
 
         db.session.commit()
@@ -701,6 +707,7 @@ def admin():
                 return f"Database Error during Movie Insert: {str(e)}", 500
 
             # --- Always trigger translation ---
+            print(f"DEBUG: Starting translation thread for movie {new_media.id}")
             threading.Thread(target=trigger_hf_translation, args=(new_media.id, storage_data)).start()
 
         return redirect(url_for('dashboard'))
