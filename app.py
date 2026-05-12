@@ -6,44 +6,39 @@ import urllib.parse
 import re
 import zipfile
 import time
-import pysrt
 import threading
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, send_file, jsonify, session
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, or_, cast, Float
 
-# ========== INITIALISATION ==========
 app = Flask(__name__)
 
-# --- DATABASE (from env) ---
+# ------------------ CONFIG ------------------
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'pool_pre_ping': True, 'pool_recycle': 300}
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-change-me')
-
 db = SQLAlchemy(app)
 
-# --- CLOUDFLARE R2 ---
+# ------------------ CLOUDFLARE R2 ------------------
 r2_endpoint = os.environ.get('R2_ENDPOINT_URL')
 r2_access_key = os.environ.get('R2_ACCESS_KEY_ID')
 r2_secret_key = os.environ.get('R2_SECRET_ACCESS_KEY')
 r2_bucket = os.environ.get('R2_BUCKET_NAME')
 r2_public_url = os.environ.get('R2_PUBLIC_URL')
-
+s3_client = None
 if r2_endpoint and r2_access_key and r2_secret_key:
     s3_client = boto3.client('s3',
         endpoint_url=r2_endpoint,
         aws_access_key_id=r2_access_key,
         aws_secret_access_key=r2_secret_key
     )
-else:
-    s3_client = None
 
-# ========== MODELS ==========
+# ------------------ MODELS ------------------
 class Movie(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    media_type = db.Column(db.String(10))          # 'movie' or 'series'
+    media_type = db.Column(db.String(10))
     title = db.Column(db.String(200))
     season = db.Column(db.Integer, nullable=True)
     episode = db.Column(db.Integer, nullable=True)
@@ -55,12 +50,12 @@ class Movie(db.Model):
     category = db.Column(db.String(200), default='General')
     plot = db.Column(db.Text, nullable=True)
     runtime = db.Column(db.String(50), nullable=True)
-    imdb_id = db.Column(db.String(20))             # NEW for advanced search
+    imdb_id = db.Column(db.String(20))
 
 class TranslationCache(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     movie_id = db.Column(db.Integer, db.ForeignKey('movie.id', ondelete='CASCADE'))
-    language = db.Column(db.String(10))            # 'ml', 'ta', 'hi'
+    language = db.Column(db.String(10))
     translated_srt = db.Column(db.Text)
     downloads = db.Column(db.Integer, default=0)
     movie = db.relationship('Movie', backref=db.backref('translations', cascade='all, delete-orphan'))
@@ -82,12 +77,12 @@ with app.app_context():
         db.session.add(SiteStat(total_visitors=0))
         db.session.commit()
 
-# ========== CATEGORIES CACHE ==========
+# ------------------ CACHED CATEGORIES ------------------
 _categories_cache = {'data': [], 'last_update': 0}
 
 def get_categories_list():
     now = time.time()
-    if now - _categories_cache['last_update'] > 3600:  # refresh hourly
+    if now - _categories_cache['last_update'] > 3600:
         all_cats = set()
         for m in Movie.query.with_entities(Movie.category).all():
             if m.category:
@@ -99,87 +94,60 @@ def get_categories_list():
         _categories_cache['last_update'] = now
     return _categories_cache['data']
 
-# ========== TRANSLATION FUNCTIONS ==========
-import pysrt
+# ------------------ HF TRANSLATION WORKER TRIGGER ------------------
+HF_WORKER_URL = os.environ.get('HF_WORKER_URL', '')
+HF_SECRET = os.environ.get('HF_SECRET', 'shared-secret')
 
-def call_indic_trans2(text: str, target_lang: str) -> str:
-    """Translate text via Hugging Face IndicTrans2 API (free)."""
-    API_URL = "https://api-inference.huggingface.co/models/ai4bharat/indictrans2-en-indic-dist-320M"
-    HF_TOKEN = os.environ.get("HF_API_TOKEN")
-    if not HF_TOKEN:
-        raise Exception("HF_API_TOKEN missing")
-    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
-    lang_map = {
-        'ml': 'mal_Mlym',
-        'ta': 'tam_Taml',
-        'hi': 'hin_Deva'
-    }
-    payload = {
-        "inputs": text,
-        "parameters": {
-            "src_lang": "eng_Latn",
-            "tgt_lang": lang_map.get(target_lang, 'mal_Mlym')
-        }
-    }
-    r = requests.post(API_URL, headers=headers, json=payload)
-    r.raise_for_status()
-    result = r.json()
-    if isinstance(result, list) and len(result) > 0:
-        return result[0].get('translation_text', text)
-    return text
+def trigger_hf_translation(imdb_id: str, english_srt_url: str, movie_id: int):
+    """Send translation request to Hugging Face Space."""
+    if not HF_WORKER_URL:
+        print("⚠️ HF_WORKER_URL not set")
+        return
 
-def translate_srt_file(english_srt_content: str, target_lang: str) -> str:
-    """Translate English SRT content to target language, preserving timestamps."""
-    subs = pysrt.from_string(english_srt_content)
-    if not subs:
-        return english_srt_content
-    # Join texts with unique delimiter
-    texts = [sub.text for sub in subs]
-    batch = " ||| ".join(texts)
-    translated_batch = call_indic_trans2(batch, target_lang)
-    translated_texts = translated_batch.split(" ||| ")
-    for i, sub in enumerate(subs):
-        sub.text = translated_texts[i] if i < len(translated_texts) else sub.text
-    return "\n".join(str(sub) for sub in subs)
+    # Create a pending job for Malayalam
+    job = TranslationJob.query.filter_by(movie_id=movie_id, language='ml').first()
+    if not job:
+        job = TranslationJob(movie_id=movie_id, language='ml', status='Pending')
+        db.session.add(job)
+        db.session.commit()
 
-def process_translation(app_instance, movie_id, lang):
-    """Run translation in background thread (safe for Render free tier)."""
-    with app_instance.app_context():
-        movie = Movie.query.get(movie_id)
-        if not movie or not movie.english_srt:
-            return
-        try:
-            # Download English SRT if it's a URL
-            if movie.english_srt.startswith('http'):
-                r = requests.get(movie.english_srt)
-                r.raise_for_status()
-                english_srt = r.text
-            else:
-                english_srt = movie.english_srt
-
-            translated = translate_srt_file(english_srt, lang)
-
-            # Save to TranslationCache
-            cache = TranslationCache.query.filter_by(movie_id=movie.id, language=lang).first()
-            if not cache:
-                cache = TranslationCache(movie_id=movie.id, language=lang)
-                db.session.add(cache)
-            cache.translated_srt = translated
-
-            # Mark job as Completed
-            job = TranslationJob.query.filter_by(movie_id=movie.id, language=lang).first()
-            if job:
-                job.status = 'Completed'
+    try:
+        resp = requests.post(HF_WORKER_URL, json={
+            "imdb_id": imdb_id,
+            "english_srt_url": english_srt_url
+        }, timeout=30)
+        if resp.status_code == 200:
+            job.status = 'Processing'
             db.session.commit()
-        except Exception as e:
-            print(f"❌ Translation error movie {movie_id} ({lang}): {e}")
-            # Mark as Failed so you can retry later
-            job = TranslationJob.query.filter_by(movie_id=movie.id, language=lang).first()
-            if job:
-                job.status = 'Failed'
-                db.session.commit()
+            print(f"✅ Translation started for movie {movie_id}")
+        else:
+            job.status = 'Failed'
+            db.session.commit()
+            print(f"❌ HF worker returned {resp.status_code}")
+    except Exception as e:
+        print(f"❌ HF trigger error: {e}")
+        job.status = 'Failed'
+        db.session.commit()
 
-# ========== AUTH ==========
+# Webhook from HF Space when translation is done
+@app.route('/api/translation_callback', methods=['POST'])
+def translation_callback():
+    data = request.json
+    secret = request.headers.get('Authorization', '').replace('Bearer ', '')
+    if secret != HF_SECRET:
+        return jsonify({"error": "unauthorized"}), 401
+
+    movie_id = data.get('movie_id')
+    language = data.get('language', 'ml')
+    status = data.get('status', 'Completed')
+
+    job = TranslationJob.query.filter_by(movie_id=movie_id, language=language).first()
+    if job:
+        job.status = status
+        db.session.commit()
+    return jsonify({"ok": True})
+
+# ------------------ AUTH ------------------
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -188,7 +156,7 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-# ========== USER ROUTES ==========
+# ------------------ USER ROUTES ------------------
 @app.route('/')
 def index():
     stat = SiteStat.query.first()
@@ -198,16 +166,7 @@ def index():
     search_query = request.args.get('q', '')
     category_query = request.args.get('cat', '')
     page = request.args.get('page', 1, type=int)
-
-    # Use cached categories (optional, you can switch fully later)
-    all_media_unpaginated = Movie.query.order_by(Movie.id.desc()).all()
-    categories_set = set()
-    for movie in all_media_unpaginated:
-        if movie.category:
-            for cat in movie.category.split(','):
-                if cat.strip() and cat.strip() != "SilentMode":
-                    categories_set.add(cat.strip())
-    categories_list = sorted(list(categories_set))
+    categories_list = get_categories_list()
 
     if search_query:
         pagination = Movie.query.filter(
@@ -301,7 +260,7 @@ def download(movie_id, language):
 
     return send_file(mem_file, as_attachment=True, download_name=final_name, mimetype='application/x-subrip')
 
-# ========== ADVANCED SEARCH ==========
+# ------------------ ADVANCED SEARCH ------------------
 @app.route('/search')
 def advanced_search():
     q = request.args.get('q', '').strip()
@@ -376,7 +335,7 @@ def advanced_search():
                                'imdb': imdb, 'sort': sort
                            })
 
-# ========== ADMIN & DASHBOARD ==========
+# ------------------ ADMIN & DASHBOARD ------------------
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -390,7 +349,6 @@ def login():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    # Clean up completed jobs
     TranslationJob.query.filter(TranslationJob.status.in_(['Completed', 'Success'])).delete(synchronize_session=False)
     db.session.commit()
 
@@ -427,7 +385,7 @@ def dashboard():
                 r2_size_str = f"{total_bytes / (1024 * 1024):.2f} MB"
             else:
                 r2_size_str = f"{total_bytes / (1024 * 1024 * 1024):.2f} GB"
-        except Exception as e:
+        except:
             r2_size_str = "Read Error"
 
     return render_template('dashboard.html',
@@ -448,20 +406,21 @@ def reset_jobs():
     for job in stuck_jobs:
         job.status = 'Pending'
     db.session.commit()
-    # No more Hugging Face Space wake-up call – jobs will be picked up by manual upload only
+
+    # Optional: re-trigger pending jobs for movies that have imdb_id and english_srt
+    pending = TranslationJob.query.filter_by(status='Pending').all()
+    for job in pending:
+        movie = Movie.query.get(job.movie_id)
+        if movie and movie.imdb_id and movie.english_srt:
+            threading.Thread(target=trigger_hf_translation, args=(movie.imdb_id, movie.english_srt, movie.id)).start()
     return redirect(url_for('dashboard'))
 
 @app.route('/admin/queue_translations/<int:movie_id>')
 @login_required
 def queue_translations(movie_id):
-    for lang in ['ml', 'ta', 'hi']:
-        if not TranslationCache.query.filter_by(movie_id=movie_id, language=lang).first() and \
-           not TranslationJob.query.filter_by(movie_id=movie_id, language=lang).first():
-            new_job = TranslationJob(movie_id=movie_id, language=lang)
-            db.session.add(new_job)
-            db.session.commit()
-            # Start background translation
-            threading.Thread(target=process_translation, args=(app, movie_id, lang)).start()
+    movie = Movie.query.get_or_404(movie_id)
+    if movie.imdb_id and movie.english_srt:
+        trigger_hf_translation(movie.imdb_id, movie.english_srt, movie.id)
     return redirect(url_for('dashboard'))
 
 @app.route('/admin/delete_job/<int:job_id>')
@@ -523,11 +482,9 @@ def edit_media(movie_id):
             TranslationJob.query.filter_by(movie_id=media.id).delete()
             db.session.commit()
 
-            for lang in ['ml', 'ta', 'hi']:
-                job = TranslationJob(movie_id=media.id, language=lang, status='Pending')
-                db.session.add(job)
-                db.session.commit()
-                threading.Thread(target=process_translation, args=(app, media.id, lang)).start()
+            # Trigger translation if IMDb ID exists
+            if media.imdb_id:
+                threading.Thread(target=trigger_hf_translation, args=(media.imdb_id, storage_data, media.id)).start()
 
         db.session.commit()
         return redirect(url_for('dashboard'))
@@ -561,7 +518,7 @@ def tmdb_details():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# --- DUAL-ENGINE AUTO FETCHER (unchanged, but keys from env) ---
+# --- DUAL-ENGINE AUTO FETCHER ---
 @app.route('/api/auto_fetch_srt', methods=['POST'])
 @login_required
 def auto_fetch_srt():
@@ -584,7 +541,6 @@ def auto_fetch_srt():
     custom_headers = {"User-Agent": "Mozilla/5.0 ... Chrome/114.0.0.0 Safari/537.36"}
     error_log = []
 
-    # --- SUBDL ---
     if SUBDL_API_KEY:
         try:
             if media_type == 'series':
@@ -616,7 +572,6 @@ def auto_fetch_srt():
         except Exception as e:
             error_log.append(f"Subdl Crash: {str(e)}")
 
-    # --- OPENSUBTITLES ---
     if OS_API_KEY:
         try:
             os_headers = {"Api-Key": OS_API_KEY, "Content-Type": "application/json", "User-Agent": "malayalamsubtitles_app v1.0"}
@@ -660,7 +615,7 @@ def auto_fetch_srt():
 
     return jsonify({"error": f"{' | '.join(error_log)}"}), 404
 
-# --- MASTER UPLOAD ROUTE (with auto-translation) ---
+# --- MASTER UPLOAD ROUTE (with auto translation trigger) ---
 @app.route('/admin', methods=['GET', 'POST'])
 @login_required
 def admin():
@@ -743,16 +698,12 @@ def admin():
                 db.session.rollback()
                 return f"Database Error during Movie Insert: {str(e)}", 500
 
-            # Queue and start translation for each language
-            for lang in ['ml', 'ta', 'hi']:
-                # Create job if not exists
-                if not TranslationJob.query.filter_by(movie_id=new_media.id, language=lang).first():
-                    job = TranslationJob(movie_id=new_media.id, language=lang, status='Pending')
-                    db.session.add(job)
-                    db.session.commit()
-
-                # Start background translation
-                threading.Thread(target=process_translation, args=(app, new_media.id, lang)).start()
+            # --- TRIGGER TRANSLATION IF IMDb ID EXISTS ---
+            # (IMDb ID should have been captured from the upload form; ensure you have an imdb_id field)
+            # Actually, the uploaded movie won't have an imdb_id yet. You need to manually set it via edit, or auto-fetch it.
+            # For now, translation will only be triggered if imdb_id is set later via edit.
+            if new_media.imdb_id:
+                threading.Thread(target=trigger_hf_translation, args=(new_media.imdb_id, storage_data, new_media.id)).start()
 
         return redirect(url_for('dashboard'))
 
@@ -802,7 +753,6 @@ def trigger_telegram(movie_id):
                    f"✅ *Subtitles Ready:* Malayalam, Tamil, Hindi\n"
                    f"⚡️ *High-Speed Download*\n\n"
                    f"👇 *Get the episode here:*{footer}")
-        import urllib.parse
         encoded_title = urllib.parse.quote(safe_title)
         button_url = f"{website_base_url}/series/{encoded_title}/{movie.season or 1}"
     else:
