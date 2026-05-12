@@ -1,8 +1,9 @@
 Flask
 Flask-SQLAlchemy
-pysrt
 deep-translator
 gunicorn
 psycopg2-binary
 requests
 boto3
+pysrt                # <--- add this line
+schedule   
