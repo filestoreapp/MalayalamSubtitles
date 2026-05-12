@@ -99,39 +99,26 @@ def get_categories_list():
 HF_WORKER_URL = os.environ.get('HF_WORKER_URL', '')
 HF_SECRET = os.environ.get('HF_SECRET', 'shared-secret')
 
-from gradio_client import Client
+# --- Replace the client call block in trigger_hf_translation ---
+import httpx
 
 def trigger_hf_translation(movie_id: int, english_srt_url: str):
-    """Send translation request to Hugging Face Space using Gradio client."""
-    if not HF_WORKER_URL:
-        print("⚠️ HF_WORKER_URL not set")
-        return
-
-    # Safely extract the base Space URL by removing the /api/translate path
-    space_url = HF_WORKER_URL.rsplit('/api/translate', 1)[0]
+    # ... (previous code is unchanged) ...
 
     with app.app_context():
-        print(f"DEBUG: Triggering translation for movie {movie_id} via Gradio API")
-        print(f"DEBUG: Space URL = {space_url}")
-
-        # Create (or reuse) Pending job for Malayalam
-        job = TranslationJob.query.filter_by(movie_id=movie_id, language='ml').first()
-        if not job:
-            job = TranslationJob(movie_id=movie_id, language='ml', status='Pending')
-            db.session.add(job)
-            db.session.commit()
+        # ... (job creation logic is unchanged) ...
 
         try:
-            client = Client(space_url)
+            # Create a custom httpx client with longer timeouts (5 minutes)
+            httpx_client = httpx.Client(timeout=httpx.Timeout(300.0, connect=30.0))
+            client = Client(space_url, httpx_client=httpx_client)
             result = client.predict(
                 file=None,
                 file_url=english_srt_url,
                 movie_id=str(movie_id),
                 api_name="/predict"
             )
-            job.status = 'Processing'
-            db.session.commit()
-            print(f"✅ Translation started for movie {movie_id}: {result}")
+            # ... (success handling is unchanged) ...
         except Exception as e:
             print(f"❌ Gradio trigger error: {e}")
             job.status = 'Failed'
