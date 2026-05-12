@@ -11,6 +11,7 @@ from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, send_file, jsonify, session
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, or_, cast, Float
+from gradio_client import Client
 
 app = Flask(__name__)
 
@@ -106,12 +107,14 @@ def trigger_hf_translation(movie_id: int, english_srt_url: str):
         print("⚠️ HF_WORKER_URL not set")
         return
 
-    space_url = HF_WORKER_URL.rstrip('/api/translate')  # e.g., https://malayalamsub-malayalamsubs.hf.space
+    # Safely extract the base Space URL by removing the /api/translate path
+    space_url = HF_WORKER_URL.rsplit('/api/translate', 1)[0]
 
     with app.app_context():
         print(f"DEBUG: Triggering translation for movie {movie_id} via Gradio API")
+        print(f"DEBUG: Space URL = {space_url}")
 
-        # Create a pending job for Malayalam
+        # Create (or reuse) Pending job for Malayalam
         job = TranslationJob.query.filter_by(movie_id=movie_id, language='ml').first()
         if not job:
             job = TranslationJob(movie_id=movie_id, language='ml', status='Pending')
@@ -121,7 +124,7 @@ def trigger_hf_translation(movie_id: int, english_srt_url: str):
         try:
             client = Client(space_url)
             result = client.predict(
-                file=None,           # no file upload
+                file=None,
                 file_url=english_srt_url,
                 movie_id=str(movie_id),
                 api_name="/predict"
@@ -133,6 +136,8 @@ def trigger_hf_translation(movie_id: int, english_srt_url: str):
             print(f"❌ Gradio trigger error: {e}")
             job.status = 'Failed'
             db.session.commit()
+
+
 
 # Webhook from HF Space when translation is done
 @app.route('/api/translation_callback', methods=['POST'])
