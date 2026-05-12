@@ -1,1 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Malayalam Subtitles Hub</title>
+    <style>
+        :root { --bg-color: #0f172a; --card-bg: #1e293b; --text-color: #f8fafc; --accent: #3b82f6; --accent-hover: #2563eb; }
+        
+        /* Lock the screen width so backgrounds never cut off when zooming! */
+        html, body { 
+            margin: 0; 
+            padding: 0; 
+            width: 100%; 
+            max-width: 100vw; 
+            overflow-x: hidden; 
+        }
+        
+        body { 
+            font-family: 'Segoe UI', system-ui, sans-serif; 
+            background-color: var(--bg-color); 
+            color: var(--text-color); 
+            display: flex; 
+            flex-direction: column; 
+            min-height: 100vh; 
+        }
+        
+        /* Navbar & Search */
+        header { width: 100%; box-sizing: border-box; background: var(--card-bg); padding: 20px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3); border-bottom: 2px solid var(--accent); }
+        h1 { margin: 0 0 15px 0; color: white; font-size: 28px; letter-spacing: 1px; }
+        .search-container { display: flex; max-width: 600px; margin: 0 auto; gap: 10px; }
+        input[type="text"], select { padding: 12px; border: none; border-radius: 6px; background: #334155; color: white; outline: none; }
+        input[type="text"] { flex: 1; }
+        button { padding: 12px 20px; background: var(--accent); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        button:hover { background: var(--accent-hover); }
 
+        .container { max-width: 1200px; margin: 40px auto; padding: 0 20px; flex-grow: 1; width: 100%; box-sizing: border-box; }
+        .section-title { font-size: 22px; margin-bottom: 15px; border-left: 4px solid var(--accent); padding-left: 10px; color: #e2e8f0; }
+
+        /* Grids (Used ONLY for Search Results now) and Scrolling Rows */
+        .media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 20px; margin-bottom: 20px; justify-content: center; }
+        
+        .horizontal-scroll { display: flex; overflow-x: auto; gap: 20px; padding-bottom: 15px; scroll-behavior: smooth; }
+        .horizontal-scroll::-webkit-scrollbar { height: 8px; }
+        .horizontal-scroll::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        .horizontal-scroll .movie-card { width: 180px; flex: 0 0 auto; }
+
+        /* Movie Cards */
+        .movie-card { background: var(--card-bg); border-radius: 10px; overflow: hidden; transition: transform 0.3s; text-decoration: none; color: white; display: flex; flex-direction: column; position: relative; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
+        .movie-card:hover { transform: translateY(-5px); box-shadow: 0 10px 15px rgba(0,0,0,0.4); }
+        .poster-container { position: relative; width: 100%; aspect-ratio: 2/3; }
+        .movie-poster { width: 100%; height: 100%; object-fit: cover; }
+        .badge { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.8); padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; border: 1px solid var(--accent); }
+        .movie-info { padding: 15px; flex-grow: 1; display: flex; flex-direction: column; justify-content: space-between; }
+        .movie-title { font-size: 16px; margin: 0 0 5px 0; font-weight: bold; line-height: 1.3; }
+        .movie-meta { font-size: 13px; color: #94a3b8; margin: 0; }
+
+        /* Pagination Buttons */
+        .pagination { display: flex; justify-content: center; gap: 10px; margin: 20px 0 50px 0; align-items: center; }
+        .page-btn { background: #334155; color: white; padding: 10px 15px; text-decoration: none; border-radius: 6px; font-weight: bold; transition: 0.2s; }
+        .page-btn:hover { background: var(--accent); }
+        .page-info { font-weight: bold; color: #94a3b8; }
+        .disabled { opacity: 0.5; pointer-events: none; }
+
+        /* PROFESSIONAL FOOTER */
+        footer { width: 100%; box-sizing: border-box; background: var(--card-bg); padding: 40px 20px; margin-top: auto; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+        .footer-content { max-width: 800px; margin: 0 auto; display: flex; flex-direction: column; gap: 15px; }
+        .footer-links { display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; margin-bottom: 10px; }
+        .footer-links a { color: #e2e8f0; text-decoration: none; font-weight: bold; transition: 0.2s; font-size: 15px; }
+        .footer-links a:hover { color: var(--accent); }
+        .disclaimer { font-size: 13px; line-height: 1.6; opacity: 0.7; }
+        .copyright { font-size: 14px; margin-top: 10px; color: white; }
+
+        /* ========================================= */
+        /* 📱 MOBILE RESPONSIVE FIXES                */
+        /* ========================================= */
+        @media (max-width: 600px) {
+            h1 { font-size: 22px; }
+            .search-container { flex-direction: column; gap: 8px; }
+            .container { margin: 20px auto; padding: 0 10px; }
+            
+            /* Keep Search Results grid tidy on mobile */
+            .media-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+            
+            /* Make all scrolling posters identical size on mobile */
+            .horizontal-scroll .movie-card { width: 140px; }
+            
+            .movie-info { padding: 10px; }
+            .movie-title { font-size: 14px; }
+            .footer-links { flex-direction: column; gap: 12px; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <a href="/" style="text-decoration: none;"><h1>🎬 Malayalam Subtitles Hub</h1></a>
+        <div style="max-width: 600px; margin: 0 auto; display: flex; flex-direction: column; gap: 15px;">
+            <form class="search-container" action="/" method="GET" style="margin: 0;">
+                <input type="text" name="q" placeholder="Search movies, series, or genres..." value="{{ search_query if mode == 'search' else '' }}">
+                <select name="cat" onchange="this.form.submit()">
+                    <option value="">All Categories</option>
+                    {% for cat in categories %}
+                        <option value="{{ cat }}" {% if search_query == cat %}selected{% endif %}>{{ cat }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit">Search</button>
+            </form>
+            <button onclick="document.getElementById('requestModal').style.display='flex'" style="background: #10b981; width: 100%; max-width: 200px; margin: 0 auto;">🙋‍♂️ Request a Subtitle</button>
+        </div>
+    </header>
+
+    <div class="container">
+        <h2 class="section-title">🔍 Advanced Search</h2>
+
+<!-- ============ FILTER PANEL ============ -->
+<form method="GET" action="/search" style="background: #1e293b; padding: 20px; border-radius: 10px; margin-bottom: 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+    <div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-end;">
+        <!-- Text search -->
+        <div style="flex: 2; min-width: 200px;">
+            <label style="color: #cbd5e1; font-size: 14px;">Search Title / Plot</label>
+            <input type="text" name="q" value="{{ current_filters.q }}" placeholder="Keywords..." style="width:100%;">
+        </div>
+        <!-- IMDb ID -->
+        <div style="flex: 1; min-width: 150px;">
+            <label style="color: #cbd5e1; font-size: 14px;">IMDb ID</label>
+            <input type="text" name="imdb" value="{{ current_filters.imdb }}" placeholder="tt1234567" style="width:100%;">
+        </div>
+        <!-- Media type -->
+        <div style="flex: 0 0 150px;">
+            <label style="color: #cbd5e1; font-size: 14px;">Type</label>
+            <select name="type" style="width:100%;">
+                <option value="">All</option>
+                <option value="movie" {% if current_filters.type=='movie' %}selected{% endif %}>Movies</option>
+                <option value="series" {% if current_filters.type=='series' %}selected{% endif %}>TV Series</option>
+            </select>
+        </div>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 15px; margin-top: 15px;">
+        <!-- Year range -->
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <div>
+                <label style="color: #cbd5e1; font-size: 14px;">Year from</label>
+                <input type="number" name="year_from" value="{{ current_filters.year_from }}" placeholder="1990" style="width:80px;">
+            </div>
+            <div>
+                <label style="color: #cbd5e1; font-size: 14px;">to</label>
+                <input type="number" name="year_to" value="{{ current_filters.year_to }}" placeholder="2026" style="width:80px;">
+            </div>
+        </div>
+        <!-- Rating range -->
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <div>
+                <label style="color: #cbd5e1; font-size: 14px;">Rating ≥</label>
+                <input type="number" name="rating_min" value="{{ current_filters.rating_min }}" step="0.1" min="0" max="10" style="width:80px;">
+            </div>
+            <div>
+                <label style="color: #cbd5e1; font-size: 14px;">≤</label>
+                <input type="number" name="rating_max" value="{{ current_filters.rating_max }}" step="0.1" min="0" max="10" style="width:80px;">
+            </div>
+        </div>
+        <!-- Category -->
+        <div style="flex: 1; min-width: 150px;">
+            <label style="color: #cbd5e1; font-size: 14px;">Genre</label>
+            <select name="category" style="width:100%;">
+                <option value="">Any</option>
+                {% for cat in categories %}
+                    <option value="{{ cat }}" {% if current_filters.category == cat %}selected{% endif %}>{{ cat }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 15px; margin-top: 15px; align-items: center;">
+        <!-- Language -->
+        <div>
+            <label style="color: #cbd5e1; font-size: 14px;">Subtitles available in</label>
+            <select name="lang" style="width:150px;">
+                <option value="">Any language</option>
+                <option value="en" {% if current_filters.lang=='en' %}selected{% endif %}>English only</option>
+                <option value="ml" {% if current_filters.lang=='ml' %}selected{% endif %}>Malayalam</option>
+                <option value="ta" {% if current_filters.lang=='ta' %}selected{% endif %}>Tamil</option>
+                <option value="hi" {% if current_filters.lang=='hi' %}selected{% endif %}>Hindi</option>
+            </select>
+        </div>
+        <!-- Sort -->
+        <div>
+            <label style="color: #cbd5e1; font-size: 14px;">Sort by</label>
+            <select name="sort" style="width:150px;">
+                <option value="newest" {% if current_filters.sort=='newest' %}selected{% endif %}>Newest</option>
+                <option value="oldest" {% if current_filters.sort=='oldest' %}selected{% endif %}>Oldest</option>
+                <option value="downloads" {% if current_filters.sort=='downloads' %}selected{% endif %}>Most Downloaded</option>
+                <option value="rating_desc" {% if current_filters.sort=='rating_desc' %}selected{% endif %}>Highest Rated</option>
+                <option value="rating_asc" {% if current_filters.sort=='rating_asc' %}selected{% endif %}>Lowest Rated</option>
+                <option value="title_asc" {% if current_filters.sort=='title_asc' %}selected{% endif %}>Title A-Z</option>
+                <option value="title_desc" {% if current_filters.sort=='title_desc' %}selected{% endif %}>Title Z-A</option>
+            </select>
+        </div>
+        <!-- Buttons -->
+        <div style="display: flex; gap: 10px; align-items: flex-end;">
+            <button type="submit" style="height: 44px;">Apply Filters</button>
+            <a href="/search" class="page-btn" style="display: inline-block; line-height: 2.2;">Clear All</a>
+        </div>
+    </div>
+</form>
+<!-- ======== END FILTER PANEL ======== -->
+
+<!-- Results -->
+{% if pagination.items %}
+    <p style="color: #94a3b8; margin-bottom: 15px;">Found {{ pagination.total }} result(s)</p>
+    <div class="media-grid">
+        {% for media in pagination.items %}
+        <a href="{% if media.media_type == 'series' %}/series/{{ media.title|urlencode }}/{{ media.season or 1 }}{% else %}/movie/{{ media.id }}{% endif %}" class="movie-card">
+            <div class="poster-container">
+                <img src="{{ media.poster_url }}" class="movie-poster" alt="{{ media.title }}">
+                <div class="badge">⭐ {{ media.rating }}</div>
+            </div>
+            <div class="movie-info">
+                <h3 class="movie-title">{{ media.title }}</h3>
+                <p class="movie-meta">{{ media.year }} • {% if media.media_type == 'series' %}TV Series{% else %}Movie{% endif %}</p>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+
+    <!-- Pagination (preserving filters) -->
+    <div class="pagination">
+        {% if pagination.has_prev %}
+            <a href="{{ url_for('advanced_search', q=current_filters.q, type=current_filters.type, year_from=current_filters.year_from, year_to=current_filters.year_to, rating_min=current_filters.rating_min, rating_max=current_filters.rating_max, category=current_filters.category, lang=current_filters.lang, imdb=current_filters.imdb, sort=current_filters.sort, page=pagination.prev_num) }}" class="page-btn">« Prev</a>
+        {% else %}
+            <span class="page-btn disabled">« Prev</span>
+        {% endif %}
+        <span class="page-info">Page {{ pagination.page }} of {{ pagination.pages }}</span>
+        {% if pagination.has_next %}
+            <a href="{{ url_for('advanced_search', q=current_filters.q, type=current_filters.type, year_from=current_filters.year_from, year_to=current_filters.year_to, rating_min=current_filters.rating_min, rating_max=current_filters.rating_max, category=current_filters.category, lang=current_filters.lang, imdb=current_filters.imdb, sort=current_filters.sort, page=pagination.next_num) }}" class="page-btn">Next »</a>
+        {% else %}
+            <span class="page-btn disabled">Next »</span>
+        {% endif %}
+    </div>
+{% else %}
+    <p style="color: #94a3b8; font-size: 18px; text-align: center; margin-top: 50px;">No subtitles found. Try different filters or <a href="/search">clear all</a>.</p>
+{% endif %}
+    <footer>
+        <div class="footer-content">
+            <h3 style="color: white; margin: 0; font-size: 20px;">🎬 Malayalam Subtitles Hub</h3>
+            
+            <div class="footer-links">
+                <a href="/">Home</a>
+                <a href="#" onclick="document.getElementById('requestModal').style.display='flex'; return false;">Request Subtitle</a>
+                <a href="https://t.me/malayalam_sub1" target="_blank">Join Telegram Channel</a>
+            </div>
+            
+            <p class="disclaimer">
+                <b>Disclaimer:</b> This website does not host, stream, or distribute any video or media files. We solely provide community-sourced subtitle files (.srt) for accessibility and educational purposes. All movie posters, titles, and details are fetched via TMDB API and belong to their respective owners.
+            </p>
+            
+            <p class="copyright">&copy; 2026 Malayalam Subtitles Hub. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+    async function submitRequest() {
+        const title = document.getElementById('req-title').value;
+        const details = document.getElementById('req-details').value;
+        const status = document.getElementById('req-status');
+        const btn = document.getElementById('req-btn');
+        
+        if (!title.trim()) return status.innerHTML = "<span style='color:#ef4444;'>❌ Please enter a title!</span>";
+        
+        btn.disabled = true;
+        btn.innerText = "⏳ Sending...";
+        status.innerHTML = "";
+        
+        try {
+            const res = await fetch('/api/request_sub', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({title, details})
+            });
+            
+            if (res.ok) {
+                status.innerHTML = "<span style='color:#10b981;'>✅ Request sent to Telegram!</span>";
+                setTimeout(() => { 
+                    document.getElementById('requestModal').style.display='none'; 
+                    status.innerHTML=''; 
+                    document.getElementById('req-title').value=''; 
+                    document.getElementById('req-details').value='';
+                    btn.disabled = false;
+                    btn.innerText = "🚀 Send Request to Admin";
+                }, 2500);
+            } else {
+                status.innerHTML = "<span style='color:#ef4444;'>❌ Server failed to send.</span>";
+                btn.disabled = false;
+                btn.innerText = "🚀 Send Request to Admin";
+            }
+        } catch(e) {
+            status.innerHTML = "<span style='color:#ef4444;'>❌ Network connection error.</span>";
+            btn.disabled = false;
+            btn.innerText = "🚀 Send Request to Admin";
+        }
+    }
+    </script>
+</body>
+</html>
