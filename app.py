@@ -5,19 +5,19 @@ import boto3
 import urllib.parse
 import re
 import zipfile
+import time
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, send_file, jsonify, session
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import func
-from sqlalchemy import or_, and_, cast, Float
+from sqlalchemy import func, or_, cast, Float
 
 app = Flask(__name__)
 
-# --- DATABASE CONNECTION & ANTI-CRASH FIX ---
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://neondb_owner:npg_fuIRzQj83YZo@ep-fragrant-forest-a1pm9zrx-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require'
+# --- DATABASE CONNECTION (from environment) ---
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'pool_pre_ping': True, 'pool_recycle': 300}
-app.secret_key = 'malayalam_subtitle_hub_secret_key' 
+app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-change-me')
 
 db = SQLAlchemy(app)
 
@@ -40,23 +40,24 @@ else:
 # --- DATABASE MODELS ---
 class Movie(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    media_type = db.Column(db.String(10))    
-    title = db.Column(db.String(200)) 
-    season = db.Column(db.Integer, nullable=True)  
-    episode = db.Column(db.Integer, nullable=True) 
-    year = db.Column(db.String(4))           
-    rating = db.Column(db.String(10))        
-    poster_url = db.Column(db.String(500)) 
+    media_type = db.Column(db.String(10))
+    title = db.Column(db.String(200))
+    season = db.Column(db.Integer, nullable=True)
+    episode = db.Column(db.Integer, nullable=True)
+    year = db.Column(db.String(4))
+    rating = db.Column(db.String(10))
+    poster_url = db.Column(db.String(500))
     english_srt = db.Column(db.Text)
     views = db.Column(db.Integer, default=0)
     category = db.Column(db.String(200), default='General')
     plot = db.Column(db.Text, nullable=True)
     runtime = db.Column(db.String(50), nullable=True)
+    imdb_id = db.Column(db.String(20))          # <-- NEW for advanced search
 
 class TranslationCache(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     movie_id = db.Column(db.Integer, db.ForeignKey('movie.id', ondelete='CASCADE'))
-    language = db.Column(db.String(10)) 
+    language = db.Column(db.String(10))
     translated_srt = db.Column(db.Text)
     downloads = db.Column(db.Integer, default=0)
     movie = db.relationship('Movie', backref=db.backref('translations', cascade='all, delete-orphan'))
@@ -64,7 +65,7 @@ class TranslationCache(db.Model):
 class TranslationJob(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     movie_id = db.Column(db.Integer, db.ForeignKey('movie.id', ondelete='CASCADE'))
-    language = db.Column(db.String(10)) 
+    language = db.Column(db.String(10))
     status = db.Column(db.String(20), default='Pending')
     movie = db.relationship('Movie', backref=db.backref('jobs', cascade='all, delete-orphan'))
 
@@ -78,6 +79,23 @@ with app.app_context():
         db.session.add(SiteStat(total_visitors=0))
         db.session.commit()
 
+# --- CACHED CATEGORIES (avoids heavy DB query every request) ---
+_categories_cache = {'data': [], 'last_update': 0}
+
+def get_categories_list():
+    now = time.time()
+    if now - _categories_cache['last_update'] > 3600:  # refresh every hour
+        all_cats = set()
+        for m in Movie.query.with_entities(Movie.category).all():
+            if m.category:
+                for c in m.category.split(','):
+                    cleaned = c.strip()
+                    if cleaned and cleaned != "SilentMode":
+                        all_cats.add(cleaned)
+        _categories_cache['data'] = sorted(all_cats)
+        _categories_cache['last_update'] = now
+    return _categories_cache['data']
+
 # --- ADMIN PROTECTION ---
 def login_required(f):
     @wraps(f)
@@ -87,113 +105,20 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-@app.route('/search')
-def advanced_search():
-    # --- Filter parameters from URL ---
-    query = request.args.get('q', '').strip()
-    media_type = request.args.get('type', '')         # 'movie' or 'series'
-    year_from = request.args.get('year_from', type=int)
-    year_to = request.args.get('year_to', type=int)
-    rating_min = request.args.get('rating_min', type=float)
-    rating_max = request.args.get('rating_max', type=float)
-    category = request.args.get('category', '')       # exact match or list?
-    lang = request.args.get('lang', '')               # 'ml', 'en', 'ta', 'hi'
-    imdb = request.args.get('imdb', '').strip()
-    sort = request.args.get('sort', 'newest')         # newest, oldest, downloads, rating, title_asc
-    page = request.args.get('page', 1, type=int)
-
-    # Base query
-    base_q = Movie.query
-
-    # --- Text search (title, plot, imdb_id) ---
-    if query:
-        base_q = base_q.filter(
-            or_(
-                Movie.title.ilike(f'%{query}%'),
-                Movie.plot.ilike(f'%{query}%'),
-                Movie.imdb_id.ilike(f'%{query}%')
-            )
-        )
-
-    # --- Filters ---
-    if media_type:
-        base_q = base_q.filter(Movie.media_type == media_type)
-
-    if category:
-        # Assuming comma-separated categories – use exact match or LIKE
-        base_q = base_q.filter(Movie.category.ilike(f'%{category}%'))
-
-    if year_from:
-        base_q = base_q.filter(Movie.year >= str(year_from))
-    if year_to:
-        base_q = base_q.filter(Movie.year <= str(year_to))
-
-    if rating_min is not None:
-        base_q = base_q.filter(cast(Movie.rating, Float) >= rating_min)
-    if rating_max is not None:
-        base_q = base_q.filter(cast(Movie.rating, Float) <= rating_max)
-
-    if imdb:
-        base_q = base_q.filter(Movie.imdb_id.ilike(f'%{imdb}%'))
-
-    # --- Language availability (join with TranslationCache) ---
-    if lang:
-        if lang == 'en':
-            # Movies that have an English subtitle file (english_srt not empty)
-            base_q = base_q.filter(Movie.english_srt.isnot(None), Movie.english_srt != '')
-        else:
-            # Subquery existence
-            base_q = base_q.join(TranslationCache).filter(
-                TranslationCache.language == lang
-            )
-
-    # --- Sorting ---
-    sort_mapping = {
-        'newest': Movie.id.desc(),
-        'oldest': Movie.id.asc(),
-        'downloads': Movie.views.desc(),
-        'rating_desc': cast(Movie.rating, Float).desc(),
-        'rating_asc': cast(Movie.rating, Float).asc(),
-        'title_asc': Movie.title.asc(),
-        'title_desc': Movie.title.desc()
-    }
-    order = sort_mapping.get(sort, Movie.id.desc())
-    base_q = base_q.order_by(order)
-
-    # --- Pagination ---
-    pagination = base_q.paginate(page=page, per_page=12, error_out=False)
-
-    # --- Keep categories list for sidebar (cache this) ---
-    # (move categories fetch to a helper function)
-    categories_list = get_categories_list()  # implement a cached version
-
-    return render_template('search.html',
-                           pagination=pagination,
-                           query=query,
-                           categories=categories_list,
-                           current_filters={
-                               'type': media_type,
-                               'year_from': year_from,
-                               'year_to': year_to,
-                               'rating_min': rating_min,
-                               'rating_max': rating_max,
-                               'category': category,
-                               'lang': lang,
-                               'imdb': imdb,
-                               'sort': sort
-                           })
-
-# --- USER ROUTES (WITH PAGINATION) ---
+# -------------------------------
+#          USER ROUTES
+# -------------------------------
 @app.route('/')
 def index():
     stat = SiteStat.query.first()
     stat.total_visitors += 1
     db.session.commit()
-    
+
     search_query = request.args.get('q', '')
     category_query = request.args.get('cat', '')
     page = request.args.get('page', 1, type=int)
-    
+
+    # We still calculate categories manually for the homepage, but can switch to get_categories_list() later
     all_media_unpaginated = Movie.query.order_by(Movie.id.desc()).all()
     categories_set = set()
     for movie in all_media_unpaginated:
@@ -205,11 +130,11 @@ def index():
 
     if search_query:
         pagination = Movie.query.filter(
-            (Movie.title.ilike(f'%{search_query}%')) | 
+            (Movie.title.ilike(f'%{search_query}%')) |
             (Movie.category.ilike(f'%{search_query}%'))
         ).order_by(Movie.id.desc()).paginate(page=page, per_page=12, error_out=False)
         return render_template('index.html', pagination=pagination, search_query=search_query, categories=categories_list, mode="search")
-    
+
     if category_query:
         pagination = Movie.query.filter(Movie.category.ilike(f'%{category_query}%')).order_by(Movie.id.desc()).paginate(page=page, per_page=12, error_out=False)
         return render_template('index.html', pagination=pagination, search_query=category_query, categories=categories_list, mode="search")
@@ -217,11 +142,11 @@ def index():
     latest_pagination = Movie.query.order_by(Movie.id.desc()).paginate(page=page, per_page=12, error_out=False)
     top_downloaded = Movie.query.order_by(Movie.views.desc()).limit(12).all()
     random_picks = Movie.query.order_by(func.random()).limit(12).all()
-    
-    return render_template('index.html', 
-                           latest_pagination=latest_pagination, 
-                           top_downloaded=top_downloaded, 
-                           random_picks=random_picks, 
+
+    return render_template('index.html',
+                           latest_pagination=latest_pagination,
+                           top_downloaded=top_downloaded,
+                           random_picks=random_picks,
                            categories=categories_list,
                            mode="home")
 
@@ -240,10 +165,10 @@ def movie_hub(movie_id):
     movie.views += 1
     db.session.commit()
     ready_languages = [c.language for c in movie.translations]
-    
+
     primary_genre = movie.category.split(',')[0].strip() if movie.category else 'General'
     related_movies = Movie.query.filter(Movie.category.ilike(f'%{primary_genre}%'), Movie.id != movie.id).limit(4).all()
-    
+
     return render_template('movie.html', movie=movie, ready_languages=ready_languages, related_movies=related_movies)
 
 @app.route('/series/<string:title>/<int:season>')
@@ -251,40 +176,40 @@ def series_page(title, season):
     episodes = Movie.query.filter_by(media_type='series', title=title, season=season).order_by(Movie.episode.asc()).all()
     if not episodes:
         return "Season not found", 404
-    show_data = episodes[0] 
+    show_data = episodes[0]
     return render_template('series.html', title=title, season=season, episodes=episodes, show_data=show_data)
 
 @app.route('/download/<int:movie_id>/<language>')
 def download(movie_id, language):
     movie = Movie.query.get_or_404(movie_id)
-    
-    if language == 'en': 
+
+    if language == 'en':
         srt_data = movie.english_srt
     else:
         cache = TranslationCache.query.filter_by(movie_id=movie_id, language=language).first_or_404()
         srt_data = cache.translated_srt
         cache.downloads += 1
         db.session.commit()
-        
+
     if srt_data.startswith('http'):
         try:
             response = requests.get(srt_data)
-            response.raise_for_status() 
+            response.raise_for_status()
             file_content = response.content
         except Exception as e:
             return f"Error fetching subtitle file: {e}", 500
     else:
         file_content = srt_data.encode('utf-8')
-        
+
     mem_file = io.BytesIO(file_content)
     mem_file.seek(0)
-    
+
     lang_map = {'en': 'English', 'ml': 'Malayalam', 'ta': 'Tamil', 'hi': 'Hindi'}
     full_lang = lang_map.get(language, language.upper())
-    
-    safe_title = re.sub(r'[^\w\s-]', '', movie.title) 
-    clean_title = re.sub(r'[-\s]+', '.', safe_title).strip('.') 
-    
+
+    safe_title = re.sub(r'[^\w\s-]', '', movie.title)
+    clean_title = re.sub(r'[-\s]+', '.', safe_title).strip('.')
+
     if movie.media_type == 'series':
         s = movie.season or 1
         e = movie.episode or 1
@@ -292,14 +217,101 @@ def download(movie_id, language):
     else:
         year_str = f".{movie.year}" if movie.year else ""
         final_name = f"{clean_title}{year_str}.{full_lang}.srt"
-    
+
     return send_file(mem_file, as_attachment=True, download_name=final_name, mimetype='application/x-subrip')
 
-# --- ADMIN & DASHBOARD ROUTES ---
+# -------------------------------
+#     ADVANCED SEARCH ROUTE
+# -------------------------------
+@app.route('/search')
+def advanced_search():
+    # --- Filter parameters from URL ---
+    q = request.args.get('q', '').strip()
+    media_type = request.args.get('type', '')
+    year_from = request.args.get('year_from', type=int)
+    year_to = request.args.get('year_to', type=int)
+    rating_min = request.args.get('rating_min', type=float)
+    rating_max = request.args.get('rating_max', type=float)
+    category = request.args.get('category', '')
+    lang = request.args.get('lang', '')
+    imdb = request.args.get('imdb', '').strip()
+    sort = request.args.get('sort', 'newest')
+    page = request.args.get('page', 1, type=int)
+
+    # Base query
+    base_q = Movie.query
+
+    # Text search across title, plot, and imdb_id
+    if q:
+        search_filters = [Movie.title.ilike(f'%{q}%'), Movie.plot.ilike(f'%{q}%')]
+        if hasattr(Movie, 'imdb_id'):
+            search_filters.append(Movie.imdb_id.ilike(f'%{q}%'))
+        base_q = base_q.filter(or_(*search_filters))
+
+    if media_type in ('movie', 'series'):
+        base_q = base_q.filter(Movie.media_type == media_type)
+
+    if category:
+        base_q = base_q.filter(Movie.category.ilike(f'%{category}%'))
+
+    if year_from:
+        base_q = base_q.filter(Movie.year >= str(year_from))
+    if year_to:
+        base_q = base_q.filter(Movie.year <= str(year_to))
+
+    if rating_min is not None:
+        base_q = base_q.filter(cast(Movie.rating, Float) >= rating_min)
+    if rating_max is not None:
+        base_q = base_q.filter(cast(Movie.rating, Float) <= rating_max)
+
+    if imdb:
+        if hasattr(Movie, 'imdb_id'):
+            base_q = base_q.filter(Movie.imdb_id.ilike(f'%{imdb}%'))
+
+    # Language filter
+    if lang:
+        if lang == 'en':
+            base_q = base_q.filter(Movie.english_srt.isnot(None), Movie.english_srt != '')
+        else:
+            base_q = base_q.filter(Movie.translations.any(TranslationCache.language == lang))
+
+    # Sorting
+    sort_mapping = {
+        'newest': Movie.id.desc(),
+        'oldest': Movie.id.asc(),
+        'downloads': Movie.views.desc(),
+        'rating_desc': cast(Movie.rating, Float).desc(),
+        'rating_asc': cast(Movie.rating, Float).asc(),
+        'title_asc': Movie.title.asc(),
+        'title_desc': Movie.title.desc()
+    }
+    order = sort_mapping.get(sort, Movie.id.desc())
+    base_q = base_q.order_by(order)
+
+    pagination = base_q.paginate(page=page, per_page=12, error_out=False)
+
+    # Use the cached categories for the sidebar dropdown
+    categories_list = get_categories_list()
+
+    return render_template('search.html',
+                           pagination=pagination,
+                           categories=categories_list,
+                           current_filters={
+                               'q': q, 'type': media_type,
+                               'year_from': year_from, 'year_to': year_to,
+                               'rating_min': rating_min, 'rating_max': rating_max,
+                               'category': category, 'lang': lang,
+                               'imdb': imdb, 'sort': sort
+                           })
+
+# -------------------------------
+#       ADMIN & DASHBOARD
+# -------------------------------
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        if request.form['username'] == 'admin' and request.form['password'] == 'malayalam123':
+        if request.form['username'] == os.environ.get('ADMIN_USER', 'admin') and \
+           request.form['password'] == os.environ.get('ADMIN_PASS', 'change-me'):
             session['logged_in'] = True
             return redirect(url_for('dashboard'))
         return render_template('login.html', error='Invalid credentials.')
@@ -315,11 +327,11 @@ def dashboard():
     stat = SiteStat.query.first()
     total_dl = db.session.query(func.sum(TranslationCache.downloads)).scalar() or 0
     total_subs = TranslationCache.query.count()
-    
+
     # 2. PAGINATION: Limit to 15 items per page
     page = request.args.get('page', 1, type=int)
     all_media_paginated = Movie.query.order_by(Movie.id.desc()).paginate(page=page, per_page=15, error_out=False)
-    
+
     pop_lang = db.session.query(TranslationCache.language, func.count(TranslationCache.id)).group_by(TranslationCache.language).order_by(func.count(TranslationCache.id).desc()).first()
     recent_jobs = TranslationJob.query.order_by(TranslationJob.id.desc()).limit(15).all()
 
@@ -342,7 +354,7 @@ def dashboard():
                     for obj in page_obj['Contents']:
                         total_bytes += obj['Size']
                         r2_file_count += 1
-            
+
             if total_bytes < 1024 * 1024:
                 r2_size_str = f"{total_bytes / 1024:.2f} KB"
             elif total_bytes < 1024 * 1024 * 1024:
@@ -352,12 +364,12 @@ def dashboard():
         except Exception as e:
             r2_size_str = "Read Error"
 
-    return render_template('dashboard.html', 
-                           visitors=stat.total_visitors, 
-                           downloads=total_dl, 
-                           total_subtitles=total_subs, 
-                           popular_lang=pop_lang, 
-                           all_media=all_media_paginated, 
+    return render_template('dashboard.html',
+                           visitors=stat.total_visitors,
+                           downloads=total_dl,
+                           total_subtitles=total_subs,
+                           popular_lang=pop_lang,
+                           all_media=all_media_paginated,
                            jobs=recent_jobs,
                            db_size=db_size,
                            r2_size_str=r2_size_str,
@@ -372,7 +384,8 @@ def reset_jobs():
     db.session.commit()
     try:
         requests.get("https://malayalamsub-malayalamsubs.hf.space/start-worker", timeout=5)
-    except Exception: pass
+    except Exception:
+        pass
     return redirect(url_for('dashboard'))
 
 @app.route('/admin/queue_translations/<int:movie_id>')
@@ -386,7 +399,8 @@ def queue_translations(movie_id):
     db.session.commit()
     try:
         requests.get("https://malayalamsub-malayalamsubs.hf.space/start-worker", timeout=5)
-    except Exception: pass
+    except Exception:
+        pass
     return redirect(url_for('dashboard'))
 
 @app.route('/admin/delete_job/<int:job_id>')
@@ -426,8 +440,8 @@ def edit_media(movie_id):
         new_srt = request.files.get('new_srt')
         if new_srt and new_srt.filename:
             content = new_srt.read().decode('utf-8', errors='ignore')
-            storage_data = content 
-            
+            storage_data = content
+
             if s3_client and r2_bucket:
                 safe_title = media.title.replace(" ", "_").replace("/", "").lower()
                 ep_tag = f"_s{media.season}e{media.episode}" if media.media_type == 'series' else ""
@@ -445,13 +459,14 @@ def edit_media(movie_id):
 
             TranslationCache.query.filter_by(movie_id=media.id).delete()
             TranslationJob.query.filter_by(movie_id=media.id).delete()
-            
+
             for lang in ['ml', 'ta', 'hi']:
                 db.session.add(TranslationJob(movie_id=media.id, language=lang, status='Pending'))
-            
+
             try:
                 requests.get("https://malayalamsub-malayalamsubs.hf.space/start-worker", timeout=5)
-            except Exception: pass
+            except Exception:
+                pass
 
         db.session.commit()
         return redirect(url_for('dashboard'))
@@ -464,7 +479,7 @@ def edit_media(movie_id):
 def tmdb_search():
     query = request.args.get('query')
     tmdb_type = request.args.get('type')
-    api_key = "4f702e8358a2849df9d2aa4f6496a9e9"
+    api_key = os.environ.get('TMDB_API_KEY')
     url = f"https://api.themoviedb.org/3/search/{tmdb_type}?api_key={api_key}&query={urllib.parse.quote(query)}"
     try:
         res = requests.get(url).json()
@@ -477,7 +492,7 @@ def tmdb_search():
 def tmdb_details():
     tmdb_id = request.args.get('id')
     tmdb_type = request.args.get('type')
-    api_key = "4f702e8358a2849df9d2aa4f6496a9e9"
+    api_key = os.environ.get('TMDB_API_KEY')
     url = f"https://api.themoviedb.org/3/{tmdb_type}/{tmdb_id}?api_key={api_key}&append_to_response=external_ids"
     try:
         res = requests.get(url).json()
@@ -495,8 +510,8 @@ def auto_fetch_srt():
     season = data.get('season')
     episode = data.get('episode')
 
-    SUBDL_API_KEY = "Fj3xMg24eTEfVxBSWOfx04kP55CHGtvB"
-    OS_API_KEY = "9AnWofHGkYabMMjKUhXpeDdwqrLvss2n"
+    SUBDL_API_KEY = os.environ.get('SUBDL_API_KEY')
+    OS_API_KEY = os.environ.get('OS_API_KEY')
 
     if not imdb_id or imdb_id == 'undefined':
         return jsonify({"error": "Missing IMDb ID. TMDB did not provide one for this title."}), 400
@@ -508,7 +523,7 @@ def auto_fetch_srt():
     custom_headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
     }
-    
+
     error_log = []
 
     # --- ENGINE 1: SUBDL ---
@@ -518,15 +533,15 @@ def auto_fetch_srt():
                 url = f"https://api.subdl.com/api/v1/subtitles?api_key={SUBDL_API_KEY}&imdb_id={imdb_id}&type=tv&season_number={season}&episode_number={episode}&languages=EN"
             else:
                 url = f"https://api.subdl.com/api/v1/subtitles?api_key={SUBDL_API_KEY}&imdb_id={imdb_id}&type=movie&languages=EN"
-                
+
             res_raw = requests.get(url, headers=custom_headers)
-            
+
             if res_raw.status_code == 200:
                 res = res_raw.json()
                 if res.get('status') and res.get('subtitles'):
                     dl_url = "https://dl.subdl.com" + res['subtitles'][0]['url']
                     dl_res = requests.get(dl_url, headers=custom_headers)
-                    
+
                     srt_text = ""
                     if dl_url.endswith('.zip') or b'PK\x03\x04' in dl_res.content[:4]:
                         with zipfile.ZipFile(io.BytesIO(dl_res.content)) as z:
@@ -536,7 +551,7 @@ def auto_fetch_srt():
                                     break
                     else:
                         srt_text = dl_res.text
-                        
+
                     if srt_text:
                         return jsonify({"success": True, "srt_text": srt_text, "source": "Subdl"})
                 else:
@@ -550,32 +565,32 @@ def auto_fetch_srt():
     if OS_API_KEY:
         try:
             os_headers = {
-                "Api-Key": OS_API_KEY, 
+                "Api-Key": OS_API_KEY,
                 "Content-Type": "application/json",
-                "User-Agent": "malayalamsubtitles_app v1.0" 
+                "User-Agent": "malayalamsubtitles_app v1.0"
             }
-            
+
             if media_type == 'series':
                 url = f"https://api.opensubtitles.com/api/v1/subtitles?parent_imdb_id={clean_imdb}&season_number={season}&episode_number={episode}&languages=en"
             else:
                 url = f"https://api.opensubtitles.com/api/v1/subtitles?imdb_id={clean_imdb}&languages=en"
 
             search_res_raw = requests.get(url, headers=os_headers)
-            
+
             if search_res_raw.status_code == 200:
                 search_res = search_res_raw.json()
                 if search_res.get('data'):
                     file_id = search_res['data'][0]['attributes']['files'][0]['file_id']
                     dl_response_raw = requests.post("https://api.opensubtitles.com/api/v1/download", headers=os_headers, json={"file_id": file_id})
-                    
+
                     if dl_response_raw.status_code == 200:
                         dl_response = dl_response_raw.json()
                         link = dl_response.get('link')
-                        
+
                         if link:
                             os_dl = requests.get(link, headers=custom_headers)
                             srt_text = ""
-                            
+
                             if link.endswith('.zip') or b'PK\x03\x04' in os_dl.content[:4]:
                                 with zipfile.ZipFile(io.BytesIO(os_dl.content)) as z:
                                     for filename in z.namelist():
@@ -590,7 +605,7 @@ def auto_fetch_srt():
                         else:
                             error_log.append(f"OS Blocked Download: {dl_response.get('message', 'Limit Reached')}")
                     else:
-                         error_log.append(f"OS Download HTTP {dl_response_raw.status_code}")
+                        error_log.append(f"OS Download HTTP {dl_response_raw.status_code}")
                 else:
                     error_log.append("OS: No file found")
             else:
@@ -601,7 +616,6 @@ def auto_fetch_srt():
     return jsonify({"error": f"{' | '.join(error_log)}"}), 404
 
 # --- MASTER UPLOAD ROUTE ---
-# --- MASTER UPLOAD ROUTE ---
 @app.route('/admin', methods=['GET', 'POST'])
 @login_required
 def admin():
@@ -609,13 +623,13 @@ def admin():
         media_type = request.form.get('media_type', 'movie')
         title = request.form.get('title', 'Unknown Title')
         season_raw = request.form.get('season', '')
-        year = request.form.get('year', '')           
+        year = request.form.get('year', '')
         rating = request.form.get('rating', '0')
-        poster_url = request.form.get('poster_url', '') 
-        silent_upload = request.form.get('silent_upload') 
+        poster_url = request.form.get('poster_url', '')
+        silent_upload = request.form.get('silent_upload')
         plot = request.form.get('plot', '')
         runtime = request.form.get('runtime', '')
-        
+
         categories = request.form.getlist('category')
         category_string = ", ".join(categories)
         if silent_upload == 'yes':
@@ -626,17 +640,17 @@ def admin():
 
         files = request.files.getlist('files[]')
         manual_episodes = request.form.getlist('episodes[]')
-        
+
         valid_files = [f for f in files if f and f.filename]
         valid_manual_eps = [ep for ep in manual_episodes if ep.strip()]
 
         items_to_process = []
-        
+
         for i, text in enumerate(fetched_srts):
             if text.strip():
                 ep = fetched_episodes[i] if i < len(fetched_episodes) else str(i+1)
                 items_to_process.append((text, ep))
-                
+
         for i, srt_file in enumerate(valid_files):
             content = srt_file.read().decode('utf-8', errors='ignore')
             ep = valid_manual_eps[i] if i < len(valid_manual_eps) else str(i+1)
@@ -649,17 +663,17 @@ def admin():
             safe_season = 1
 
         for content, ep_str in items_to_process:
-            
+
             # FIX 2: Sanitize Subtitles (Strips Postgres-crashing \x00 Null Bytes)
             safe_content = content.replace('\x00', '')
-            storage_data = safe_content 
-            
+            storage_data = safe_content
+
             # FIX 3: Crash-Proof Episode Parsing
             try:
                 current_ep = int(ep_str) if media_type == 'series' and ep_str and str(ep_str).strip() else None
             except ValueError:
                 current_ep = 1
-            
+
             if s3_client and r2_bucket:
                 safe_title_str = title.replace(" ", "_").replace("/", "").lower()
                 ep_tag = f"_s{safe_season}e{current_ep}" if media_type == 'series' else ""
@@ -674,14 +688,14 @@ def admin():
                     print(f"R2 Upload Failed: {e}")
 
             new_media = Movie(
-                media_type=media_type, title=title, 
+                media_type=media_type, title=title,
                 season=safe_season if media_type == 'series' else None,
-                episode=current_ep, year=year, 
-                rating=rating, poster_url=poster_url, english_srt=storage_data, 
+                episode=current_ep, year=year,
+                rating=rating, poster_url=poster_url, english_srt=storage_data,
                 category=category_string, plot=plot, runtime=runtime
             )
             db.session.add(new_media)
-            
+
             # FIX 4: DB Try-Catch to prevent 500 errors on screen
             try:
                 db.session.commit()
@@ -691,15 +705,16 @@ def admin():
 
             for lang in ['ml', 'ta', 'hi']:
                 db.session.add(TranslationJob(movie_id=new_media.id, language=lang, status='Pending'))
-            
+
             try:
                 db.session.commit()
             except Exception as e:
                 db.session.rollback()
 
-        try: 
+        try:
             requests.get("https://malayalamsub-malayalamsubs.hf.space/start-worker", timeout=5)
-        except Exception: pass
+        except Exception:
+            pass
 
         return redirect(url_for('dashboard'))
 
@@ -708,15 +723,15 @@ def admin():
 # --- SECURE RENDER RELAY FOR TELEGRAM ---
 @app.route('/api/trigger_telegram/<int:movie_id>', methods=['GET', 'POST'])
 def trigger_telegram(movie_id):
-    if request.args.get('secret') != 'malayalam_super_secret_999':
+    if request.args.get('secret') != os.environ.get('TELEGRAM_SECRET'):
         return "Unauthorized", 401
 
     TELEGRAM_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
     CHANNEL_ID = os.environ.get('TELEGRAM_CHANNEL_ID')
     movie = Movie.query.get_or_404(movie_id)
-    
+
     raw_category = movie.category if movie.category else "General"
-    
+
     if "SilentMode" in raw_category:
         return "Silent Mode Active - No Post", 200
 
@@ -725,21 +740,21 @@ def trigger_telegram(movie_id):
 
     clean_category = raw_category.replace(", SilentMode", "").replace("SilentMode", "")
     tags = " ".join([f"#{t.strip().replace(' ', '_')}" for t in clean_category.split(',') if t.strip()]) if clean_category.strip() else "#General"
-    
+
     website_base_url = "https://malayalamsubtitles.onrender.com"
     footer = f"\n\n━━━━━━━━━━━━━━━━━━━━\n📢 *Join Channel:* @malayalam\\_sub1\n💬 *Request Subtitles:* @Subrequest\\_bot"
-    
+
     safe_title = movie.title if movie.title else "Unknown Title"
     safe_rating = movie.rating if movie.rating else "N/A"
-    
+
     runtime_text = f"⏱ *Runtime:* {movie.runtime}\n" if movie.runtime else ""
-    
+
     safe_plot = ""
     if movie.plot:
         clean_plot = movie.plot.replace("*", "").replace("_", "").replace("`", "")
         safe_plot = clean_plot[:250] + "..." if len(clean_plot) > 250 else clean_plot
         safe_plot = f"📖 *Plot:* {safe_plot}\n\n"
-    
+
     if movie.media_type == 'series':
         caption = (f"📺 *{safe_title}* - New Episode!\n\n"
                    f"🔢 *Season {movie.season or 1} - Episode {movie.episode or 1}*\n"
@@ -767,19 +782,19 @@ def trigger_telegram(movie_id):
     try:
         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto"
         payload = {
-            "chat_id": CHANNEL_ID, 
-            "photo": movie.poster_url if movie.poster_url else "https://via.placeholder.com/500x750?text=No+Poster", 
+            "chat_id": CHANNEL_ID,
+            "photo": movie.poster_url if movie.poster_url else "https://via.placeholder.com/500x750?text=No+Poster",
             "caption": caption,
-            "parse_mode": "Markdown", 
+            "parse_mode": "Markdown",
             "reply_markup": {"inline_keyboard": [[{"text": "📥 Download Subtitles", "url": button_url}]]}
         }
         response = requests.post(url, json=payload)
-        
+
         if response.status_code == 200:
             return "Posted to Telegram Successfully!", 200
         else:
             return f"Telegram API Error: {response.text}", 500
-            
+
     except Exception as e:
         return str(e), 500
 
@@ -789,9 +804,9 @@ def sitemap():
     base_url = "https://malayalamsubtitles.onrender.com"
     xml = ['<?xml version="1.0" encoding="UTF-8"?>']
     xml.append('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')
-    
+
     xml.append(f'<url><loc>{base_url}/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>')
-    
+
     all_media = Movie.query.order_by(Movie.id.desc()).all()
     for media in all_media:
         if media.media_type == 'series':
@@ -800,7 +815,7 @@ def sitemap():
         else:
             url = f"{base_url}/movie/{media.id}"
         xml.append(f'<url><loc>{url}</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>')
-        
+
     xml.append('</urlset>')
     return app.response_class('\n'.join(xml), mimetype='application/xml')
 
@@ -809,15 +824,15 @@ def request_sub():
     data = request.json
     title = data.get('title')
     details = data.get('details', 'No extra details provided.')
-    
+
     TELEGRAM_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
-    CHANNEL_ID = os.environ.get('TELEGRAM_CHANNEL_ID') 
-    
+    CHANNEL_ID = os.environ.get('TELEGRAM_CHANNEL_ID')
+
     if not TELEGRAM_TOKEN or not CHANNEL_ID:
         return jsonify({"error": "Telegram not configured"}), 500
-        
+
     msg = f"🔔 *New Subtitle Request from Website*\n\n🎬 *Title:* {title}\n📝 *Details:* {details}\n\n_Admin, add this to your upload list!_"
-    
+
     try:
         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
         payload = {"chat_id": CHANNEL_ID, "text": msg, "parse_mode": "Markdown"}
@@ -826,54 +841,8 @@ def request_sub():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route('/secret-db-upgrade')
-def upgrade_database():
-    try:
-        # Moved inside the try-block so any connection error is caught!
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        # 1. Add new columns
-        cursor.execute("ALTER TABLE media ADD COLUMN IF NOT EXISTS tmdb_id VARCHAR(50);")
-        cursor.execute("ALTER TABLE media ADD COLUMN IF NOT EXISTS release_version VARCHAR(100) DEFAULT 'Standard';")
-        
-        # 2. Clean out any old duplicates safely (casting to VARCHAR to prevent type crashes)
-        cursor.execute("""
-            DELETE FROM media a USING media b
-            WHERE a.id > b.id 
-              AND a.tmdb_id = b.tmdb_id 
-              AND a.type = b.type 
-              AND COALESCE(CAST(a.season AS VARCHAR), '0') = COALESCE(CAST(b.season AS VARCHAR), '0') 
-              AND COALESCE(CAST(a.episode AS VARCHAR), '0') = COALESCE(CAST(b.episode AS VARCHAR), '0');
-        """)
-        
-        # 3. Apply the strict lock ONLY if it doesn't exist yet
-        cursor.execute("""
-            DO $$
-            BEGIN
-                IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'unique_movie') THEN
-                    ALTER TABLE media ADD CONSTRAINT unique_movie UNIQUE (tmdb_id, type, season, episode);
-                END IF;
-            END
-            $$;
-        """)
-        
-        conn.commit()
-        return "✅ DATABASE UPGRADED SUCCESSFULLY! You can now delete this route from your code."
-        
-    except Exception as e:
-        if 'conn' in locals() and conn:
-            conn.rollback()
-        # This will now safely print the exact database error on your screen instead of a 500 error!
-        return f"❌ Error Details: {str(e)}"
-        
-    finally:
-        if 'cursor' in locals() and cursor:
-            cursor.close()
-        if 'conn' in locals() and conn:
-            conn.close()
+# Removed the secret-db-upgrade route for security
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
-
