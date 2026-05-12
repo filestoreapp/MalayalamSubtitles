@@ -50,7 +50,7 @@ class Movie(db.Model):
     category = db.Column(db.String(200), default='General')
     plot = db.Column(db.Text, nullable=True)
     runtime = db.Column(db.String(50), nullable=True)
-    imdb_id = db.Column(db.String(20))
+    imdb_id = db.Column(db.String(20))             # still available for search, not needed for translation
 
 class TranslationCache(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -98,8 +98,8 @@ def get_categories_list():
 HF_WORKER_URL = os.environ.get('HF_WORKER_URL', '')
 HF_SECRET = os.environ.get('HF_SECRET', 'shared-secret')
 
-def trigger_hf_translation(imdb_id: str, english_srt_url: str, movie_id: int):
-    """Send translation request to Hugging Face Space."""
+def trigger_hf_translation(movie_id: int, english_srt_url: str):
+    """Send translation request to Hugging Face Space using movie_id."""
     if not HF_WORKER_URL:
         print("⚠️ HF_WORKER_URL not set")
         return
@@ -113,7 +113,7 @@ def trigger_hf_translation(imdb_id: str, english_srt_url: str, movie_id: int):
 
     try:
         resp = requests.post(HF_WORKER_URL, json={
-            "imdb_id": imdb_id,
+            "movie_id": movie_id,
             "english_srt_url": english_srt_url
         }, timeout=30)
         if resp.status_code == 200:
@@ -123,7 +123,7 @@ def trigger_hf_translation(imdb_id: str, english_srt_url: str, movie_id: int):
         else:
             job.status = 'Failed'
             db.session.commit()
-            print(f"❌ HF worker returned {resp.status_code}")
+            print(f"❌ HF worker returned {resp.status_code}: {resp.text}")
     except Exception as e:
         print(f"❌ HF trigger error: {e}")
         job.status = 'Failed'
@@ -260,7 +260,7 @@ def download(movie_id, language):
 
     return send_file(mem_file, as_attachment=True, download_name=final_name, mimetype='application/x-subrip')
 
-# ------------------ ADVANCED SEARCH ------------------
+# ------------------ ADVANCED SEARCH (unchanged) ------------------
 @app.route('/search')
 def advanced_search():
     q = request.args.get('q', '').strip()
@@ -349,6 +349,7 @@ def login():
 @app.route('/dashboard')
 @login_required
 def dashboard():
+    # Auto‑cleanup finished jobs
     TranslationJob.query.filter(TranslationJob.status.in_(['Completed', 'Success'])).delete(synchronize_session=False)
     db.session.commit()
 
@@ -407,20 +408,20 @@ def reset_jobs():
         job.status = 'Pending'
     db.session.commit()
 
-    # Optional: re-trigger pending jobs for movies that have imdb_id and english_srt
+    # Re‑trigger pending jobs
     pending = TranslationJob.query.filter_by(status='Pending').all()
     for job in pending:
         movie = Movie.query.get(job.movie_id)
-        if movie and movie.imdb_id and movie.english_srt:
-            threading.Thread(target=trigger_hf_translation, args=(movie.imdb_id, movie.english_srt, movie.id)).start()
+        if movie and movie.english_srt:
+            threading.Thread(target=trigger_hf_translation, args=(movie.id, movie.english_srt)).start()
     return redirect(url_for('dashboard'))
 
 @app.route('/admin/queue_translations/<int:movie_id>')
 @login_required
 def queue_translations(movie_id):
     movie = Movie.query.get_or_404(movie_id)
-    if movie.imdb_id and movie.english_srt:
-        trigger_hf_translation(movie.imdb_id, movie.english_srt, movie.id)
+    if movie.english_srt:
+        trigger_hf_translation(movie.id, movie.english_srt)
     return redirect(url_for('dashboard'))
 
 @app.route('/admin/delete_job/<int:job_id>')
@@ -477,21 +478,20 @@ def edit_media(movie_id):
 
             media.english_srt = storage_data
 
-            # Clear old translations and re-queue
+            # Clear old translations and re‑queue
             TranslationCache.query.filter_by(movie_id=media.id).delete()
             TranslationJob.query.filter_by(movie_id=media.id).delete()
             db.session.commit()
 
-            # Trigger translation if IMDb ID exists
-            if media.imdb_id:
-                threading.Thread(target=trigger_hf_translation, args=(media.imdb_id, storage_data, media.id)).start()
+            # Trigger translation immediately
+            threading.Thread(target=trigger_hf_translation, args=(media.id, storage_data)).start()
 
         db.session.commit()
         return redirect(url_for('dashboard'))
 
     return render_template('edit.html', media=media)
 
-# --- TMDB PROXY ---
+# --- TMDB PROXY (unchanged) ---
 @app.route('/api/tmdb_search')
 @login_required
 def tmdb_search():
@@ -518,7 +518,7 @@ def tmdb_details():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# --- DUAL-ENGINE AUTO FETCHER ---
+# --- DUAL-ENGINE AUTO FETCHER (unchanged) ---
 @app.route('/api/auto_fetch_srt', methods=['POST'])
 @login_required
 def auto_fetch_srt():
@@ -615,7 +615,7 @@ def auto_fetch_srt():
 
     return jsonify({"error": f"{' | '.join(error_log)}"}), 404
 
-# --- MASTER UPLOAD ROUTE (with auto translation trigger) ---
+# --- MASTER UPLOAD ROUTE (now always triggers translation) ---
 @app.route('/admin', methods=['GET', 'POST'])
 @login_required
 def admin():
@@ -698,18 +698,14 @@ def admin():
                 db.session.rollback()
                 return f"Database Error during Movie Insert: {str(e)}", 500
 
-            # --- TRIGGER TRANSLATION IF IMDb ID EXISTS ---
-            # (IMDb ID should have been captured from the upload form; ensure you have an imdb_id field)
-            # Actually, the uploaded movie won't have an imdb_id yet. You need to manually set it via edit, or auto-fetch it.
-            # For now, translation will only be triggered if imdb_id is set later via edit.
-            if new_media.imdb_id:
-                threading.Thread(target=trigger_hf_translation, args=(new_media.imdb_id, storage_data, new_media.id)).start()
+            # --- Always trigger translation ---
+            threading.Thread(target=trigger_hf_translation, args=(new_media.id, storage_data)).start()
 
         return redirect(url_for('dashboard'))
 
     return render_template('admin.html')
 
-# --- SECURE RENDER RELAY FOR TELEGRAM ---
+# --- SECURE RENDER RELAY FOR TELEGRAM (unchanged) ---
 @app.route('/api/trigger_telegram/<int:movie_id>', methods=['GET', 'POST'])
 def trigger_telegram(movie_id):
     if request.args.get('secret') != os.environ.get('TELEGRAM_SECRET'):
@@ -783,7 +779,7 @@ def trigger_telegram(movie_id):
     except Exception as e:
         return str(e), 500
 
-# --- SITEMAP & REQUESTS ---
+# --- SITEMAP & REQUESTS (unchanged) ---
 @app.route('/sitemap.xml')
 def sitemap():
     base_url = "https://malayalamsubtitles.onrender.com"
