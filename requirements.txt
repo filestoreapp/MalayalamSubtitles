@@ -7,3 +7,4 @@ requests
 boto3
 pysrt                # <--- add this line
 schedule   
+gradio_client
