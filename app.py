@@ -563,7 +563,8 @@ def auto_fetch_srt():
 
     custom_headers = {"User-Agent": "Mozilla/5.0 ... Chrome/114.0.0.0 Safari/537.36"}
     error_log = []
-        if SUBDL_API_KEY:
+
+    if SUBDL_API_KEY:
         try:
             if media_type == 'series':
                 url = f"https://api.subdl.com/api/v1/subtitles?api_key={SUBDL_API_KEY}&imdb_id={imdb_id}&type=tv&season_number={season}&episode_number={episode}&languages=EN"
@@ -617,7 +618,6 @@ def auto_fetch_srt():
         except Exception as e:
             error_log.append(f"Subdl Crash: {str(e)}")
 
-       
     if OS_API_KEY:
         try:
             os_headers = {"Api-Key": OS_API_KEY, "Content-Type": "application/json", "User-Agent": "malayalamsubtitles_app v1.0"}
