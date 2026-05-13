@@ -866,6 +866,106 @@ def request_sub():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/scheduled_fetch', methods=['POST', 'GET'])
+def scheduled_fetch():
+    """Called by external cron job every 2 hours. Fetches new MOVIE subtitles only."""
+    secret = request.args.get('secret') or request.headers.get('X-Auth-Secret')
+    if secret != os.environ.get('SCHEDULER_SECRET', 'scheduler-secret'):
+        return jsonify({"error": "unauthorized"}), 401
+
+    SUBDL_API_KEY = os.environ.get('SUBDL_API_KEY')
+    if not SUBDL_API_KEY:
+        return jsonify({"error": "SUBDL_API_KEY not set"}), 500
+
+    # Fetch recent English movie subtitles from Subdl
+    fetch_url = f"https://api.subdl.com/api/v1/subtitles?api_key={SUBDL_API_KEY}&type=movie&languages=EN&per_page=30"
+    try:
+        resp = requests.get(fetch_url, headers={"User-Agent": "Mozilla/5.0..."})
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as e:
+        return jsonify({"error": f"Subdl request failed: {e}"}), 500
+
+    if not data.get('status') or not data.get('subtitles'):
+        return jsonify({"message": "No new subtitles found"}), 200
+
+    new_movies = 0
+    for sub in data['subtitles']:
+        imdb_id = sub.get('imdb_id')
+        if not imdb_id:
+            continue
+        # Skip if already in database
+        existing = Movie.query.filter_by(imdb_id=imdb_id, media_type='movie').first()
+        if existing:
+            continue
+
+        # Fetch TMDB details for the movie
+        tmdb_api = os.environ.get('TMDB_API_KEY')
+        tmdb_url = f"https://api.themoviedb.org/3/find/{imdb_id}?api_key={tmdb_api}&external_source=imdb_id"
+        try:
+            tmdb_res = requests.get(tmdb_url).json()
+            movie_results = tmdb_res.get('movie_results', [])
+            if not movie_results:
+                continue
+            tmdb_data = movie_results[0]
+            title = tmdb_data.get('title', 'Unknown')
+            year = tmdb_data.get('release_date', '')[:4] if tmdb_data.get('release_date') else ''
+            rating = str(tmdb_data.get('vote_average', 'N/A'))
+            poster_path = tmdb_data.get('poster_path')
+            poster_url = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else 'https://via.placeholder.com/500x750?text=No+Poster'
+            plot = tmdb_data.get('overview', '')
+            runtime = f"{tmdb_data.get('runtime', '')} min" if tmdb_data.get('runtime') else ''
+        except:
+            title = sub.get('title', 'Unknown')
+            year = ''
+            rating = 'N/A'
+            poster_url = 'https://via.placeholder.com/500x750?text=No+Poster'
+            plot = ''
+            runtime = ''
+
+        # Download the English SRT file
+        try:
+            srt_url = "https://dl.subdl.com" + sub['url']
+            srt_resp = requests.get(srt_url, headers={"User-Agent": "Mozilla/5.0..."})
+            srt_text = srt_resp.text
+            # Upload to R2
+            safe_id = imdb_id.replace('tt', '')
+            r2_filename = f"english_movie_{safe_id}_{os.urandom(4).hex()}.srt"
+            r2_url = None
+            if s3_client and r2_bucket:
+                s3_client.put_object(
+                    Bucket=r2_bucket, Key=r2_filename,
+                    Body=srt_text.encode('utf-8'), ContentType='application/x-subrip'
+                )
+                r2_url = f"{r2_public_url.rstrip('/')}/{r2_filename}"
+        except Exception as e:
+            print(f"Skipping {imdb_id}: SRT download/upload failed: {e}")
+            continue
+
+        # Insert new movie record
+        new_movie = Movie(
+            media_type='movie',
+            title=title,
+            year=year,
+            rating=rating,
+            poster_url=poster_url,
+            english_srt=r2_url if r2_url else srt_text,
+            category='General',
+            plot=plot,
+            runtime=runtime,
+            imdb_id=imdb_id
+        )
+        db.session.add(new_movie)
+        db.session.commit()
+
+        # Trigger translation for the new movie
+        if r2_url:
+            threading.Thread(target=trigger_hf_translation, args=(new_movie.id, r2_url)).start()
+
+        new_movies += 1
+
+    return jsonify({"message": f"Added {new_movies} new movies"}), 200
+
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
