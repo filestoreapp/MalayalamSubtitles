@@ -11,7 +11,6 @@ from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, send_file, jsonify, session
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, or_, cast, Float
-from gradio_client import Client
 
 app = Flask(__name__)
 
@@ -36,7 +35,7 @@ if r2_endpoint and r2_access_key and r2_secret_key:
         aws_secret_access_key=r2_secret_key
     )
 
-# ------------------ MODELS ------------------
+# ------------------ MODELS (progress column added) ------------------
 class Movie(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     media_type = db.Column(db.String(10))
@@ -66,6 +65,7 @@ class TranslationJob(db.Model):
     movie_id = db.Column(db.Integer, db.ForeignKey('movie.id', ondelete='CASCADE'))
     language = db.Column(db.String(10))
     status = db.Column(db.String(20), default='Pending')
+    progress = db.Column(db.Integer, default=0)      # NEW: percentage 0-100
     movie = db.relationship('Movie', backref=db.backref('jobs', cascade='all, delete-orphan'))
 
 class SiteStat(db.Model):
@@ -95,46 +95,47 @@ def get_categories_list():
         _categories_cache['last_update'] = now
     return _categories_cache['data']
 
-# ------------------ HF TRANSLATION WORKER TRIGGER ------------------
-HF_WORKER_URL = os.environ.get('HF_WORKER_URL', '')   # e.g., https://malayalamsub-malayalamsubs.hf.space/api/translate
+# ------------------ TRIGGER TRANSLATION (ALL 3 LANGUAGES) ------------------
+HF_WORKER_URL = os.environ.get('HF_WORKER_URL', '')
 HF_SECRET = os.environ.get('HF_SECRET', 'shared-secret')
+TELEGRAM_SECRET = os.environ.get('TELEGRAM_SECRET', '')
 
 def trigger_hf_translation(movie_id: int, english_srt_url: str):
-    """Fire translation request to HF Space (now asynchronous)."""
+    """Fire translation requests for Malayalam, Tamil, Hindi."""
     if not HF_WORKER_URL:
         print("⚠️ HF_WORKER_URL not set")
         return
 
+    languages = ['ml', 'ta', 'hi']
     with app.app_context():
-        print(f"DEBUG: Sending translation request for movie {movie_id}")
-
-        job = TranslationJob.query.filter_by(movie_id=movie_id, language='ml').first()
-        if not job:
-            job = TranslationJob(movie_id=movie_id, language='ml', status='Pending')
-            db.session.add(job)
-            db.session.commit()
-
-        try:
-            resp = requests.post(HF_WORKER_URL, json={
-                "movie_id": movie_id,
-                "english_srt_url": english_srt_url
-            }, timeout=10)   # short timeout because Space replies instantly
-
-            if resp.status_code == 200:   # or 202
-                job.status = 'Processing'
+        for lang in languages:
+            job = TranslationJob.query.filter_by(movie_id=movie_id, language=lang).first()
+            if not job:
+                job = TranslationJob(movie_id=movie_id, language=lang, status='Pending', progress=0)
+                db.session.add(job)
                 db.session.commit()
-                print(f"✅ Translation job accepted for movie {movie_id}")
-            else:
+
+            try:
+                resp = requests.post(HF_WORKER_URL, json={
+                    "movie_id": movie_id,
+                    "english_srt_url": english_srt_url,
+                    "language": lang
+                }, timeout=10)
+                if resp.status_code == 200:
+                    job.status = 'Processing'
+                    job.progress = 0
+                    db.session.commit()
+                    print(f"✅ {lang.upper()} job accepted for movie {movie_id}")
+                else:
+                    job.status = 'Failed'
+                    db.session.commit()
+                    print(f"❌ {lang.upper()} trigger failed: {resp.status_code}")
+            except Exception as e:
+                print(f"❌ {lang.upper()} trigger error: {e}")
                 job.status = 'Failed'
                 db.session.commit()
-                print(f"❌ Space returned {resp.status_code}: {resp.text}")
-        except Exception as e:
-            print(f"❌ Trigger error: {e}")
-            job.status = 'Failed'
-            db.session.commit()
 
-
-# Webhook from HF Space when translation is done
+# ------------------ CALLBACK ENDPOINT (progress & Telegram auto-post) ------------------
 @app.route('/api/translation_callback', methods=['POST'])
 def translation_callback():
     data = request.json
@@ -143,13 +144,30 @@ def translation_callback():
         return jsonify({"error": "unauthorized"}), 401
 
     movie_id = data.get('movie_id')
-    language = data.get('language', 'ml')
-    status = data.get('status', 'Completed')
+    language = data.get('language')
+    status = data.get('status')
+    progress = data.get('progress', 0)
 
     job = TranslationJob.query.filter_by(movie_id=movie_id, language=language).first()
     if job:
         job.status = status
+        job.progress = progress
         db.session.commit()
+
+    # Auto Telegram when all three are completed
+    if status == 'Completed' and movie_id:
+        all_jobs = TranslationJob.query.filter_by(movie_id=movie_id).all()
+        all_done = all(j.status == 'Completed' for j in all_jobs if j.language in ['ml','ta','hi'])
+        if all_done:
+            try:
+                requests.get(
+                    url_for('trigger_telegram', movie_id=movie_id, _external=True),
+                    params={'secret': TELEGRAM_SECRET},
+                    timeout=5
+                )
+            except Exception as e:
+                print(f"⚠️ Auto Telegram post failed: {e}")
+
     return jsonify({"ok": True})
 
 # ------------------ AUTH ------------------
@@ -265,7 +283,7 @@ def download(movie_id, language):
 
     return send_file(mem_file, as_attachment=True, download_name=final_name, mimetype='application/x-subrip')
 
-# ------------------ ADVANCED SEARCH (unchanged) ------------------
+# ------------------ ADVANCED SEARCH ------------------
 @app.route('/search')
 def advanced_search():
     q = request.args.get('q', '').strip()
@@ -418,7 +436,6 @@ def reset_jobs():
     for job in pending:
         movie = Movie.query.get(job.movie_id)
         if movie and movie.english_srt:
-            print(f"DEBUG: Re-triggering translation for movie {movie.id}")
             threading.Thread(target=trigger_hf_translation, args=(movie.id, movie.english_srt)).start()
     return redirect(url_for('dashboard'))
 
@@ -427,7 +444,6 @@ def reset_jobs():
 def queue_translations(movie_id):
     movie = Movie.query.get_or_404(movie_id)
     if movie.english_srt:
-        print(f"DEBUG: Manually queuing translation for movie {movie.id}")
         threading.Thread(target=trigger_hf_translation, args=(movie.id, movie.english_srt)).start()
     return redirect(url_for('dashboard'))
 
@@ -490,7 +506,6 @@ def edit_media(movie_id):
             TranslationJob.query.filter_by(movie_id=media.id).delete()
             db.session.commit()
 
-            print(f"DEBUG: Re-triggering translation after edit for movie {media.id}")
             threading.Thread(target=trigger_hf_translation, args=(media.id, storage_data)).start()
 
         db.session.commit()
@@ -498,7 +513,7 @@ def edit_media(movie_id):
 
     return render_template('edit.html', media=media)
 
-# --- TMDB PROXY (unchanged) ---
+# --- TMDB PROXY ---
 @app.route('/api/tmdb_search')
 @login_required
 def tmdb_search():
@@ -622,7 +637,7 @@ def auto_fetch_srt():
 
     return jsonify({"error": f"{' | '.join(error_log)}"}), 404
 
-# --- MASTER UPLOAD ROUTE (now always triggers translation) ---
+# --- MASTER UPLOAD ROUTE (auto‑triggers translation) ---
 @app.route('/admin', methods=['GET', 'POST'])
 @login_required
 def admin():
@@ -705,8 +720,7 @@ def admin():
                 db.session.rollback()
                 return f"Database Error during Movie Insert: {str(e)}", 500
 
-            # --- Always trigger translation ---
-            print(f"DEBUG: Starting translation thread for movie {new_media.id}")
+            # Automatically trigger translation for all 3 languages
             threading.Thread(target=trigger_hf_translation, args=(new_media.id, storage_data)).start()
 
         return redirect(url_for('dashboard'))
@@ -716,7 +730,7 @@ def admin():
 # --- SECURE RENDER RELAY FOR TELEGRAM (unchanged) ---
 @app.route('/api/trigger_telegram/<int:movie_id>', methods=['GET', 'POST'])
 def trigger_telegram(movie_id):
-    if request.args.get('secret') != os.environ.get('TELEGRAM_SECRET'):
+    if request.args.get('secret') != TELEGRAM_SECRET:
         return "Unauthorized", 401
 
     TELEGRAM_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
@@ -787,7 +801,7 @@ def trigger_telegram(movie_id):
     except Exception as e:
         return str(e), 500
 
-# --- SITEMAP & REQUESTS (unchanged) ---
+# --- SITEMAP & REQUESTS ---
 @app.route('/sitemap.xml')
 def sitemap():
     base_url = "https://malayalamsubtitles.onrender.com"
