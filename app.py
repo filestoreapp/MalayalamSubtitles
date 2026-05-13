@@ -96,34 +96,42 @@ def get_categories_list():
     return _categories_cache['data']
 
 # ------------------ HF TRANSLATION WORKER TRIGGER ------------------
-HF_WORKER_URL = os.environ.get('HF_WORKER_URL', '')
+HF_WORKER_URL = os.environ.get('HF_WORKER_URL', '')   # e.g., https://malayalamsub-malayalamsubs.hf.space/api/translate
 HF_SECRET = os.environ.get('HF_SECRET', 'shared-secret')
 
-# --- Replace the client call block in trigger_hf_translation ---
-import httpx
-
 def trigger_hf_translation(movie_id: int, english_srt_url: str):
-    # ... (previous code is unchanged) ...
+    """Fire translation request to HF Space (now asynchronous)."""
+    if not HF_WORKER_URL:
+        print("⚠️ HF_WORKER_URL not set")
+        return
 
     with app.app_context():
-        # ... (job creation logic is unchanged) ...
+        print(f"DEBUG: Sending translation request for movie {movie_id}")
 
-        try:
-            # Create a custom httpx client with longer timeouts (5 minutes)
-            httpx_client = httpx.Client(timeout=httpx.Timeout(300.0, connect=30.0))
-            client = Client(space_url, httpx_client=httpx_client)
-            result = client.predict(
-                file=None,
-                file_url=english_srt_url,
-                movie_id=str(movie_id),
-                api_name="/predict"
-            )
-            # ... (success handling is unchanged) ...
-        except Exception as e:
-            print(f"❌ Gradio trigger error: {e}")
-            job.status = 'Failed'
+        job = TranslationJob.query.filter_by(movie_id=movie_id, language='ml').first()
+        if not job:
+            job = TranslationJob(movie_id=movie_id, language='ml', status='Pending')
+            db.session.add(job)
             db.session.commit()
 
+        try:
+            resp = requests.post(HF_WORKER_URL, json={
+                "movie_id": movie_id,
+                "english_srt_url": english_srt_url
+            }, timeout=10)   # short timeout because Space replies instantly
+
+            if resp.status_code == 200:   # or 202
+                job.status = 'Processing'
+                db.session.commit()
+                print(f"✅ Translation job accepted for movie {movie_id}")
+            else:
+                job.status = 'Failed'
+                db.session.commit()
+                print(f"❌ Space returned {resp.status_code}: {resp.text}")
+        except Exception as e:
+            print(f"❌ Trigger error: {e}")
+            job.status = 'Failed'
+            db.session.commit()
 
 
 # Webhook from HF Space when translation is done
