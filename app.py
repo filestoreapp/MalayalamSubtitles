@@ -563,7 +563,6 @@ def auto_fetch_srt():
 
     custom_headers = {"User-Agent": "Mozilla/5.0 ... Chrome/114.0.0.0 Safari/537.36"}
     error_log = []
-
         if SUBDL_API_KEY:
         try:
             if media_type == 'series':
@@ -577,33 +576,24 @@ def auto_fetch_srt():
                 if res.get('status') and res.get('subtitles'):
                     subs = res['subtitles']
 
-                    # ---- Intelligent filtering & sorting ----
-                    # 1. Only consider English (already filtered by API, but just in case)
-                    # 2. Prefer SRT format (sometimes there are VTT, etc.)
-                    # 3. Skip hearing-impaired if flag exists
-                    # 4. Sort by downloads descending, then rating descending
+                    # ---- Intelligent selection ----
                     def score_sub(sub):
-                        # skip if hearing_impaired flag is True
                         if sub.get('hearing_impaired', False):
-                            return -1  # will be filtered out
-                        # format priority (SRT = 2, others = 0)
+                            return -1
                         fmt_score = 2 if sub.get('format', '').lower() == 'srt' else 0
                         downloads = int(sub.get('downloads', 0))
                         rating = float(sub.get('rating', 0))
-                        # combine: downloads dominates, rating breaks tie
                         return (fmt_score, downloads, rating)
 
                     scored = []
                     for sub in subs:
                         s = score_sub(sub)
-                        if s == -1:  # hearing-impaired
+                        if s == -1:
                             continue
                         scored.append((s, sub))
 
-                    # sort descending by the tuple (fmt_score, downloads, rating)
-                    scored.sort(key=lambda x: x[0], reverse=True)
-
                     if scored:
+                        scored.sort(key=lambda x: x[0], reverse=True)
                         best_sub = scored[0][1]
                         dl_url = "https://dl.subdl.com" + best_sub['url']
                         dl_res = requests.get(dl_url, headers=custom_headers)
@@ -623,9 +613,11 @@ def auto_fetch_srt():
                 else:
                     error_log.append("Subdl: No subtitles found")
             else:
-                error_log.append(f"Subdl blocked connection (HTTP {res_raw.status_code})")
+                error_log.append(f"Subdl HTTP {res_raw.status_code}")
         except Exception as e:
             error_log.append(f"Subdl Crash: {str(e)}")
+
+       
     if OS_API_KEY:
         try:
             os_headers = {"Api-Key": OS_API_KEY, "Content-Type": "application/json", "User-Agent": "malayalamsubtitles_app v1.0"}
