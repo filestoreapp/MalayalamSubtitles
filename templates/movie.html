@@ -3,204 +3,102 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    
-    <title>{{ movie.title }} ({{ movie.year }}) - Malayalam Subtitles</title>
-    <meta name="description" content="Download Malayalam, Tamil, and Hindi subtitles for {{ movie.title }}.">
-    
-    <meta property="og:type" content="video.movie">
-    <meta property="og:title" content="{{ movie.title }} ({{ movie.year }}) - Malayalam Subtitles">
-    <meta property="og:description" content="{{ movie.plot if movie.plot else 'Download high-quality Malayalam subtitles for ' ~ movie.title ~ ' instantly.' }}">
-    <meta property="og:image" content="{{ movie.poster_url }}">
-    <meta property="og:url" content="{{ request.url }}">
-    
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="{{ movie.title }} ({{ movie.year }}) - Subtitles">
-    <meta name="twitter:description" content="{{ movie.plot if movie.plot else 'Download subtitles instantly.' }}">
-    <meta name="twitter:image" content="{{ movie.poster_url }}">
-
+    <title>{{ movie.title }} – Malayalam Subtitles Hub</title>
     <style>
-        :root { --bg-color: #0f172a; --card-bg: #1e293b; --text-color: #f8fafc; --accent: #3b82f6; --accent-hover: #2563eb; }
-        html, body { margin: 0; padding: 0; width: 100%; max-width: 100vw; overflow-x: hidden; }
-        body { font-family: 'Segoe UI', system-ui, sans-serif; background-color: var(--bg-color); color: var(--text-color); display: flex; flex-direction: column; min-height: 100vh; }
-        
-        header { width: 100%; box-sizing: border-box; background: var(--card-bg); padding: 15px 20px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3); border-bottom: 2px solid var(--accent); }
-        h1 { margin: 0; color: white; font-size: 24px; letter-spacing: 1px; }
+        :root { --bg: #0b0f19; --card-bg: #1a1f2e; --text: #e2e8f0; --accent: #3b82f6; --accent2: #8b5cf6; }
+        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; }
+        .container { max-width: 1000px; margin: 0 auto; padding: 20px; }
+        .movie-header { display: flex; gap: 30px; flex-wrap: wrap; margin-bottom: 30px; }
+        .poster-large { width: 250px; border-radius: 16px; overflow: hidden; box-shadow: 0 8px 30px rgba(0,0,0,0.5); }
+        .poster-large img { width: 100%; display: block; }
+        .details { flex: 1; }
+        .details h1 { font-size: 2.2rem; margin: 0 0 10px; }
+        .meta-badges { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 15px; }
+        .meta-badge { background: var(--accent); padding: 4px 12px; border-radius: 16px; font-size: 13px; font-weight: 600; }
+        .plot { line-height: 1.6; color: #cbd5e1; margin-bottom: 25px; }
 
-        .container { max-width: 1000px; margin: 40px auto; padding: 0 20px; flex-grow: 1; width: 100%; box-sizing: border-box; }
-        
-        /* Movie Layout */
-        .movie-header { display: flex; gap: 30px; background: var(--card-bg); padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
-        .poster-box { flex-shrink: 0; width: 300px; }
-        .poster-box img { width: 100%; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.4); }
-        
-        .movie-details { flex-grow: 1; }
-        .title { font-size: 36px; margin: 0 0 10px 0; font-weight: bold; line-height: 1.2; }
-        .meta-tags { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
-        .tag { background: #334155; padding: 6px 12px; border-radius: 6px; font-size: 14px; font-weight: bold; color: #cbd5e1; }
-        .tag-rating { background: #f59e0b; color: #fff; }
-        
-        .plot { font-size: 16px; line-height: 1.6; color: #94a3b8; margin-bottom: 30px; }
+        .download-section { margin-top: 20px; }
+        .lang-grid { display: flex; gap: 10px; flex-wrap: wrap; }
+        .lang-btn { display: flex; align-items: center; gap: 6px; background: var(--card-bg); border: 1px solid #2d3748; border-radius: 8px; padding: 10px 16px; color: white; text-decoration: none; font-weight: 600; transition: 0.2s; }
+        .lang-btn:hover { background: var(--accent); border-color: var(--accent); }
 
-        /* Download Section */
-        .download-section { background: #0f172a; padding: 20px; border-radius: 8px; border: 1px solid #334155; margin-bottom: 20px; }
-        .download-section h3 { margin-top: 0; color: #e2e8f0; border-bottom: 1px solid #334155; padding-bottom: 10px; }
-        
-        .dl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 15px; }
-        .dl-btn { background: var(--accent); color: white; padding: 12px; text-align: center; text-decoration: none; border-radius: 6px; font-weight: bold; transition: 0.2s; display: block; }
-        .dl-btn:hover { background: var(--accent-hover); transform: translateY(-2px); }
-        .dl-btn.disabled { background: #475569; pointer-events: none; opacity: 0.6; }
-        
-        /* Share Button */
-        .share-btn { background: #10b981; color: white; border: none; padding: 12px; border-radius: 6px; font-weight: bold; font-size: 16px; width: 100%; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
-        .share-btn:hover { background: #059669; }
+        .progress-box { margin: 15px 0; background: #1e293b; border-radius: 8px; padding: 12px; display: inline-block; }
+        .progress-bar { width: 200px; height: 6px; background: #334155; border-radius: 6px; overflow: hidden; }
+        .progress-fill { height: 100%; background: var(--accent); border-radius: 6px; transition: width 0.5s; }
 
-        /* Footer */
-        footer { width: 100%; box-sizing: border-box; background: var(--card-bg); padding: 40px 20px; margin-top: auto; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
-        .footer-content { max-width: 800px; margin: 0 auto; display: flex; flex-direction: column; gap: 15px; }
-        .footer-links { display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; margin-bottom: 10px; }
-        .footer-links a { color: #e2e8f0; text-decoration: none; font-weight: bold; transition: 0.2s; font-size: 15px; }
-        .footer-links a:hover { color: var(--accent); }
-        .disclaimer { font-size: 13px; line-height: 1.6; opacity: 0.7; }
+        .related { margin-top: 40px; }
+        .related-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); gap: 15px; }
+        .related-card { background: var(--card-bg); border-radius: 10px; overflow: hidden; text-decoration: none; color: inherit; transition: 0.2s; }
+        .related-card:hover { transform: translateY(-3px); }
+        .related-card img { width: 100%; aspect-ratio: 2/3; object-fit: cover; }
+        .related-title { padding: 8px; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-        @media (max-width: 768px) {
-            .movie-header { flex-direction: column; align-items: center; padding: 20px; }
-            .poster-box { width: 200px; }
-            .title { font-size: 28px; text-align: center; }
-            .meta-tags { justify-content: center; }
-            .plot { text-align: center; }
-        }
+        a.back { display: inline-block; margin-bottom: 20px; color: var(--accent); }
     </style>
 </head>
 <body>
-
-    <header>
-        <a href="/" style="text-decoration: none;"><h1>🎬 Malayalam Subtitles Hub</h1></a>
-    </header>
-
     <div class="container">
+        <a href="/" class="back">← Back to Home</a>
+
         <div class="movie-header">
-            <div class="poster-box">
+            <div class="poster-large">
                 <img src="{{ movie.poster_url }}" alt="{{ movie.title }}">
             </div>
-            
-            <div class="movie-details">
-                <h2 class="title">{{ movie.title }}</h2>
-                
-                <div class="meta-tags">
-                    <span class="tag tag-rating">⭐ {{ movie.rating }} / 10</span>
-                    <span class="tag">📅 {{ movie.year }}</span>
-                    {% if movie.runtime %}<span class="tag">⏱ {{ movie.runtime }}</span>{% endif %}
-                    {% if movie.category %}<span class="tag">🎭 {{ movie.category.split(',')[0] }}</span>{% endif %}
+            <div class="details">
+                <h1>{{ movie.title }}</h1>
+                <div class="meta-badges">
+                    <span class="meta-badge">⭐ {{ movie.rating }}</span>
+                    <span class="meta-badge">{{ movie.year }}</span>
+                    {% if movie.runtime %}<span class="meta-badge">⏱ {{ movie.runtime }}</span>{% endif %}
+                    <span class="meta-badge">{{ movie.media_type|capitalize }}</span>
                 </div>
-                
-                <p class="plot">{{ movie.plot if movie.plot else "No plot description available for this title." }}</p>
-                
+                {% if movie.plot %}<p class="plot">{{ movie.plot }}</p>{% endif %}
+
+                <!-- Download buttons -->
                 <div class="download-section">
                     <h3>📥 Download Subtitles</h3>
-                    <div class="dl-grid">
-                        <a href="/download/{{ movie.id }}/en" class="dl-btn">🇺🇸 English</a>
-                        
-                        {% if 'ml' in ready_languages %}
-                            <a href="/download/{{ movie.id }}/ml" class="dl-btn" style="background:#f59e0b; color:#000;">🇮🇳 Malayalam</a>
-                        {% else %}
-                            <span class="dl-btn disabled">⏳ ML (Processing)</span>
-                        {% endif %}
-                        
-                        {% if 'ta' in ready_languages %}
-                            <a href="/download/{{ movie.id }}/ta" class="dl-btn">🇮🇳 Tamil</a>
-                        {% else %}
-                            <span class="dl-btn disabled">⏳ TA (Processing)</span>
-                        {% endif %}
-                        
-                        {% if 'hi' in ready_languages %}
-                            <a href="/download/{{ movie.id }}/hi" class="dl-btn">🇮🇳 Hindi</a>
-                        {% else %}
-                            <span class="dl-btn disabled">⏳ HI (Processing)</span>
-                        {% endif %}
+                    <div class="lang-grid">
+                        {% for lang in ['en','ml','ta','hi'] %}
+                            {% if lang == 'en' or lang in ready_languages %}
+                                <a href="/download/{{ movie.id }}/{{ lang }}" class="lang-btn">
+                                    {% if lang == 'en' %}🇬🇧 English
+                                    {% elif lang == 'ml' %}🇮🇳 Malayalam
+                                    {% elif lang == 'ta' %}🇮🇳 Tamil
+                                    {% elif lang == 'hi' %}🇮🇳 Hindi
+                                    {% endif %}
+                                </a>
+                            {% endif %}
+                        {% endfor %}
                     </div>
                 </div>
 
-                <button class="share-btn" onclick="shareMovie()">
-                    🔗 Share this Movie
-                </button>
+                <!-- Translation progress (if any job not completed) -->
+                {% for lang_code, lang_name in [('ml','Malayalam'), ('ta','Tamil'), ('hi','Hindi')] %}
+                    {% set job = movie.jobs | selectattr("language", "equalto", lang_code) | first %}
+                    {% if job and job.status != "Completed" %}
+                        <div class="progress-box">
+                            <span style="color:#facc15;">⏳ {{ lang_name }} – {{ job.status }} ({{ job.progress }}%)</span>
+                            <div class="progress-bar"><div class="progress-fill" style="width:{{ job.progress }}%;"></div></div>
+                        </div>
+                    {% endif %}
+                {% endfor %}
             </div>
         </div>
-    </div>
 
-    <div id="requestModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:1000; align-items:center; justify-content:center;">
-        <div style="background:#1e293b; padding:30px; border-radius:10px; width:90%; max-width:400px; position:relative; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 1px solid #334155;">
-            <span onclick="document.getElementById('requestModal').style.display='none'" style="position:absolute; right:15px; top:10px; font-size:28px; cursor:pointer; color:#94a3b8; transition: 0.2s;">&times;</span>
-            <h2 style="margin-top:0; color:#f8fafc; border-bottom: 2px solid #3b82f6; padding-bottom: 10px; margin-bottom: 20px;">Request a Subtitle</h2>
-            <input type="text" id="req-title" placeholder="Movie / Series Title *" style="width:100%; padding:12px; margin-bottom:15px; border-radius:6px; border:1px solid #475569; background:#0f172a; color:white; box-sizing: border-box;">
-            <textarea id="req-details" placeholder="Extra Details (Optional)" rows="3" style="width:100%; padding:12px; margin-bottom:20px; border-radius:6px; border:1px solid #475569; background:#0f172a; color:white; box-sizing: border-box; resize: none;"></textarea>
-            <button onclick="submitRequest()" id="req-btn" style="width:100%; background:#3b82f6; font-size: 16px; padding: 12px; border:none; border-radius:6px; color:white; font-weight:bold; cursor:pointer;">🚀 Send Request to Admin</button>
-            <div id="req-status" style="margin-top:15px; text-align:center; font-size:14px; font-weight: bold;"></div>
-        </div>
-    </div>
-
-    <footer>
-        <div class="footer-content">
-            <h3 style="color: white; margin: 0; font-size: 20px;">🎬 Malayalam Subtitles Hub</h3>
-            <div class="footer-links">
-                <a href="/">Home</a>
-                <a href="#" onclick="document.getElementById('requestModal').style.display='flex'; return false;">Request Subtitle</a>
-                <a href="https://t.me/malayalam_sub1" target="_blank">Join Telegram Channel</a>
+        <!-- Related movies -->
+        {% if related_movies %}
+        <div class="related">
+            <h2>📌 Related</h2>
+            <div class="related-grid">
+                {% for r in related_movies %}
+                <a href="/movie/{{ r.id }}" class="related-card">
+                    <img src="{{ r.poster_url }}" alt="{{ r.title }}">
+                    <div class="related-title">{{ r.title }}</div>
+                </a>
+                {% endfor %}
             </div>
-            <p class="disclaimer"><b>Disclaimer:</b> This website does not host, stream, or distribute any video or media files. We solely provide community-sourced subtitle files (.srt) for accessibility and educational purposes.</p>
-            <p style="font-size: 14px; margin-top: 10px; color: white;">&copy; 2026 Malayalam Subtitles Hub. All rights reserved.</p>
         </div>
-    </footer>
-
-    <script>
-    // Native Mobile Share Logic
-    function shareMovie() {
-        if (navigator.share) {
-            navigator.share({
-                title: '{{ movie.title }} - Malayalam Subtitles',
-                text: 'Download Malayalam subtitles for {{ movie.title }}!',
-                url: window.location.href
-            }).catch(console.error);
-        } else {
-            // Fallback for Desktop: Copy link
-            navigator.clipboard.writeText(window.location.href);
-            const btn = document.querySelector('.share-btn');
-            btn.innerHTML = '✅ Link Copied!';
-            btn.style.background = '#27ae60';
-            setTimeout(() => {
-                btn.innerHTML = '🔗 Share this Movie';
-                btn.style.background = '#10b981';
-            }, 3000);
-        }
-    }
-
-    // Request Logic
-    async function submitRequest() {
-        const title = document.getElementById('req-title').value;
-        const details = document.getElementById('req-details').value;
-        const status = document.getElementById('req-status');
-        const btn = document.getElementById('req-btn');
-        if (!title.trim()) return status.innerHTML = "<span style='color:#ef4444;'>❌ Please enter a title!</span>";
-        
-        btn.disabled = true; btn.innerText = "⏳ Sending..."; status.innerHTML = "";
-        try {
-            const res = await fetch('/api/request_sub', {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({title, details})
-            });
-            if (res.ok) {
-                status.innerHTML = "<span style='color:#10b981;'>✅ Request sent to Telegram!</span>";
-                setTimeout(() => { 
-                    document.getElementById('requestModal').style.display='none'; 
-                    status.innerHTML=''; document.getElementById('req-title').value=''; document.getElementById('req-details').value='';
-                    btn.disabled = false; btn.innerText = "🚀 Send Request to Admin";
-                }, 2500);
-            } else {
-                status.innerHTML = "<span style='color:#ef4444;'>❌ Server failed.</span>"; btn.disabled = false; btn.innerText = "🚀 Send Request to Admin";
-            }
-        } catch(e) {
-            status.innerHTML = "<span style='color:#ef4444;'>❌ Network error.</span>"; btn.disabled = false; btn.innerText = "🚀 Send Request to Admin";
-        }
-    }
-    </script>
+        {% endif %}
+    </div>
 </body>
 </html>
