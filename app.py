@@ -251,7 +251,8 @@ def download(movie_id, language):
     else:
         cache = TranslationCache.query.filter_by(movie_id=movie_id, language=language).first_or_404()
         srt_data = cache.translated_srt
-        cache.downloads += 1
+        # Fix: handle None gracefully
+        cache.downloads = (cache.downloads or 0) + 1
         db.session.commit()
 
     if srt_data.startswith('http'):
