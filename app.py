@@ -35,7 +35,7 @@ if r2_endpoint and r2_access_key and r2_secret_key:
         aws_secret_access_key=r2_secret_key
     )
 
-# ------------------ MODELS (progress column added) ------------------
+# ------------------ MODELS ------------------
 class Movie(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     media_type = db.Column(db.String(10))
@@ -65,7 +65,7 @@ class TranslationJob(db.Model):
     movie_id = db.Column(db.Integer, db.ForeignKey('movie.id', ondelete='CASCADE'))
     language = db.Column(db.String(10))
     status = db.Column(db.String(20), default='Pending')
-    progress = db.Column(db.Integer, default=0)      # NEW: percentage 0-100
+    progress = db.Column(db.Integer, default=0)
     movie = db.relationship('Movie', backref=db.backref('jobs', cascade='all, delete-orphan'))
 
 class SiteStat(db.Model):
@@ -95,7 +95,7 @@ def get_categories_list():
         _categories_cache['last_update'] = now
     return _categories_cache['data']
 
-# ------------------ TRIGGER TRANSLATION (ALL 3 LANGUAGES) ------------------
+# ------------------ TRIGGER TRANSLATION ------------------
 HF_WORKER_URL = os.environ.get('HF_WORKER_URL', '')
 HF_SECRET = os.environ.get('HF_SECRET', 'shared-secret')
 TELEGRAM_SECRET = os.environ.get('TELEGRAM_SECRET', '')
@@ -135,7 +135,7 @@ def trigger_hf_translation(movie_id: int, english_srt_url: str):
                 job.status = 'Failed'
                 db.session.commit()
 
-# ------------------ CALLBACK ENDPOINT (progress & Telegram auto-post) ------------------
+# ------------------ CALLBACK ENDPOINT ------------------
 @app.route('/api/translation_callback', methods=['POST'])
 def translation_callback():
     data = request.json
@@ -154,7 +154,6 @@ def translation_callback():
         job.progress = progress
         db.session.commit()
 
-    # Auto Telegram when all three are completed
     if status == 'Completed' and movie_id:
         all_jobs = TranslationJob.query.filter_by(movie_id=movie_id).all()
         all_done = all(j.status == 'Completed' for j in all_jobs if j.language in ['ml','ta','hi'])
@@ -191,7 +190,6 @@ def index():
     page = request.args.get('page', 1, type=int)
     categories_list = get_categories_list()
 
-    # If a search is active, render the search results as before
     if search_query:
         pagination = Movie.query.filter(
             (Movie.title.ilike(f'%{search_query}%')) |
@@ -212,26 +210,47 @@ def index():
                                mode="search")
 
     # ---- Home page sections ----
-    # Trending Movies (most views, movies only)
+    # Trending Movies
     trending_movies = Movie.query.filter_by(media_type='movie').order_by(Movie.views.desc()).limit(12).all()
 
-    # Trending TV Shows (most views, series only)
-    trending_series = Movie.query.filter_by(media_type='series').order_by(Movie.views.desc()).limit(12).all()
+    # Trending TV Shows (one card per unique title)
+    trending_series_subq = db.session.query(
+        Movie.title,
+        func.max(Movie.views).label('max_views')
+    ).filter_by(media_type='series').group_by(Movie.title).subquery()
+    trending_series = Movie.query.join(
+        trending_series_subq,
+        db.and_(Movie.title == trending_series_subq.c.title,
+                Movie.views == trending_series_subq.c.max_views)
+    ).order_by(Movie.views.desc()).limit(12).all()
 
-    # Popular Movies (most downloaded, via TranslationCache sum, but simpler: movies with highest views again? 
-    # We'll use highest number of translations downloads if you want true popularity; 
-    # for simplicity, we reuse views but you can change later)
+    # Popular Movies
     popular_movies = Movie.query.filter_by(media_type='movie').order_by(Movie.views.desc()).limit(12).all()
 
-    # Top Rated Movies (rating as float)
-    from sqlalchemy import cast, Float
-    top_rated_movies = Movie.query.filter_by(media_type='movie').order_by(cast(Movie.rating, Float).desc()).limit(12).all()
+    # Top Rated Movies
+    top_rated_movies = Movie.query.filter_by(media_type='movie')\
+                           .order_by(cast(Movie.rating, Float).desc()).limit(12).all()
 
-    # Top Rated TV Shows
-    top_rated_series = Movie.query.filter_by(media_type='series').order_by(cast(Movie.rating, Float).desc()).limit(12).all()
+    # Top Rated TV Shows (one card per unique title)
+    top_rated_series_subq = db.session.query(
+        Movie.title,
+        func.max(cast(Movie.rating, Float)).label('max_rating')
+    ).filter_by(media_type='series').group_by(Movie.title).subquery()
+    top_rated_series = Movie.query.join(
+        top_rated_series_subq,
+        db.and_(Movie.title == top_rated_series_subq.c.title,
+                cast(Movie.rating, Float) == top_rated_series_subq.c.max_rating)
+    ).order_by(cast(Movie.rating, Float).desc()).limit(12).all()
 
-    # Recent Uploads (latest by id)
-    recent_uploads = Movie.query.order_by(Movie.id.desc()).limit(12).all()
+    # Recent Uploads (one card per unique title)
+    recent_uploads_subq = db.session.query(
+        Movie.title,
+        func.max(Movie.id).label('max_id')
+    ).group_by(Movie.title).subquery()
+    recent_uploads = Movie.query.join(
+        recent_uploads_subq,
+        Movie.id == recent_uploads_subq.c.max_id
+    ).order_by(Movie.id.desc()).limit(12).all()
 
     return render_template('index.html',
                            mode="home",
@@ -260,15 +279,29 @@ def movie_hub(movie_id):
     movie.views += 1
     db.session.commit()
     ready_languages = [c.language for c in movie.translations]
-
     primary_genre = movie.category.split(',')[0].strip() if movie.category else 'General'
     related_movies = Movie.query.filter(Movie.category.ilike(f'%{primary_genre}%'), Movie.id != movie.id).limit(4).all()
-
     return render_template('movie.html', movie=movie, ready_languages=ready_languages, related_movies=related_movies)
+
+@app.route('/series/<string:title>')
+def series_overview(title):
+    episodes = Movie.query.filter_by(media_type='series', title=title)\
+                         .order_by(Movie.season.asc(), Movie.episode.asc()).all()
+    if not episodes:
+        return "Series not found", 404
+    show_data = episodes[0]
+    seasons = {}
+    for ep in episodes:
+        s = ep.season or 1
+        if s not in seasons:
+            seasons[s] = []
+        seasons[s].append(ep)
+    return render_template('series_overview.html', title=title, show_data=show_data, seasons=seasons)
 
 @app.route('/series/<string:title>/<int:season>')
 def series_page(title, season):
-    episodes = Movie.query.filter_by(media_type='series', title=title, season=season).order_by(Movie.episode.asc()).all()
+    episodes = Movie.query.filter_by(media_type='series', title=title, season=season)\
+                         .order_by(Movie.episode.asc()).all()
     if not episodes:
         return "Season not found", 404
     show_data = episodes[0]
@@ -277,19 +310,17 @@ def series_page(title, season):
 @app.route('/download/<int:movie_id>/<language>')
 def download(movie_id, language):
     movie = Movie.query.get_or_404(movie_id)
-
     if language == 'en':
         srt_data = movie.english_srt
     else:
         cache = TranslationCache.query.filter_by(movie_id=movie_id, language=language).first_or_404()
         srt_data = cache.translated_srt
-        # Fix: handle None gracefully
         cache.downloads = (cache.downloads or 0) + 1
         db.session.commit()
 
     if srt_data.startswith('http'):
         try:
-            response = requests.get(srt_data)
+            response = requests.get(srt_data, timeout=15)
             response.raise_for_status()
             file_content = response.content
         except Exception as e:
@@ -305,7 +336,6 @@ def download(movie_id, language):
 
     safe_title = re.sub(r'[^\w\s-]', '', movie.title)
     clean_title = re.sub(r'[-\s]+', '.', safe_title).strip('.')
-
     if movie.media_type == 'series':
         s = movie.season or 1
         e = movie.episode or 1
@@ -332,33 +362,26 @@ def advanced_search():
     page = request.args.get('page', 1, type=int)
 
     base_q = Movie.query
-
     if q:
         search_filters = [Movie.title.ilike(f'%{q}%'), Movie.plot.ilike(f'%{q}%')]
         if hasattr(Movie, 'imdb_id'):
             search_filters.append(Movie.imdb_id.ilike(f'%{q}%'))
         base_q = base_q.filter(or_(*search_filters))
-
     if media_type in ('movie', 'series'):
         base_q = base_q.filter(Movie.media_type == media_type)
-
     if category:
         base_q = base_q.filter(Movie.category.ilike(f'%{category}%'))
-
     if year_from:
         base_q = base_q.filter(Movie.year >= str(year_from))
     if year_to:
         base_q = base_q.filter(Movie.year <= str(year_to))
-
     if rating_min is not None:
         base_q = base_q.filter(cast(Movie.rating, Float) >= rating_min)
     if rating_max is not None:
         base_q = base_q.filter(cast(Movie.rating, Float) <= rating_max)
-
     if imdb:
         if hasattr(Movie, 'imdb_id'):
             base_q = base_q.filter(Movie.imdb_id.ilike(f'%{imdb}%'))
-
     if lang:
         if lang == 'en':
             base_q = base_q.filter(Movie.english_srt.isnot(None), Movie.english_srt != '')
@@ -374,15 +397,11 @@ def advanced_search():
         'title_asc': Movie.title.asc(),
         'title_desc': Movie.title.desc()
     }
-    order = sort_mapping.get(sort, Movie.id.desc())
-    base_q = base_q.order_by(order)
-
+    base_q = base_q.order_by(sort_mapping.get(sort, Movie.id.desc()))
     pagination = base_q.paginate(page=page, per_page=12, error_out=False)
-    categories_list = get_categories_list()
-
     return render_template('search.html',
                            pagination=pagination,
-                           categories=categories_list,
+                           categories=get_categories_list(),
                            current_filters={
                                'q': q, 'type': media_type,
                                'year_from': year_from, 'year_to': year_to,
@@ -405,7 +424,6 @@ def login():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    # Auto‑cleanup finished jobs
     TranslationJob.query.filter(TranslationJob.status.in_(['Completed', 'Success'])).delete(synchronize_session=False)
     db.session.commit()
 
@@ -415,8 +433,8 @@ def dashboard():
 
     page = request.args.get('page', 1, type=int)
     all_media_paginated = Movie.query.order_by(Movie.id.desc()).paginate(page=page, per_page=15, error_out=False)
-
-    pop_lang = db.session.query(TranslationCache.language, func.count(TranslationCache.id)).group_by(TranslationCache.language).order_by(func.count(TranslationCache.id).desc()).first()
+    pop_lang = db.session.query(TranslationCache.language, func.count(TranslationCache.id))\
+                        .group_by(TranslationCache.language).order_by(func.count(TranslationCache.id).desc()).first()
     recent_jobs = TranslationJob.query.order_by(TranslationJob.id.desc()).limit(15).all()
 
     try:
@@ -463,8 +481,6 @@ def reset_jobs():
     for job in stuck_jobs:
         job.status = 'Pending'
     db.session.commit()
-
-    # Re‑trigger pending jobs
     pending = TranslationJob.query.filter_by(status='Pending').all()
     for job in pending:
         movie = Movie.query.get(job.movie_id)
@@ -500,7 +516,6 @@ def delete_media(movie_id):
 @login_required
 def edit_media(movie_id):
     media = Movie.query.get_or_404(movie_id)
-
     if request.method == 'POST':
         media.title = request.form.get('title')
         media.year = request.form.get('year')
@@ -509,7 +524,6 @@ def edit_media(movie_id):
         media.category = request.form.get('category')
         media.plot = request.form.get('plot')
         media.runtime = request.form.get('runtime')
-
         if media.media_type == 'series':
             media.season = request.form.get('season')
             media.episode = request.form.get('episode')
@@ -518,7 +532,6 @@ def edit_media(movie_id):
         if new_srt and new_srt.filename:
             content = new_srt.read().decode('utf-8', errors='ignore')
             storage_data = content
-
             if s3_client and r2_bucket:
                 safe_title = media.title.replace(" ", "_").replace("/", "").lower()
                 ep_tag = f"_s{media.season}e{media.episode}" if media.media_type == 'series' else ""
@@ -531,19 +544,13 @@ def edit_media(movie_id):
                     storage_data = f"{r2_public_url}/{r2_filename}"
                 except Exception as e:
                     print(f"R2 Upload Failed on Edit: {e}")
-
             media.english_srt = storage_data
-
-            # Clear old translations and re‑queue
             TranslationCache.query.filter_by(movie_id=media.id).delete()
             TranslationJob.query.filter_by(movie_id=media.id).delete()
             db.session.commit()
-
             threading.Thread(target=trigger_hf_translation, args=(media.id, storage_data)).start()
-
         db.session.commit()
         return redirect(url_for('dashboard'))
-
     return render_template('edit.html', media=media)
 
 # --- TMDB PROXY ---
@@ -555,8 +562,7 @@ def tmdb_search():
     api_key = os.environ.get('TMDB_API_KEY')
     url = f"https://api.themoviedb.org/3/search/{tmdb_type}?api_key={api_key}&query={urllib.parse.quote(query)}"
     try:
-        res = requests.get(url).json()
-        return jsonify(res)
+        return jsonify(requests.get(url).json())
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -568,12 +574,11 @@ def tmdb_details():
     api_key = os.environ.get('TMDB_API_KEY')
     url = f"https://api.themoviedb.org/3/{tmdb_type}/{tmdb_id}?api_key={api_key}&append_to_response=external_ids"
     try:
-        res = requests.get(url).json()
-        return jsonify(res)
+        return jsonify(requests.get(url).json())
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# --- DUAL-ENGINE AUTO FETCHER (unchanged) ---
+# --- DUAL-ENGINE AUTO FETCHER (with intelligent Subdl selection) ---
 @app.route('/api/auto_fetch_srt', methods=['POST'])
 @login_required
 def auto_fetch_srt():
@@ -608,8 +613,6 @@ def auto_fetch_srt():
                 res = res_raw.json()
                 if res.get('status') and res.get('subtitles'):
                     subs = res['subtitles']
-
-                    # ---- Intelligent selection ----
                     def score_sub(sub):
                         if sub.get('hearing_impaired', False):
                             return -1
@@ -693,7 +696,7 @@ def auto_fetch_srt():
 
     return jsonify({"error": f"{' | '.join(error_log)}"}), 404
 
-# --- MASTER UPLOAD ROUTE (auto‑triggers translation) ---
+# --- MASTER UPLOAD ROUTE ---
 @app.route('/admin', methods=['GET', 'POST'])
 @login_required
 def admin():
@@ -776,14 +779,13 @@ def admin():
                 db.session.rollback()
                 return f"Database Error during Movie Insert: {str(e)}", 500
 
-            # Automatically trigger translation for all 3 languages
             threading.Thread(target=trigger_hf_translation, args=(new_media.id, storage_data)).start()
 
         return redirect(url_for('dashboard'))
 
     return render_template('admin.html')
 
-# --- SECURE RENDER RELAY FOR TELEGRAM (unchanged) ---
+# --- TELEGRAM TRIGGER ---
 @app.route('/api/trigger_telegram/<int:movie_id>', methods=['GET', 'POST'])
 def trigger_telegram(movie_id):
     if request.args.get('secret') != TELEGRAM_SECRET:
@@ -793,22 +795,20 @@ def trigger_telegram(movie_id):
     CHANNEL_ID = os.environ.get('TELEGRAM_CHANNEL_ID')
     movie = Movie.query.get_or_404(movie_id)
 
-    raw_category = movie.category if movie.category else "General"
-    if "SilentMode" in raw_category:
+    if "SilentMode" in (movie.category or ''):
         return "Silent Mode Active - No Post", 200
 
     if not TELEGRAM_TOKEN or not CHANNEL_ID:
         return "Missing Telegram Secrets on Render", 400
 
-    clean_category = raw_category.replace(", SilentMode", "").replace("SilentMode", "")
+    clean_category = (movie.category or '').replace(", SilentMode", "").replace("SilentMode", "")
     tags = " ".join([f"#{t.strip().replace(' ', '_')}" for t in clean_category.split(',') if t.strip()]) if clean_category.strip() else "#General"
 
     website_base_url = "https://malayalamsubtitles.onrender.com"
     footer = f"\n\n━━━━━━━━━━━━━━━━━━━━\n📢 *Join Channel:* @malayalam\\_sub1\n💬 *Request Subtitles:* @Subrequest\\_bot"
 
-    safe_title = movie.title if movie.title else "Unknown Title"
-    safe_rating = movie.rating if movie.rating else "N/A"
-
+    safe_title = movie.title or "Unknown Title"
+    safe_rating = movie.rating or "N/A"
     runtime_text = f"⏱ *Runtime:* {movie.runtime}\n" if movie.runtime else ""
 
     safe_plot = ""
@@ -844,7 +844,7 @@ def trigger_telegram(movie_id):
         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto"
         payload = {
             "chat_id": CHANNEL_ID,
-            "photo": movie.poster_url if movie.poster_url else "https://via.placeholder.com/500x750?text=No+Poster",
+            "photo": movie.poster_url or "https://via.placeholder.com/500x750?text=No+Poster",
             "caption": caption,
             "parse_mode": "Markdown",
             "reply_markup": {"inline_keyboard": [[{"text": "📥 Download Subtitles", "url": button_url}]]}
@@ -898,6 +898,7 @@ def request_sub():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# ------------------ AUTO FETCH SCHEDULER ENDPOINT ------------------
 @app.route('/api/scheduled_fetch', methods=['POST', 'GET'])
 def scheduled_fetch():
     """Called by external cron job every 2 hours. Fetches new MOVIE subtitles only."""
@@ -909,7 +910,6 @@ def scheduled_fetch():
     if not SUBDL_API_KEY:
         return jsonify({"error": "SUBDL_API_KEY not set"}), 500
 
-    # Fetch recent English movie subtitles from Subdl
     fetch_url = f"https://api.subdl.com/api/v1/subtitles?api_key={SUBDL_API_KEY}&type=movie&languages=EN&per_page=30"
     try:
         resp = requests.get(fetch_url, headers={"User-Agent": "Mozilla/5.0..."})
@@ -926,12 +926,10 @@ def scheduled_fetch():
         imdb_id = sub.get('imdb_id')
         if not imdb_id:
             continue
-        # Skip if already in database
         existing = Movie.query.filter_by(imdb_id=imdb_id, media_type='movie').first()
         if existing:
             continue
 
-        # Fetch TMDB details for the movie
         tmdb_api = os.environ.get('TMDB_API_KEY')
         tmdb_url = f"https://api.themoviedb.org/3/find/{imdb_id}?api_key={tmdb_api}&external_source=imdb_id"
         try:
@@ -955,12 +953,10 @@ def scheduled_fetch():
             plot = ''
             runtime = ''
 
-        # Download the English SRT file
         try:
             srt_url = "https://dl.subdl.com" + sub['url']
             srt_resp = requests.get(srt_url, headers={"User-Agent": "Mozilla/5.0..."})
             srt_text = srt_resp.text
-            # Upload to R2
             safe_id = imdb_id.replace('tt', '')
             r2_filename = f"english_movie_{safe_id}_{os.urandom(4).hex()}.srt"
             r2_url = None
@@ -970,11 +966,9 @@ def scheduled_fetch():
                     Body=srt_text.encode('utf-8'), ContentType='application/x-subrip'
                 )
                 r2_url = f"{r2_public_url.rstrip('/')}/{r2_filename}"
-        except Exception as e:
-            print(f"Skipping {imdb_id}: SRT download/upload failed: {e}")
+        except:
             continue
 
-        # Insert new movie record
         new_movie = Movie(
             media_type='movie',
             title=title,
@@ -990,10 +984,8 @@ def scheduled_fetch():
         db.session.add(new_movie)
         db.session.commit()
 
-        # Trigger translation for the new movie
         if r2_url:
             threading.Thread(target=trigger_hf_translation, args=(new_movie.id, r2_url)).start()
-
         new_movies += 1
 
     return jsonify({"message": f"Added {new_movies} new movies"}), 200
