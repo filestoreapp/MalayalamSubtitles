@@ -11,7 +11,6 @@
         a { text-decoration: none; color: inherit; }
         .container { max-width: 1300px; margin: 0 auto; padding: 0 20px; width: 100%; }
 
-        /* Header */
         header { background: rgba(15,23,42,0.8); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; padding: 16px 0; }
         .header-inner { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
         .logo { font-size: 1.8rem; font-weight: 800; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
@@ -25,10 +24,8 @@
         .search-bar input { flex: 1; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); color: white; }
         .search-bar select { padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); color: white; }
 
-        /* Section titles */
         .section-title { font-size: 1.6rem; margin: 30px 0 12px; border-left: 4px solid var(--accent); padding-left: 12px; }
 
-        /* Horizontal scroll rows */
         .scroll-row { display: flex; gap: 16px; overflow-x: auto; padding-bottom: 15px; margin-bottom: 20px; scroll-behavior: smooth; }
         .scroll-row::-webkit-scrollbar { height: 6px; }
         .scroll-row::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
@@ -42,7 +39,6 @@
         .title { font-weight: 700; font-size: 14px; line-height: 1.3; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .meta { font-size: 12px; color: #94a3b8; display: flex; gap: 6px; flex-wrap: wrap; }
 
-        /* Footer */
         footer { margin-top: auto; padding: 20px 0; text-align: center; border-top: 1px solid var(--border); color: #64748b; font-size: 13px; }
 
         @media (max-width: 600px) {
@@ -64,7 +60,6 @@
     </header>
 
     <div class="container">
-        <!-- Search & Categories -->
         <form action="/" method="GET" class="search-bar">
             <input type="text" name="q" placeholder="Search movies, series, or genres..." value="{{ search_query if mode == 'search' else '' }}">
             <select name="cat" onchange="this.form.submit()">
@@ -77,11 +72,10 @@
         </form>
 
         {% if mode == "search" %}
-            <!-- Search results rendered as grid -->
             <div class="section-title">Results for "{{ search_query }}"</div>
             <div class="scroll-row">
                 {% for media in pagination.items %}
-                <a href="{% if media.media_type == 'series' %}/series/{{ media.title|urlencode }}/{{ media.season or 1 }}{% else %}/movie/{{ media.id }}{% endif %}" class="card">
+                <a href="{% if media.media_type == 'series' %}/series/{{ media.title|urlencode }}{% else %}/movie/{{ media.id }}{% endif %}" class="card">
                     <div class="poster">
                         <img src="{{ media.poster_url }}" alt="{{ media.title }}">
                         <div class="badge">⭐ {{ media.rating }}</div>
@@ -93,9 +87,8 @@
                 </a>
                 {% endfor %}
             </div>
-            <!-- Pagination (keep existing) -->
+            <!-- Pagination (keep your existing pagination block here) -->
         {% else %}
-            <!-- Trending Movies -->
             <div class="section-title">🔥 Trending Movies</div>
             <div class="scroll-row">
                 {% for media in trending_movies %}
@@ -112,7 +105,6 @@
                 {% endfor %}
             </div>
 
-            <!-- Trending TV Shows -->
             <div class="section-title">📺 Trending TV Shows</div>
             <div class="scroll-row">
                 {% for media in trending_series %}
@@ -129,7 +121,6 @@
                 {% endfor %}
             </div>
 
-            <!-- Popular Movies (most downloaded) -->
             <div class="section-title">💿 Popular Movies</div>
             <div class="scroll-row">
                 {% for media in popular_movies %}
@@ -146,7 +137,6 @@
                 {% endfor %}
             </div>
 
-            <!-- Top Rated Movies -->
             <div class="section-title">⭐ Top Rated Movies</div>
             <div class="scroll-row">
                 {% for media in top_rated_movies %}
@@ -163,7 +153,6 @@
                 {% endfor %}
             </div>
 
-            <!-- Top Rated TV Shows -->
             <div class="section-title">⭐ Top Rated TV Shows</div>
             <div class="scroll-row">
                 {% for media in top_rated_series %}
@@ -180,7 +169,6 @@
                 {% endfor %}
             </div>
 
-            <!-- Recent Uploads -->
             <div class="section-title">🆕 Recent Uploads</div>
             <div class="scroll-row">
                 {% for media in recent_uploads %}
@@ -199,9 +187,8 @@
         {% endif %}
     </div>
 
-    <!-- Request Modal (keep existing) -->
     <div id="requestModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:200; align-items:center; justify-content:center;">
-        <!-- ... (paste your existing modal HTML/JS here) ... -->
+        <!-- Paste your existing request modal HTML/JS here -->
     </div>
 
     <footer>
