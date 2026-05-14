@@ -116,7 +116,7 @@
             <div class="section-title">📺 Trending TV Shows</div>
             <div class="scroll-row">
                 {% for media in trending_series %}
-                <a href="/series/{{ media.title|urlencode }}/{{ media.season or 1 }}" class="card">
+                <a href="/series/{{ media.title|urlencode }}" class="card">
                     <div class="poster">
                         <img src="{{ media.poster_url }}" alt="{{ media.title }}">
                         <div class="badge">👁 {{ media.views }}</div>
@@ -167,7 +167,7 @@
             <div class="section-title">⭐ Top Rated TV Shows</div>
             <div class="scroll-row">
                 {% for media in top_rated_series %}
-                <a href="/series/{{ media.title|urlencode }}/{{ media.season or 1 }}" class="card">
+                <a href="/series/{{ media.title|urlencode }}" class="card">
                     <div class="poster">
                         <img src="{{ media.poster_url }}" alt="{{ media.title }}">
                         <div class="badge">⭐ {{ media.rating }}</div>
@@ -184,7 +184,7 @@
             <div class="section-title">🆕 Recent Uploads</div>
             <div class="scroll-row">
                 {% for media in recent_uploads %}
-                <a href="{% if media.media_type == 'series' %}/series/{{ media.title|urlencode }}/{{ media.season or 1 }}{% else %}/movie/{{ media.id }}{% endif %}" class="card">
+                <a href="{% if media.media_type == 'series' %}/series/{{ media.title|urlencode }}{% else %}/movie/{{ media.id }}{% endif %}" class="card">
                     <div class="poster">
                         <img src="{{ media.poster_url }}" alt="{{ media.title }}">
                         <div class="badge">⭐ {{ media.rating }}</div>
