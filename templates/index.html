@@ -21,18 +21,19 @@
         .btn { padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; transition: 0.2s; background: var(--accent); color: white; }
         .btn:hover { opacity: 0.9; }
 
-        /* Hero */
-        .hero { margin: 30px 0 20px; }
-        .hero h2 { font-size: 1.8rem; margin-bottom: 15px; border-left: 4px solid var(--accent); padding-left: 12px; }
+        .search-bar { display: flex; gap: 10px; margin: 20px 0; }
+        .search-bar input { flex: 1; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); color: white; }
+        .search-bar select { padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); color: white; }
 
-        /* Tabs */
-        .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
-        .tab { padding: 8px 20px; border-radius: 20px; background: #1e293b; color: #94a3b8; cursor: pointer; transition: 0.2s; font-weight: 600; }
-        .tab.active { background: var(--accent); color: white; }
+        /* Section titles */
+        .section-title { font-size: 1.6rem; margin: 30px 0 12px; border-left: 4px solid var(--accent); padding-left: 12px; }
 
-        /* Grid */
-        .media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 18px; margin-bottom: 30px; }
-        .card { background: var(--card-bg); border-radius: 12px; overflow: hidden; transition: transform 0.2s, box-shadow 0.2s; display: flex; flex-direction: column; }
+        /* Horizontal scroll rows */
+        .scroll-row { display: flex; gap: 16px; overflow-x: auto; padding-bottom: 15px; margin-bottom: 20px; scroll-behavior: smooth; }
+        .scroll-row::-webkit-scrollbar { height: 6px; }
+        .scroll-row::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+
+        .card { background: var(--card-bg); border-radius: 12px; overflow: hidden; transition: transform 0.2s, box-shadow 0.2s; flex: 0 0 160px; display: flex; flex-direction: column; }
         .card:hover { transform: translateY(-4px); box-shadow: 0 12px 24px rgba(0,0,0,0.4); }
         .poster { aspect-ratio: 2/3; background: #2d3748; position: relative; overflow: hidden; }
         .poster img { width: 100%; height: 100%; object-fit: cover; }
@@ -41,22 +42,13 @@
         .title { font-weight: 700; font-size: 14px; line-height: 1.3; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .meta { font-size: 12px; color: #94a3b8; display: flex; gap: 6px; flex-wrap: wrap; }
 
-        /* Horizontal scroll */
-        .scroll-row { display: flex; gap: 16px; overflow-x: auto; padding-bottom: 12px; margin-bottom: 25px; scroll-behavior: smooth; }
-        .scroll-row .card { min-width: 150px; max-width: 160px; }
-
-        /* Category pills */
-        .categories { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
-        .cat-pill { padding: 6px 14px; border-radius: 20px; background: #1e293b; font-size: 13px; cursor: pointer; transition: 0.2s; }
-        .cat-pill.active { background: var(--accent); color: white; }
-
         /* Footer */
         footer { margin-top: auto; padding: 20px 0; text-align: center; border-top: 1px solid var(--border); color: #64748b; font-size: 13px; }
 
         @media (max-width: 600px) {
             .header-inner { flex-direction: column; align-items: flex-start; }
-            .media-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; }
-            .scroll-row .card { min-width: 130px; }
+            .scroll-row { gap: 10px; }
+            .card { flex: 0 0 140px; }
         }
     </style>
 </head>
@@ -72,68 +64,139 @@
     </header>
 
     <div class="container">
-        <!-- Hero: Latest Releases -->
-        <div class="hero">
-            <h2>✨ Latest Releases</h2>
-        </div>
+        <!-- Search & Categories -->
+        <form action="/" method="GET" class="search-bar">
+            <input type="text" name="q" placeholder="Search movies, series, or genres..." value="{{ search_query if mode == 'search' else '' }}">
+            <select name="cat" onchange="this.form.submit()">
+                <option value="">All Categories</option>
+                {% for cat in categories %}
+                    <option value="{{ cat }}" {% if search_query == cat %}selected{% endif %}>{{ cat }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn">Search</button>
+        </form>
 
-        <!-- Tabs for Movies / Series -->
-        <div class="tabs">
-            <div class="tab active" onclick="filterMedia('all')">All</div>
-            <div class="tab" onclick="filterMedia('movie')">Movies</div>
-            <div class="tab" onclick="filterMedia('series')">TV Series</div>
-        </div>
+        {% if mode == "search" %}
+            <!-- Search results rendered as grid -->
+            <div class="section-title">Results for "{{ search_query }}"</div>
+            <div class="scroll-row">
+                {% for media in pagination.items %}
+                <a href="{% if media.media_type == 'series' %}/series/{{ media.title|urlencode }}/{{ media.season or 1 }}{% else %}/movie/{{ media.id }}{% endif %}" class="card">
+                    <div class="poster">
+                        <img src="{{ media.poster_url }}" alt="{{ media.title }}">
+                        <div class="badge">⭐ {{ media.rating }}</div>
+                    </div>
+                    <div class="info">
+                        <div class="title">{{ media.title }}</div>
+                        <div class="meta">{{ media.year }} • {{ 'Series' if media.media_type == 'series' else 'Movie' }}</div>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+            <!-- Pagination (keep existing) -->
+        {% else %}
+            <!-- Trending Movies -->
+            <div class="section-title">🔥 Trending Movies</div>
+            <div class="scroll-row">
+                {% for media in trending_movies %}
+                <a href="/movie/{{ media.id }}" class="card">
+                    <div class="poster">
+                        <img src="{{ media.poster_url }}" alt="{{ media.title }}">
+                        <div class="badge">👁 {{ media.views }}</div>
+                    </div>
+                    <div class="info">
+                        <div class="title">{{ media.title }}</div>
+                        <div class="meta">{{ media.year }}</div>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
 
-        <!-- Media Grid (all latest items) -->
-        <div class="media-grid" id="mediaGrid">
-            {% for media in latest_pagination.items %}
-            <a href="{% if media.media_type == 'series' %}/series/{{ media.title|urlencode }}/{{ media.season or 1 }}{% else %}/movie/{{ media.id }}{% endif %}" class="card" data-type="{{ media.media_type }}">
-                <div class="poster">
-                    <img src="{{ media.poster_url }}" alt="{{ media.title }}" loading="lazy">
-                    <div class="badge">⭐ {{ media.rating }}</div>
-                </div>
-                <div class="info">
-                    <div class="title">{{ media.title }}</div>
-                    <div class="meta">{{ media.year }} • {{ 'Series' if media.media_type == 'series' else 'Movie' }}</div>
-                </div>
-            </a>
-            {% endfor %}
-        </div>
+            <!-- Trending TV Shows -->
+            <div class="section-title">📺 Trending TV Shows</div>
+            <div class="scroll-row">
+                {% for media in trending_series %}
+                <a href="/series/{{ media.title|urlencode }}/{{ media.season or 1 }}" class="card">
+                    <div class="poster">
+                        <img src="{{ media.poster_url }}" alt="{{ media.title }}">
+                        <div class="badge">👁 {{ media.views }}</div>
+                    </div>
+                    <div class="info">
+                        <div class="title">{{ media.title }}</div>
+                        <div class="meta">{{ media.year }}</div>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
 
-        <!-- Pagination -->
-        <div style="display:flex; justify-content:center; gap:12px; margin:20px 0;">
-            {% if latest_pagination.has_prev %}
-                <a href="{{ url_for('index', page=latest_pagination.prev_num) }}" class="btn" style="background:#1e293b;">« Prev</a>
-            {% endif %}
-            <span style="align-self:center;">Page {{ latest_pagination.page }} of {{ latest_pagination.pages }}</span>
-            {% if latest_pagination.has_next %}
-                <a href="{{ url_for('index', page=latest_pagination.next_num) }}" class="btn" style="background:#1e293b;">Next »</a>
-            {% endif %}
-        </div>
+            <!-- Popular Movies (most downloaded) -->
+            <div class="section-title">💿 Popular Movies</div>
+            <div class="scroll-row">
+                {% for media in popular_movies %}
+                <a href="/movie/{{ media.id }}" class="card">
+                    <div class="poster">
+                        <img src="{{ media.poster_url }}" alt="{{ media.title }}">
+                        <div class="badge">💾</div>
+                    </div>
+                    <div class="info">
+                        <div class="title">{{ media.title }}</div>
+                        <div class="meta">{{ media.year }}</div>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
 
-        <!-- Trending / Top Downloaded -->
-        <h2 class="hero" style="margin-top:10px;">🔥 Trending</h2>
-        <div class="scroll-row">
-            {% for media in top_downloaded %}
-            <a href="{% if media.media_type == 'series' %}/series/{{ media.title|urlencode }}/{{ media.season or 1 }}{% else %}/movie/{{ media.id }}{% endif %}" class="card">
-                <div class="poster">
-                    <img src="{{ media.poster_url }}" alt="{{ media.title }}" loading="lazy">
-                    <div class="badge">👁 {{ media.views }}</div>
-                </div>
-                <div class="info">
-                    <div class="title">{{ media.title }}</div>
-                </div>
-            </a>
-            {% endfor %}
-        </div>
+            <!-- Top Rated Movies -->
+            <div class="section-title">⭐ Top Rated Movies</div>
+            <div class="scroll-row">
+                {% for media in top_rated_movies %}
+                <a href="/movie/{{ media.id }}" class="card">
+                    <div class="poster">
+                        <img src="{{ media.poster_url }}" alt="{{ media.title }}">
+                        <div class="badge">⭐ {{ media.rating }}</div>
+                    </div>
+                    <div class="info">
+                        <div class="title">{{ media.title }}</div>
+                        <div class="meta">{{ media.year }}</div>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
 
-        <!-- Categories -->
-        <div class="categories">
-            <a href="/" class="cat-pill active">All</a>
-            {% for cat in categories %}
-                <a href="/?cat={{ cat }}" class="cat-pill">{{ cat }}</a>
-            {% endfor %}
-        </div>
+            <!-- Top Rated TV Shows -->
+            <div class="section-title">⭐ Top Rated TV Shows</div>
+            <div class="scroll-row">
+                {% for media in top_rated_series %}
+                <a href="/series/{{ media.title|urlencode }}/{{ media.season or 1 }}" class="card">
+                    <div class="poster">
+                        <img src="{{ media.poster_url }}" alt="{{ media.title }}">
+                        <div class="badge">⭐ {{ media.rating }}</div>
+                    </div>
+                    <div class="info">
+                        <div class="title">{{ media.title }}</div>
+                        <div class="meta">{{ media.year }}</div>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+
+            <!-- Recent Uploads -->
+            <div class="section-title">🆕 Recent Uploads</div>
+            <div class="scroll-row">
+                {% for media in recent_uploads %}
+                <a href="{% if media.media_type == 'series' %}/series/{{ media.title|urlencode }}/{{ media.season or 1 }}{% else %}/movie/{{ media.id }}{% endif %}" class="card">
+                    <div class="poster">
+                        <img src="{{ media.poster_url }}" alt="{{ media.title }}">
+                        <div class="badge">⭐ {{ media.rating }}</div>
+                    </div>
+                    <div class="info">
+                        <div class="title">{{ media.title }}</div>
+                        <div class="meta">{{ media.year }} • {{ 'Series' if media.media_type == 'series' else 'Movie' }}</div>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+        {% endif %}
     </div>
 
     <!-- Request Modal (keep existing) -->
@@ -144,20 +207,5 @@
     <footer>
         <p>© 2026 Malayalam Subtitles Hub — <a href="/sitemap.xml">Sitemap</a> | <a href="https://t.me/malayalam_sub1" target="_blank">Telegram</a></p>
     </footer>
-
-    <script>
-        // Tab filtering
-        function filterMedia(type) {
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            event.target.classList.add('active');
-            document.querySelectorAll('#mediaGrid .card').forEach(card => {
-                if (type === 'all' || card.dataset.type === type) {
-                    card.style.display = '';
-                } else {
-                    card.style.display = 'none';
-                }
-            });
-        }
-    </script>
 </body>
 </html>
