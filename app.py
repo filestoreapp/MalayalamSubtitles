@@ -191,27 +191,59 @@ def index():
     page = request.args.get('page', 1, type=int)
     categories_list = get_categories_list()
 
+    # If a search is active, render the search results as before
     if search_query:
         pagination = Movie.query.filter(
             (Movie.title.ilike(f'%{search_query}%')) |
             (Movie.category.ilike(f'%{search_query}%'))
         ).order_by(Movie.id.desc()).paginate(page=page, per_page=12, error_out=False)
-        return render_template('index.html', pagination=pagination, search_query=search_query, categories=categories_list, mode="search")
+        return render_template('index.html',
+                               pagination=pagination,
+                               search_query=search_query,
+                               categories=categories_list,
+                               mode="search")
 
     if category_query:
         pagination = Movie.query.filter(Movie.category.ilike(f'%{category_query}%')).order_by(Movie.id.desc()).paginate(page=page, per_page=12, error_out=False)
-        return render_template('index.html', pagination=pagination, search_query=category_query, categories=categories_list, mode="search")
+        return render_template('index.html',
+                               pagination=pagination,
+                               search_query=category_query,
+                               categories=categories_list,
+                               mode="search")
 
-    latest_pagination = Movie.query.order_by(Movie.id.desc()).paginate(page=page, per_page=12, error_out=False)
-    top_downloaded = Movie.query.order_by(Movie.views.desc()).limit(12).all()
-    random_picks = Movie.query.order_by(func.random()).limit(12).all()
+    # ---- Home page sections ----
+    # Trending Movies (most views, movies only)
+    trending_movies = Movie.query.filter_by(media_type='movie').order_by(Movie.views.desc()).limit(12).all()
+
+    # Trending TV Shows (most views, series only)
+    trending_series = Movie.query.filter_by(media_type='series').order_by(Movie.views.desc()).limit(12).all()
+
+    # Popular Movies (most downloaded, via TranslationCache sum, but simpler: movies with highest views again? 
+    # We'll use highest number of translations downloads if you want true popularity; 
+    # for simplicity, we reuse views but you can change later)
+    popular_movies = Movie.query.filter_by(media_type='movie').order_by(Movie.views.desc()).limit(12).all()
+
+    # Top Rated Movies (rating as float)
+    from sqlalchemy import cast, Float
+    top_rated_movies = Movie.query.filter_by(media_type='movie').order_by(cast(Movie.rating, Float).desc()).limit(12).all()
+
+    # Top Rated TV Shows
+    top_rated_series = Movie.query.filter_by(media_type='series').order_by(cast(Movie.rating, Float).desc()).limit(12).all()
+
+    # Recent Uploads (latest by id)
+    recent_uploads = Movie.query.order_by(Movie.id.desc()).limit(12).all()
 
     return render_template('index.html',
-                           latest_pagination=latest_pagination,
-                           top_downloaded=top_downloaded,
-                           random_picks=random_picks,
+                           mode="home",
                            categories=categories_list,
-                           mode="home")
+                           trending_movies=trending_movies,
+                           trending_series=trending_series,
+                           popular_movies=popular_movies,
+                           top_rated_movies=top_rated_movies,
+                           top_rated_series=top_rated_series,
+                           recent_uploads=recent_uploads,
+                           search_query='',
+                           pagination=None)
 
 @app.route('/robots.txt')
 def robots_txt():
