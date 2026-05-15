@@ -5,20 +5,77 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ title }} – All Episodes</title>
     <style>
-        :root { --bg: #0b0f19; --card-bg: #1a1f2e; --text: #e2e8f0; --accent: #3b82f6; }
-        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
+        :root {
+            --bg: #0a0a0a;
+            --card-bg: #1a1a1a;
+            --text: #f1f1f1;
+            --accent: #f04747;
+            --accent-hover: #d93a3a;
+            --accent-soft: #f47b7b;
+            --border: #2a2a2a;
+            --success: #2ecc71;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+        }
         .container { max-width: 900px; margin: 0 auto; }
         h1 { font-size: 1.8rem; margin-bottom: 5px; }
         .back { color: var(--accent); text-decoration: none; display: inline-block; margin-bottom: 15px; }
-        .poster-large { width: 200px; border-radius: 12px; margin-right: 20px; float: left; }
-        .meta { color: #94a3b8; margin-bottom: 20px; }
-        .season-title { font-size: 1.4rem; margin-top: 30px; border-left: 4px solid var(--accent); padding-left: 10px; }
+        .poster-large {
+            width: 200px;
+            border-radius: 12px;
+            margin-right: 20px;
+            float: left;
+        }
+        .meta { color: #aaa; margin-bottom: 20px; }
+        .season-title {
+            font-size: 1.4rem;
+            margin-top: 30px;
+            border-left: 4px solid var(--accent);
+            padding-left: 10px;
+        }
         .episode-list { display: flex; flex-direction: column; gap: 12px; margin-top: 15px; }
-        .episode-card { background: var(--card-bg); border-radius: 12px; padding: 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+        .episode-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
         .ep-title { font-weight: 700; }
         .ep-downloads { display: flex; gap: 8px; flex-wrap: wrap; }
-        .lang-link { padding: 6px 12px; border-radius: 6px; background: #334155; color: white; text-decoration: none; font-size: 13px; transition: 0.2s; }
-        .lang-link:hover { background: var(--accent); }
+
+        .btn {
+            padding: 8px 14px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            color: white;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        .btn-download {
+            background: var(--success);
+            box-shadow: 0 4px 12px rgba(46,204,113,0.25);
+        }
+        .btn-download:hover {
+            background: #27ae60;
+            box-shadow: 0 6px 18px rgba(46,204,113,0.35);
+        }
     </style>
 </head>
 <body>
@@ -38,12 +95,15 @@
                     <div class="ep-title">Episode {{ ep.episode }}</div>
                     <div class="ep-downloads">
                         {% if ep.english_srt %}
-                        <a href="/download/{{ ep.id }}/en" class="lang-link">🇬🇧 EN</a>
+                        <a href="/download/{{ ep.id }}/en" class="btn btn-download">🇬🇧 EN</a>
                         {% endif %}
                         {% for lang in ['ml','ta','hi'] %}
                             {% if lang in ep.translations|map(attribute='language') %}
-                            <a href="/download/{{ ep.id }}/{{ lang }}" class="lang-link">
-                                {% if lang == 'ml' %}🇮🇳 ML{% elif lang == 'ta' %}🇮🇳 TA{% else %}🇮🇳 HI{% endif %}
+                            <a href="/download/{{ ep.id }}/{{ lang }}" class="btn btn-download">
+                                {% if lang == 'ml' %}🇮🇳 ML
+                                {% elif lang == 'ta' %}🇮🇳 TA
+                                {% else %}🇮🇳 HI
+                                {% endif %}
                             </a>
                             {% endif %}
                         {% endfor %}
