@@ -910,7 +910,8 @@ def scheduled_fetch():
     if not SUBDL_API_KEY:
         return jsonify({"error": "SUBDL_API_KEY not set"}), 500
 
-    fetch_url = f"https://api.subdl.com/api/v1/subtitles?api_key={SUBDL_API_KEY}&type=movie&languages=EN&per_page=30"
+    # ✅ Add &sort=recent to get the latest subtitles
+    fetch_url = f"https://api.subdl.com/api/v1/subtitles?api_key={SUBDL_API_KEY}&type=movie&languages=EN&per_page=30&sort=recent"
     try:
         resp = requests.get(fetch_url, headers={"User-Agent": "Mozilla/5.0..."})
         resp.raise_for_status()
