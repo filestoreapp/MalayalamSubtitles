@@ -910,8 +910,8 @@ def scheduled_fetch():
     if not SUBDL_API_KEY:
         return jsonify({"error": "SUBDL_API_KEY not set"}), 500
 
-    # ✅ Add &sort=recent to get the latest subtitles
-    fetch_url = f"https://api.subdl.com/api/v1/subtitles?api_key={SUBDL_API_KEY}&type=movie&languages=EN&per_page=30&sort=recent"
+    # Fetch ALL recent English subtitles (movies + series mixed), no 'type' filter
+    fetch_url = f"https://api.subdl.com/api/v1/subtitles?api_key={SUBDL_API_KEY}&languages=EN&per_page=30&sort=recent"
     try:
         resp = requests.get(fetch_url, headers={"User-Agent": "Mozilla/5.0..."})
         resp.raise_for_status()
@@ -924,28 +924,35 @@ def scheduled_fetch():
 
     new_movies = 0
     for sub in data['subtitles']:
+        # Filter out TV series – we only want movies
+        if sub.get('type') != 'movie':
+            continue
+
         imdb_id = sub.get('imdb_id')
         if not imdb_id:
             continue
+
         existing = Movie.query.filter_by(imdb_id=imdb_id, media_type='movie').first()
         if existing:
             continue
 
+        # TMDB enrichment
         tmdb_api = os.environ.get('TMDB_API_KEY')
         tmdb_url = f"https://api.themoviedb.org/3/find/{imdb_id}?api_key={tmdb_api}&external_source=imdb_id"
         try:
             tmdb_res = requests.get(tmdb_url).json()
             movie_results = tmdb_res.get('movie_results', [])
-            if not movie_results:
-                continue
-            tmdb_data = movie_results[0]
-            title = tmdb_data.get('title', 'Unknown')
-            year = tmdb_data.get('release_date', '')[:4] if tmdb_data.get('release_date') else ''
-            rating = str(tmdb_data.get('vote_average', 'N/A'))
-            poster_path = tmdb_data.get('poster_path')
-            poster_url = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else 'https://via.placeholder.com/500x750?text=No+Poster'
-            plot = tmdb_data.get('overview', '')
-            runtime = f"{tmdb_data.get('runtime', '')} min" if tmdb_data.get('runtime') else ''
+            if movie_results:
+                tmdb_data = movie_results[0]
+                title = tmdb_data.get('title', sub.get('title', 'Unknown'))
+                year = tmdb_data.get('release_date', '')[:4] if tmdb_data.get('release_date') else ''
+                rating = str(tmdb_data.get('vote_average', 'N/A'))
+                poster_path = tmdb_data.get('poster_path')
+                poster_url = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else 'https://via.placeholder.com/500x750?text=No+Poster'
+                plot = tmdb_data.get('overview', '')
+                runtime = f"{tmdb_data.get('runtime', '')} min" if tmdb_data.get('runtime') else ''
+            else:
+                raise Exception("TMDB returned no movie results")
         except:
             title = sub.get('title', 'Unknown')
             year = ''
@@ -954,6 +961,7 @@ def scheduled_fetch():
             plot = ''
             runtime = ''
 
+        # Download and upload to R2
         try:
             srt_url = "https://dl.subdl.com" + sub['url']
             srt_resp = requests.get(srt_url, headers={"User-Agent": "Mozilla/5.0..."})
