@@ -5,40 +5,105 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ movie.title }} – Malayalam Subtitles Hub</title>
     <style>
-        :root { --bg: #0b0f19; --card-bg: #1a1f2e; --text: #e2e8f0; --accent: #3b82f6; --accent2: #8b5cf6; }
-        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; }
-        .container { max-width: 1000px; margin: 0 auto; padding: 20px; }
+        :root {
+            --bg: #0a0a0a;
+            --card-bg: #1a1a1a;
+            --text: #f1f1f1;
+            --accent: #f04747;
+            --accent-hover: #d93a3a;
+            --accent-soft: #f47b7b;
+            --border: #2a2a2a;
+            --success: #2ecc71;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1000px; margin: 0 auto; }
+        a { text-decoration: none; color: inherit; }
+        .back { color: var(--accent); display: inline-block; margin-bottom: 15px; }
+
+        /* Header */
         .movie-header { display: flex; gap: 30px; flex-wrap: wrap; margin-bottom: 30px; }
-        .poster-large { width: 250px; border-radius: 16px; overflow: hidden; box-shadow: 0 8px 30px rgba(0,0,0,0.5); }
+        .poster-large {
+            width: 250px;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+        }
         .poster-large img { width: 100%; display: block; }
         .details { flex: 1; }
         .details h1 { font-size: 2.2rem; margin: 0 0 10px; }
         .meta-badges { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 15px; }
-        .meta-badge { background: var(--accent); padding: 4px 12px; border-radius: 16px; font-size: 13px; font-weight: 600; }
-        .plot { line-height: 1.6; color: #cbd5e1; margin-bottom: 25px; }
+        .meta-badge {
+            background: var(--accent);
+            padding: 4px 12px;
+            border-radius: 16px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .plot { line-height: 1.6; color: #ccc; margin-bottom: 25px; }
 
+        /* Download buttons */
         .download-section { margin-top: 20px; }
         .lang-grid { display: flex; gap: 10px; flex-wrap: wrap; }
-        .lang-btn { display: flex; align-items: center; gap: 6px; background: var(--card-bg); border: 1px solid #2d3748; border-radius: 8px; padding: 10px 16px; color: white; text-decoration: none; font-weight: 600; transition: 0.2s; }
-        .lang-btn:hover { background: var(--accent); border-color: var(--accent); }
+        .btn {
+            padding: 10px 18px;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            text-decoration: none;
+            color: white;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        .btn-download {
+            background: var(--success);
+            box-shadow: 0 4px 12px rgba(46,204,113,0.25);
+        }
+        .btn-download:hover {
+            background: #27ae60;
+            box-shadow: 0 6px 18px rgba(46,204,113,0.35);
+        }
 
-        .progress-box { margin: 15px 0; background: #1e293b; border-radius: 8px; padding: 12px; display: inline-block; }
-        .progress-bar { width: 200px; height: 6px; background: #334155; border-radius: 6px; overflow: hidden; }
+        /* Progress box */
+        .progress-box { margin: 15px 0; background: var(--card-bg); border-radius: 8px; padding: 12px; display: inline-block; }
+        .progress-bar { width: 200px; height: 6px; background: #333; border-radius: 6px; overflow: hidden; }
         .progress-fill { height: 100%; background: var(--accent); border-radius: 6px; transition: width 0.5s; }
 
+        /* Related movies */
         .related { margin-top: 40px; }
         .related-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); gap: 15px; }
-        .related-card { background: var(--card-bg); border-radius: 10px; overflow: hidden; text-decoration: none; color: inherit; transition: 0.2s; }
+        .related-card {
+            background: var(--card-bg);
+            border-radius: 10px;
+            overflow: hidden;
+            text-decoration: none;
+            color: inherit;
+            transition: 0.2s;
+        }
         .related-card:hover { transform: translateY(-3px); }
         .related-card img { width: 100%; aspect-ratio: 2/3; object-fit: cover; }
         .related-title { padding: 8px; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-        a.back { display: inline-block; margin-bottom: 20px; color: var(--accent); }
+        @media (max-width: 600px) {
+            .poster-large { width: 180px; }
+            .details h1 { font-size: 1.5rem; }
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <a href="/" class="back">← Back to Home</a>
+        <a href="/" class="back">← Home</a>
 
         <div class="movie-header">
             <div class="poster-large">
@@ -60,11 +125,11 @@
                     <div class="lang-grid">
                         {% for lang in ['en','ml','ta','hi'] %}
                             {% if lang == 'en' or lang in ready_languages %}
-                                <a href="/download/{{ movie.id }}/{{ lang }}" class="lang-btn">
+                                <a href="/download/{{ movie.id }}/{{ lang }}" class="btn btn-download">
                                     {% if lang == 'en' %}🇬🇧 English
                                     {% elif lang == 'ml' %}🇮🇳 Malayalam
                                     {% elif lang == 'ta' %}🇮🇳 Tamil
-                                    {% elif lang == 'hi' %}🇮🇳 Hindi
+                                    {% else %}🇮🇳 Hindi
                                     {% endif %}
                                 </a>
                             {% endif %}
@@ -72,7 +137,7 @@
                     </div>
                 </div>
 
-                <!-- Translation progress (if any job not completed) -->
+                <!-- Translation progress (if any language not completed) -->
                 {% for lang_code, lang_name in [('ml','Malayalam'), ('ta','Tamil'), ('hi','Hindi')] %}
                     {% set job = movie.jobs | selectattr("language", "equalto", lang_code) | first %}
                     {% if job and job.status != "Completed" %}
