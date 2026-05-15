@@ -901,71 +901,92 @@ def request_sub():
 # ------------------ AUTO FETCH SCHEDULER ENDPOINT ------------------
 @app.route('/api/scheduled_fetch', methods=['POST', 'GET'])
 def scheduled_fetch():
-    """Called by external cron job every 2 hours. Fetches new MOVIE subtitles only."""
+    """Called by external cron job every 2 hours. Discovers movies via OpenSubtitles, downloads via Subdl."""
     secret = request.args.get('secret') or request.headers.get('X-Auth-Secret')
     if secret != os.environ.get('SCHEDULER_SECRET', 'scheduler-secret'):
         return jsonify({"error": "unauthorized"}), 401
 
+    OS_API_KEY = os.environ.get('OS_API_KEY')
     SUBDL_API_KEY = os.environ.get('SUBDL_API_KEY')
-    if not SUBDL_API_KEY:
-        return jsonify({"error": "SUBDL_API_KEY not set"}), 500
+    if not OS_API_KEY or not SUBDL_API_KEY:
+        return jsonify({"error": "API keys not set"}), 500
 
-    # Fetch ALL recent English subtitles (movies + series mixed), no 'type' filter
-    fetch_url = f"https://api.subdl.com/api/v1/subtitles?api_key={SUBDL_API_KEY}&languages=EN&per_page=30&sort=recent"
+    # 1. Discover recent movie subtitles using OpenSubtitles (no download, only metadata)
+    discovery_url = "https://api.opensubtitles.com/api/v1/subtitles?languages=en&type=movie&order_by=upload_date&per_page=5"
+    headers = {
+        "Api-Key": OS_API_KEY,
+        "Content-Type": "application/json",
+        "User-Agent": "malayalamsubtitles_app v1.0"
+    }
+
     try:
-        resp = requests.get(fetch_url, headers={"User-Agent": "Mozilla/5.0..."})
+        resp = requests.get(discovery_url, headers=headers, timeout=15)
         resp.raise_for_status()
         data = resp.json()
     except Exception as e:
-        return jsonify({"error": f"Subdl request failed: {e}"}), 500
+        return jsonify({"error": f"OpenSubtitles discovery failed: {e}"}), 500
 
-    if not data.get('status') or not data.get('subtitles'):
-        return jsonify({"message": "No new subtitles found"}), 200
+    if not data.get('data'):
+        return jsonify({"message": "No new movies found"}), 200
 
     new_movies = 0
-    for sub in data['subtitles']:
-        # Filter out TV series – we only want movies
-        if sub.get('type') != 'movie':
-            continue
-
-        imdb_id = sub.get('imdb_id')
+    for item in data['data']:
+        attrs = item.get('attributes', {})
+        imdb_id = attrs.get('imdb_id')
         if not imdb_id:
             continue
 
+        # Skip if already in database
         existing = Movie.query.filter_by(imdb_id=imdb_id, media_type='movie').first()
         if existing:
             continue
 
-        # TMDB enrichment
-        tmdb_api = os.environ.get('TMDB_API_KEY')
-        tmdb_url = f"https://api.themoviedb.org/3/find/{imdb_id}?api_key={tmdb_api}&external_source=imdb_id"
+        # 2. Download the English subtitle from Subdl using the IMDb ID
+        srt_text = None
         try:
-            tmdb_res = requests.get(tmdb_url).json()
-            movie_results = tmdb_res.get('movie_results', [])
-            if movie_results:
-                tmdb_data = movie_results[0]
-                title = tmdb_data.get('title', sub.get('title', 'Unknown'))
-                year = tmdb_data.get('release_date', '')[:4] if tmdb_data.get('release_date') else ''
-                rating = str(tmdb_data.get('vote_average', 'N/A'))
-                poster_path = tmdb_data.get('poster_path')
-                poster_url = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else 'https://via.placeholder.com/500x750?text=No+Poster'
-                plot = tmdb_data.get('overview', '')
-                runtime = f"{tmdb_data.get('runtime', '')} min" if tmdb_data.get('runtime') else ''
+            # Ensure correct IMDb ID format
+            if not imdb_id.startswith('tt'):
+                imdb_id_fmt = f"tt{imdb_id}"
             else:
-                raise Exception("TMDB returned no movie results")
-        except:
-            title = sub.get('title', 'Unknown')
-            year = ''
-            rating = 'N/A'
-            poster_url = 'https://via.placeholder.com/500x750?text=No+Poster'
-            plot = ''
-            runtime = ''
+                imdb_id_fmt = imdb_id
 
-        # Download and upload to R2
+            subdl_url = f"https://api.subdl.com/api/v1/subtitles?api_key={SUBDL_API_KEY}&imdb_id={imdb_id_fmt}&type=movie&languages=EN"
+            subdl_resp = requests.get(subdl_url, headers={"User-Agent": "Mozilla/5.0..."})
+            if subdl_resp.status_code == 200:
+                subdl_data = subdl_resp.json()
+                if subdl_data.get('status') and subdl_data.get('subtitles'):
+                    # Intelligent selection (same as auto_fetch)
+                    def score_sub(sub):
+                        if sub.get('hearing_impaired', False):
+                            return -1
+                        fmt_score = 2 if sub.get('format', '').lower() == 'srt' else 0
+                        downloads = int(sub.get('downloads', 0))
+                        rating = float(sub.get('rating', 0))
+                        return (fmt_score, downloads, rating)
+
+                    scored = []
+                    for sub in subdl_data['subtitles']:
+                        s = score_sub(sub)
+                        if s == -1:
+                            continue
+                        scored.append((s, sub))
+
+                    if scored:
+                        scored.sort(key=lambda x: x[0], reverse=True)
+                        best_sub = scored[0][1]
+                        dl_url = "https://dl.subdl.com" + best_sub['url']
+                        dl_resp = requests.get(dl_url, headers={"User-Agent": "Mozilla/5.0..."})
+                        if dl_resp.status_code == 200:
+                            srt_text = dl_resp.text
+        except Exception as e:
+            print(f"Subdl download failed for {imdb_id}: {e}")
+            continue
+
+        if not srt_text:
+            continue
+
+        # 3. Upload to R2
         try:
-            srt_url = "https://dl.subdl.com" + sub['url']
-            srt_resp = requests.get(srt_url, headers={"User-Agent": "Mozilla/5.0..."})
-            srt_text = srt_resp.text
             safe_id = imdb_id.replace('tt', '')
             r2_filename = f"english_movie_{safe_id}_{os.urandom(4).hex()}.srt"
             r2_url = None
@@ -977,6 +998,33 @@ def scheduled_fetch():
                 r2_url = f"{r2_public_url.rstrip('/')}/{r2_filename}"
         except:
             continue
+
+        # 4. Get movie metadata – prefer TMDB, fallback to OpenSubtitles fields
+        title = attrs.get('title', 'Unknown')
+        year = attrs.get('year', '')
+        rating = attrs.get('rating', 'N/A')
+        poster_url = 'https://via.placeholder.com/500x750?text=No+Poster'
+        plot = ''
+        runtime = ''
+
+        tmdb_api = os.environ.get('TMDB_API_KEY')
+        if tmdb_api:
+            try:
+                tmdb_url = f"https://api.themoviedb.org/3/find/{imdb_id}?api_key={tmdb_api}&external_source=imdb_id"
+                tmdb_res = requests.get(tmdb_url).json()
+                movie_results = tmdb_res.get('movie_results', [])
+                if movie_results:
+                    tmdb = movie_results[0]
+                    title = tmdb.get('title', title)
+                    release = tmdb.get('release_date', '')
+                    year = release[:4] if release else year
+                    rating = str(tmdb.get('vote_average', rating))
+                    if tmdb.get('poster_path'):
+                        poster_url = f"https://image.tmdb.org/t/p/w500{tmdb.get('poster_path')}"
+                    plot = tmdb.get('overview', '')
+                    runtime = f"{tmdb.get('runtime', '')} min" if tmdb.get('runtime') else ''
+            except:
+                pass
 
         new_movie = Movie(
             media_type='movie',
@@ -993,12 +1041,12 @@ def scheduled_fetch():
         db.session.add(new_movie)
         db.session.commit()
 
+        # 5. Trigger translation
         if r2_url:
             threading.Thread(target=trigger_hf_translation, args=(new_movie.id, r2_url)).start()
         new_movies += 1
 
     return jsonify({"message": f"Added {new_movies} new movies"}), 200
-
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
