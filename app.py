@@ -915,7 +915,6 @@ def request_sub():
         return jsonify({"error": str(e)}), 500
 
 # ------------------ AUTO FETCH SCHEDULER ENDPOINT ------------------
-import random, time
 
 @app.route('/api/scheduled_fetch', methods=['POST', 'GET'])
 def scheduled_fetch():
@@ -928,89 +927,33 @@ def scheduled_fetch():
     if not TMDB_API_KEY or not SUBDL_API_KEY:
         return jsonify({"error": "API keys missing"}), 500
 
-    # ---------- COLLECT CANDIDATES ----------
-    candidate_ids = set()
-
-    # 1. OTT discover (digital release)
-    try:
-        url = (f"https://api.themoviedb.org/3/discover/movie?"
-               f"api_key={TMDB_API_KEY}&language=en-US&sort_by=release_date.desc"
-               f"&with_release_type=4&page=1")
-        resp = requests.get(url, timeout=10).json()
-        ott_movies = resp.get('results', [])
-        print(f"🔎 TMDB OTT discover returned {len(ott_movies)} movies")
-        for m in ott_movies[:30]:
-            candidate_ids.add(m['id'])
-    except Exception as e:
-        print(f"❌ TMDB OTT discover error: {e}")
-
-    # 2. Now playing (will be filtered for digital release later)
-    try:
-        url = f"https://api.themoviedb.org/3/movie/now_playing?api_key={TMDB_API_KEY}&language=en-US&page=1"
-        resp = requests.get(url, timeout=10).json()
-        now_playing = resp.get('results', [])
-        print(f"🔎 TMDB now_playing returned {len(now_playing)} movies")
-        for m in now_playing[:20]:
-            candidate_ids.add(m['id'])
-    except Exception as e:
-        print(f"❌ TMDB now_playing error: {e}")
-
-    # Fallback: if OTT list is empty, get popular movies and try to filter for digital later
-    if len(candidate_ids) < 5:
-        print("⚠️ Few OTT candidates, falling back to popular movies")
-        try:
-            url = f"https://api.themoviedb.org/3/movie/popular?api_key={TMDB_API_KEY}&language=en-US&page=1"
-            resp = requests.get(url, timeout=10).json()
-            popular = resp.get('results', [])
-            print(f"🔎 TMDB popular returned {len(popular)} movies")
-            for m in popular[:20]:
-                candidate_ids.add(m['id'])
-        except Exception as e:
-            print(f"❌ TMDB popular error: {e}")
-
-    print(f"📊 Total candidates after collecting: {len(candidate_ids)}")
-    candidate_list = list(candidate_ids)
-    random.shuffle(candidate_list)
-
-    # ---------- PROCESS CANDIDATES ----------
-    new_movies = 0
-    for tmdb_id in candidate_list:
-        if new_movies >= 5:
-            break
-
-        # Get IMDb ID
+    # ------------------------------------------------------------
+    # Helper: process a single TMDB movie ID and add to database
+    # ------------------------------------------------------------
+    def process_movie(tmdb_id, require_digital=False):
         try:
             ext_url = f"https://api.themoviedb.org/3/movie/{tmdb_id}/external_ids?api_key={TMDB_API_KEY}"
             ext_data = requests.get(ext_url, timeout=5).json()
             imdb_id = ext_data.get('imdb_id')
             if not imdb_id:
-                print(f"⏭️  TMDB {tmdb_id}: no IMDb ID")
-                continue
+                return False
         except:
-            continue
+            return False
 
-        # Skip if already in database
         if Movie.query.filter_by(imdb_id=imdb_id, media_type='movie').first():
-            print(f"⏭️  {imdb_id}: already in DB")
-            continue
+            return False
 
-        # Verify digital release (OTT) – skip if not
-        try:
-            release_url = f"https://api.themoviedb.org/3/movie/{tmdb_id}/release_dates?api_key={TMDB_API_KEY}"
-            release_data = requests.get(release_url, timeout=5).json()
-            has_digital = any(
-                rd.get('type') == 4
-                for country in release_data.get('results', [])
-                for rd in country.get('release_dates', [])
-            )
-            if not has_digital:
-                print(f"⏭️  {imdb_id}: no digital release date")
-                continue
-        except Exception as e:
-            print(f"⚠️  {imdb_id}: failed to check release dates – {e}")
-            continue
+        if require_digital:
+            try:
+                release_url = f"https://api.themoviedb.org/3/movie/{tmdb_id}/release_dates?api_key={TMDB_API_KEY}"
+                release_data = requests.get(release_url, timeout=5).json()
+                if not any(rd.get('type') == 4
+                           for country in release_data.get('results', [])
+                           for rd in country.get('release_dates', [])):
+                    return False
+            except:
+                return False
 
-        # Download subtitle from Subdl
         srt_text = None
         try:
             imdb_id_fmt = imdb_id if imdb_id.startswith('tt') else f"tt{imdb_id}"
@@ -1034,19 +977,12 @@ def scheduled_fetch():
                         dl_resp = requests.get(dl_url, headers={"User-Agent": "Mozilla/5.0..."}, timeout=15)
                         if dl_resp.status_code == 200:
                             srt_text = dl_resp.text
-                else:
-                    print(f"⏭️  {imdb_id}: Subdl returned no subtitles")
-            else:
-                print(f"⏭️  {imdb_id}: Subdl HTTP {subdl_resp.status_code}")
-        except Exception as e:
-            print(f"⚠️  {imdb_id}: Subdl error – {e}")
-            continue
+        except:
+            pass
 
         if not srt_text:
-            print(f"⏭️  {imdb_id}: no SRT content")
-            continue
+            return False
 
-        # Upload to R2
         try:
             safe_id = imdb_id.replace('tt', '')
             r2_filename = f"english_movie_{safe_id}_{os.urandom(4).hex()}.srt"
@@ -1058,9 +994,8 @@ def scheduled_fetch():
                 )
                 r2_url = f"{r2_public_url.rstrip('/')}/{r2_filename}"
         except:
-            continue
+            return False
 
-        # TMDB metadata
         try:
             details = requests.get(f"https://api.themoviedb.org/3/movie/{tmdb_id}?api_key={TMDB_API_KEY}&language=en-US").json()
             title = details.get('title', 'Unknown')
@@ -1070,12 +1005,9 @@ def scheduled_fetch():
             plot = details.get('overview', '')
             runtime = f"{details.get('runtime', '')} min" if details.get('runtime') else ''
         except:
-            title = 'Unknown'
-            year = ''
-            rating = 'N/A'
+            title = 'Unknown'; year = ''; rating = 'N/A'
             poster = 'https://via.placeholder.com/500x750?text=No+Poster'
-            plot = ''
-            runtime = ''
+            plot = ''; runtime = ''
 
         new_movie = Movie(
             media_type='movie',
@@ -1088,8 +1020,63 @@ def scheduled_fetch():
 
         if r2_url:
             threading.Thread(target=trigger_hf_translation, args=(new_movie.id, r2_url)).start()
-        new_movies += 1
-        print(f"✅ Added: {title} ({imdb_id})")
+        return True
+
+    # ------------------------------------------------------------
+    # Phase 1 – OTT candidates (digital release)
+    # ------------------------------------------------------------
+    candidate_ids = set()
+    print("🔍 Phase 1: OTT sources")
+    try:
+        url = (f"https://api.themoviedb.org/3/discover/movie?"
+               f"api_key={TMDB_API_KEY}&language=en-US&sort_by=release_date.desc"
+               f"&with_release_type=4&page=1")
+        for m in requests.get(url, timeout=10).json().get('results', [])[:30]:
+            candidate_ids.add(m['id'])
+    except: pass
+
+    try:
+        url = f"https://api.themoviedb.org/3/movie/now_playing?api_key={TMDB_API_KEY}&language=en-US&page=1"
+        for m in requests.get(url, timeout=10).json().get('results', [])[:20]:
+            candidate_ids.add(m['id'])
+    except: pass
+
+    candidate_list = list(candidate_ids)
+    random.shuffle(candidate_list)
+
+    new_movies = 0
+    for tmdb_id in candidate_list:
+        if new_movies >= 5: break
+        if process_movie(tmdb_id, require_digital=True):
+            new_movies += 1
+            print(f"✅ OTT: {tmdb_id}")
+
+    # ------------------------------------------------------------
+    # Phase 2 – Fallback: any movie (no digital requirement)
+    # ------------------------------------------------------------
+    if new_movies < 5:
+        print("🔍 Phase 2: Fallback (any movie)")
+        fallback_ids = set()
+        for endpoint, pages in [('popular', 3), ('top_rated', 3), ('discover/movie', 2)]:
+            for page in range(1, pages+1):
+                try:
+                    if endpoint == 'discover/movie':
+                        url = (f"https://api.themoviedb.org/3/discover/movie?"
+                               f"api_key={TMDB_API_KEY}&language=en-US&sort_by=popularity.desc"
+                               f"&vote_count.gte=100&page={page}")
+                    else:
+                        url = f"https://api.themoviedb.org/3/movie/{endpoint}?api_key={TMDB_API_KEY}&language=en-US&page={page}"
+                    for m in requests.get(url, timeout=10).json().get('results', [])[:30]:
+                        fallback_ids.add(m['id'])
+                except: pass
+
+        fallback_list = list(fallback_ids)
+        random.shuffle(fallback_list)
+        for tmdb_id in fallback_list:
+            if new_movies >= 5: break
+            if process_movie(tmdb_id, require_digital=False):
+                new_movies += 1
+                print(f"✅ Fallback: {tmdb_id}")
 
     return jsonify({"message": f"Added {new_movies} new movies (5 max)"}), 200
 if __name__ == '__main__':
