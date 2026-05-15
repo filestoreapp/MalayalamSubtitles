@@ -424,6 +424,7 @@ def login():
 @app.route('/dashboard')
 @login_required
 def dashboard():
+    # Auto‑cleanup finished jobs (keep)
     TranslationJob.query.filter(TranslationJob.status.in_(['Completed', 'Success'])).delete(synchronize_session=False)
     db.session.commit()
 
@@ -431,12 +432,21 @@ def dashboard():
     total_dl = db.session.query(func.sum(TranslationCache.downloads)).scalar() or 0
     total_subs = TranslationCache.query.count()
 
+    # New stats
+    total_movies = Movie.query.filter_by(media_type='movie').count()
+    total_series = Movie.query.filter(Movie.media_type == 'series').distinct(Movie.title).count()
+    english_subs = Movie.query.filter(Movie.english_srt.isnot(None), Movie.english_srt != '').count()
+
+    # Existing queries
     page = request.args.get('page', 1, type=int)
     all_media_paginated = Movie.query.order_by(Movie.id.desc()).paginate(page=page, per_page=15, error_out=False)
+
     pop_lang = db.session.query(TranslationCache.language, func.count(TranslationCache.id))\
                         .group_by(TranslationCache.language).order_by(func.count(TranslationCache.id).desc()).first()
     recent_jobs = TranslationJob.query.order_by(TranslationJob.id.desc()).limit(15).all()
+    failed_jobs_count = TranslationJob.query.filter_by(status='Failed').count()
 
+    # Storage sizes (unchanged)
     try:
         db_size_query = db.session.execute(db.text("SELECT pg_size_pretty(pg_database_size(current_database()))")).scalar()
         db_size = db_size_query if db_size_query else "Unknown"
@@ -472,7 +482,12 @@ def dashboard():
                            jobs=recent_jobs,
                            db_size=db_size,
                            r2_size_str=r2_size_str,
-                           r2_file_count=r2_file_count)
+                           r2_file_count=r2_file_count,
+                           total_movies=total_movies,
+                           total_series=total_series,
+                           english_subs=english_subs,
+                           failed_jobs_count=failed_jobs_count,
+                           scheduler_secret=os.environ.get('SCHEDULER_SECRET', ''))
 
 @app.route('/admin/reset_jobs')
 @login_required
