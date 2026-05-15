@@ -5,32 +5,98 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ title }} – Season {{ season }}</title>
     <style>
-        :root { --bg: #0b0f19; --card-bg: #1a1f2e; --text: #e2e8f0; --accent: #3b82f6; --accent2: #8b5cf6; }
-        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; }
-        .container { max-width: 900px; margin: 0 auto; padding: 20px; }
-        .back { color: var(--accent); margin-bottom: 15px; display: inline-block; }
+        :root {
+            --bg: #0a0a0a;
+            --card-bg: #1a1a1a;
+            --text: #f1f1f1;
+            --accent: #f04747;
+            --accent-hover: #d93a3a;
+            --accent-soft: #f47b7b;
+            --border: #2a2a2a;
+            --success: #2ecc71;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+        }
+        .container { max-width: 900px; margin: 0 auto; }
         h1 { font-size: 1.8rem; margin-bottom: 5px; }
+        .back { color: var(--accent); display: inline-block; margin-bottom: 15px; }
         .season-picker { display: flex; gap: 10px; flex-wrap: wrap; margin: 20px 0; }
-        .season-btn { padding: 8px 16px; border-radius: 8px; background: var(--card-bg); border: 1px solid #2d3748; cursor: pointer; font-weight: 600; transition: 0.2s; }
-        .season-btn.active { background: var(--accent); border-color: var(--accent); }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .btn-accent {
+            background: var(--accent);
+            color: white;
+            box-shadow: 0 4px 12px rgba(240,71,71,0.25);
+        }
+        .btn-accent:hover {
+            background: var(--accent-hover);
+            box-shadow: 0 6px 18px rgba(240,71,71,0.35);
+        }
+        .btn-outline {
+            background: transparent;
+            border: 2px solid var(--accent);
+            color: var(--accent);
+        }
+        .btn-outline:hover {
+            background: var(--accent);
+            color: white;
+        }
+        .btn-download {
+            background: var(--success);
+            color: white;
+            box-shadow: 0 4px 12px rgba(46,204,113,0.25);
+        }
+        .btn-download:hover {
+            background: #27ae60;
+            box-shadow: 0 6px 18px rgba(46,204,113,0.35);
+        }
+
         .episode-list { display: flex; flex-direction: column; gap: 12px; }
-        .episode-card { background: var(--card-bg); border-radius: 12px; padding: 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+        .episode-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
         .ep-title { font-weight: 700; }
         .ep-downloads { display: flex; gap: 8px; flex-wrap: wrap; }
-        .lang-link { padding: 6px 12px; border-radius: 6px; background: #334155; color: white; text-decoration: none; font-size: 13px; transition: 0.2s; }
-        .lang-link:hover { background: var(--accent); }
     </style>
 </head>
 <body>
     <div class="container">
         <a href="/" class="back">← Home</a>
         <h1>{{ show_data.title }}</h1>
-        <p style="color:#94a3b8;">⭐ {{ show_data.rating }} | {{ show_data.year }} | {{ show_data.category }}</p>
+        <p style="color:#aaa;">⭐ {{ show_data.rating }} | {{ show_data.year }} | {{ show_data.category }}</p>
 
         <!-- Season selector -->
         <div class="season-picker">
             {% for s in range(1, (show_data.season or 1)+1) %}
-                <a href="/series/{{ title|urlencode }}/{{ s }}" class="season-btn {% if s == season %}active{% endif %}">Season {{ s }}</a>
+                <a href="/series/{{ title|urlencode }}/{{ s }}"
+                   class="btn {% if s == season %}btn-accent{% else %}btn-outline{% endif %}">
+                    Season {{ s }}
+                </a>
             {% endfor %}
         </div>
 
@@ -41,11 +107,11 @@
                 <div class="ep-title">Episode {{ ep.episode }}</div>
                 <div class="ep-downloads">
                     {% if ep.english_srt %}
-                    <a href="/download/{{ ep.id }}/en" class="lang-link">🇬🇧 EN</a>
+                    <a href="/download/{{ ep.id }}/en" class="btn btn-download">🇬🇧 EN</a>
                     {% endif %}
                     {% for lang in ['ml','ta','hi'] %}
                         {% if lang in ep.translations|map(attribute='language') %}
-                        <a href="/download/{{ ep.id }}/{{ lang }}" class="lang-link">
+                        <a href="/download/{{ ep.id }}/{{ lang }}" class="btn btn-download">
                             {% if lang == 'ml' %}🇮🇳 ML
                             {% elif lang == 'ta' %}🇮🇳 TA
                             {% else %}🇮🇳 HI
