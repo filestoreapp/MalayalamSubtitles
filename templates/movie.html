@@ -14,6 +14,7 @@
             --accent-soft: #f47b7b;
             --border: #2a2a2a;
             --success: #2ecc71;
+            --warning: #f1c40f;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -21,24 +22,95 @@
             background: var(--bg);
             color: var(--text);
             min-height: 100vh;
-            padding: 20px;
         }
-        .container { max-width: 1000px; margin: 0 auto; }
         a { text-decoration: none; color: inherit; }
-        .back { color: var(--accent); display: inline-block; margin-bottom: 15px; }
 
-        /* Header */
-        .movie-header { display: flex; gap: 30px; flex-wrap: wrap; margin-bottom: 30px; }
-        .poster-large {
-            width: 250px;
-            border-radius: 16px;
-            overflow: hidden;
-            box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+        /* Sticky header */
+        .sticky-header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: rgba(10,10,10,0.85);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
         }
-        .poster-large img { width: 100%; display: block; }
-        .details { flex: 1; }
-        .details h1 { font-size: 2.2rem; margin: 0 0 10px; }
-        .meta-badges { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 15px; }
+        .back-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--accent);
+            font-weight: 600;
+            transition: 0.2s;
+        }
+        .back-btn:hover { color: var(--accent-hover); }
+        .sticky-title {
+            font-weight: 700;
+            font-size: 1rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex: 1;
+            text-align: center;
+        }
+        .btn {
+            padding: 8px 14px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            text-decoration: none;
+            color: white;
+            background: var(--accent);
+            box-shadow: 0 4px 12px rgba(240,71,71,0.25);
+        }
+        .btn:hover { background: var(--accent-hover); }
+        .btn-outline {
+            background: transparent;
+            border: 2px solid var(--accent);
+            color: var(--accent);
+            box-shadow: none;
+        }
+        .btn-outline:hover { background: var(--accent); color: white; }
+        .btn-download {
+            background: var(--success);
+            box-shadow: 0 4px 12px rgba(46,204,113,0.25);
+        }
+        .btn-download:hover { background: #27ae60; }
+
+        .container { max-width: 1000px; margin: 0 auto; padding: 20px; }
+
+        /* Hero section */
+        .movie-hero {
+            display: flex;
+            gap: 24px;
+            flex-wrap: wrap;
+            margin-bottom: 30px;
+        }
+        .poster-wrapper {
+            flex: 0 0 220px;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+        }
+        .poster-wrapper img { width: 100%; display: block; }
+        .movie-details { flex: 1; }
+        .movie-title { font-size: 2rem; font-weight: 800; margin-bottom: 8px; }
+        .meta-row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
         .meta-badge {
             background: var(--accent);
             padding: 4px 12px;
@@ -46,115 +118,180 @@
             font-size: 13px;
             font-weight: 600;
         }
-        .plot { line-height: 1.6; color: #ccc; margin-bottom: 25px; }
-
-        /* Download buttons */
-        .download-section { margin-top: 20px; }
-        .lang-grid { display: flex; gap: 10px; flex-wrap: wrap; }
-        .btn {
-            padding: 10px 18px;
-            border-radius: 10px;
-            border: none;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 0.9rem;
-            transition: all 0.2s ease;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            text-decoration: none;
-            color: white;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-        }
-        .btn-download {
-            background: var(--success);
-            box-shadow: 0 4px 12px rgba(46,204,113,0.25);
-        }
-        .btn-download:hover {
-            background: #27ae60;
-            box-shadow: 0 6px 18px rgba(46,204,113,0.35);
+        .plot-text {
+            line-height: 1.7;
+            color: #ccc;
+            margin-bottom: 24px;
         }
 
-        /* Progress box */
-        .progress-box { margin: 15px 0; background: var(--card-bg); border-radius: 8px; padding: 12px; display: inline-block; }
-        .progress-bar { width: 200px; height: 6px; background: #333; border-radius: 6px; overflow: hidden; }
-        .progress-fill { height: 100%; background: var(--accent); border-radius: 6px; transition: width 0.5s; }
+        /* Download section */
+        .download-section { margin-bottom: 30px; }
+        .section-title {
+            font-size: 1.3rem;
+            margin-bottom: 12px;
+            border-left: 4px solid var(--accent);
+            padding-left: 10px;
+        }
+        .lang-grid {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        /* Translation progress */
+        .progress-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 30px; }
+        .progress-item {
+            background: var(--card-bg);
+            border-radius: 8px;
+            padding: 12px;
+        }
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 6px;
+        }
+        .progress-lang { font-weight: 600; }
+        .progress-status { font-size: 13px; color: var(--warning); }
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #333;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: var(--accent);
+            border-radius: 6px;
+            transition: width 0.5s;
+        }
 
         /* Related movies */
-        .related { margin-top: 40px; }
-        .related-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); gap: 15px; }
+        .related-section { margin-bottom: 30px; }
+        .scroll-row {
+            display: flex;
+            gap: 12px;
+            overflow-x: auto;
+            padding-bottom: 10px;
+            scroll-behavior: smooth;
+        }
+        .scroll-row::-webkit-scrollbar { height: 4px; }
+        .scroll-row::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
         .related-card {
             background: var(--card-bg);
             border-radius: 10px;
             overflow: hidden;
-            text-decoration: none;
-            color: inherit;
+            flex: 0 0 140px;
             transition: 0.2s;
         }
-        .related-card:hover { transform: translateY(-3px); }
+        .related-card:hover { transform: translateY(-4px); box-shadow: 0 12px 24px rgba(0,0,0,0.5); }
         .related-card img { width: 100%; aspect-ratio: 2/3; object-fit: cover; }
-        .related-title { padding: 8px; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .related-title { padding: 8px; font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+        /* Share button */
+        .share-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            color: var(--accent);
+            font-weight: 600;
+            margin-left: 12px;
+        }
+
+        /* Mobile */
         @media (max-width: 600px) {
-            .poster-large { width: 180px; }
-            .details h1 { font-size: 1.5rem; }
+            .movie-hero { flex-direction: column; align-items: center; }
+            .poster-wrapper { flex: 0 0 180px; }
+            .movie-title { font-size: 1.5rem; text-align: center; }
+            .meta-row { justify-content: center; }
+            .plot-text { text-align: center; }
+            .lang-grid { justify-content: center; }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <a href="/" class="back">← Home</a>
+    <!-- Sticky Header -->
+    <div class="sticky-header">
+        <a href="/" class="back-btn">← Back</a>
+        <span class="sticky-title">{{ movie.title }}</span>
+        <button class="btn-outline" onclick="sharePage()">📤 Share</button>
+    </div>
 
-        <div class="movie-header">
-            <div class="poster-large">
+    <div class="container">
+        <!-- Hero Section -->
+        <div class="movie-hero">
+            <div class="poster-wrapper">
                 <img src="{{ movie.poster_url }}" alt="{{ movie.title }}">
             </div>
-            <div class="details">
-                <h1>{{ movie.title }}</h1>
-                <div class="meta-badges">
+            <div class="movie-details">
+                <h1 class="movie-title">{{ movie.title }}</h1>
+                <div class="meta-row">
                     <span class="meta-badge">⭐ {{ movie.rating }}</span>
                     <span class="meta-badge">{{ movie.year }}</span>
                     {% if movie.runtime %}<span class="meta-badge">⏱ {{ movie.runtime }}</span>{% endif %}
                     <span class="meta-badge">{{ movie.media_type|capitalize }}</span>
                 </div>
-                {% if movie.plot %}<p class="plot">{{ movie.plot }}</p>{% endif %}
+                {% if movie.plot %}
+                <p class="plot-text">{{ movie.plot }}</p>
+                {% endif %}
+            </div>
+        </div>
 
-                <!-- Download buttons -->
-                <div class="download-section">
-                    <h3>📥 Download Subtitles</h3>
-                    <div class="lang-grid">
-                        {% for lang in ['en','ml','ta','hi'] %}
-                            {% if lang == 'en' or lang in ready_languages %}
-                                <a href="/download/{{ movie.id }}/{{ lang }}" class="btn btn-download">
-                                    {% if lang == 'en' %}🇬🇧 English
-                                    {% elif lang == 'ml' %}🇮🇳 Malayalam
-                                    {% elif lang == 'ta' %}🇮🇳 Tamil
-                                    {% else %}🇮🇳 Hindi
-                                    {% endif %}
-                                </a>
+        <!-- Download Buttons -->
+        <div class="download-section">
+            <h2 class="section-title">📥 Download Subtitles</h2>
+            <div class="lang-grid">
+                {% for lang in ['en','ml','ta','hi'] %}
+                    {% if lang == 'en' or lang in ready_languages %}
+                        <a href="/download/{{ movie.id }}/{{ lang }}" class="btn btn-download">
+                            {% if lang == 'en' %}🇬🇧 English
+                            {% elif lang == 'ml' %}🇮🇳 Malayalam
+                            {% elif lang == 'ta' %}🇮🇳 Tamil
+                            {% else %}🇮🇳 Hindi
                             {% endif %}
-                        {% endfor %}
-                    </div>
-                </div>
-
-                <!-- Translation progress (if any language not completed) -->
-                {% for lang_code, lang_name in [('ml','Malayalam'), ('ta','Tamil'), ('hi','Hindi')] %}
-                    {% set job = movie.jobs | selectattr("language", "equalto", lang_code) | first %}
-                    {% if job and job.status != "Completed" %}
-                        <div class="progress-box">
-                            <span style="color:#facc15;">⏳ {{ lang_name }} – {{ job.status }} ({{ job.progress }}%)</span>
-                            <div class="progress-bar"><div class="progress-fill" style="width:{{ job.progress }}%;"></div></div>
-                        </div>
+                        </a>
                     {% endif %}
                 {% endfor %}
             </div>
         </div>
 
-        <!-- Related movies -->
+        <!-- Translation Progress (if any language not completed) -->
+        {% set has_progress = false %}
+        {% for lang_code, lang_name in [('ml','Malayalam'), ('ta','Tamil'), ('hi','Hindi')] %}
+            {% set job = movie.jobs | selectattr("language", "equalto", lang_code) | first %}
+            {% if job and job.status != "Completed" %}
+                {% set has_progress = true %}
+            {% endif %}
+        {% endfor %}
+
+        {% if has_progress %}
+        <div class="progress-section">
+            <h2 class="section-title">⌛ Translation Progress</h2>
+            <div class="progress-list">
+                {% for lang_code, lang_name in [('ml','Malayalam'), ('ta','Tamil'), ('hi','Hindi')] %}
+                    {% set job = movie.jobs | selectattr("language", "equalto", lang_code) | first %}
+                    {% if job %}
+                    <div class="progress-item">
+                        <div class="progress-header">
+                            <span class="progress-lang">{{ lang_name }}</span>
+                            <span class="progress-status">{{ job.status }} – {{ job.progress }}%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: {{ job.progress }}%;"></div>
+                        </div>
+                    </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Related Movies -->
         {% if related_movies %}
-        <div class="related">
-            <h2>📌 Related</h2>
-            <div class="related-grid">
+        <div class="related-section">
+            <h2 class="section-title">📌 Related Movies</h2>
+            <div class="scroll-row">
                 {% for r in related_movies %}
                 <a href="/movie/{{ r.id }}" class="related-card">
                     <img src="{{ r.poster_url }}" alt="{{ r.title }}">
@@ -165,5 +302,27 @@
         </div>
         {% endif %}
     </div>
+
+    <!-- Share Script -->
+    <script>
+        function sharePage() {
+            const url = window.location.href;
+            if (navigator.share) {
+                navigator.share({ title: '{{ movie.title }}', url: url });
+            } else {
+                navigator.clipboard.writeText(url).then(() => {
+                    alert('Link copied to clipboard!');
+                });
+            }
+        }
+
+        // Recently viewed (localStorage)
+        const movieId = '{{ movie.id }}';
+        let recent = JSON.parse(localStorage.getItem('recentMovies') || '[]');
+        recent = recent.filter(id => id !== movieId);
+        recent.unshift(movieId);
+        if (recent.length > 10) recent.pop();
+        localStorage.setItem('recentMovies', JSON.stringify(recent));
+    </script>
 </body>
 </html>
