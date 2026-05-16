@@ -918,6 +918,7 @@ def request_sub():
 
 @app.route('/api/scheduled_fetch', methods=['POST', 'GET'])
 def scheduled_fetch():
+    """Called by external cron job every 2 hours. Fetches up to 5 random new movies."""
     secret = request.args.get('secret') or request.headers.get('X-Auth-Secret')
     if secret != os.environ.get('SCHEDULER_SECRET', 'scheduler-secret'):
         return jsonify({"error": "unauthorized"}), 401
@@ -931,6 +932,7 @@ def scheduled_fetch():
     # Helper: process a single TMDB movie ID and add to database
     # ------------------------------------------------------------
     def process_movie(tmdb_id, require_digital=False):
+        # Get IMDb ID
         try:
             ext_url = f"https://api.themoviedb.org/3/movie/{tmdb_id}/external_ids?api_key={TMDB_API_KEY}"
             ext_data = requests.get(ext_url, timeout=5).json()
@@ -940,9 +942,11 @@ def scheduled_fetch():
         except:
             return False
 
+        # Skip if already in DB
         if Movie.query.filter_by(imdb_id=imdb_id, media_type='movie').first():
             return False
 
+        # Optionally require digital release
         if require_digital:
             try:
                 release_url = f"https://api.themoviedb.org/3/movie/{tmdb_id}/release_dates?api_key={TMDB_API_KEY}"
@@ -954,6 +958,7 @@ def scheduled_fetch():
             except:
                 return False
 
+        # Download English subtitle from Subdl (with intelligent selection)
         srt_text = None
         try:
             imdb_id_fmt = imdb_id if imdb_id.startswith('tt') else f"tt{imdb_id}"
@@ -976,13 +981,23 @@ def scheduled_fetch():
                         dl_url = "https://dl.subdl.com" + best['url']
                         dl_resp = requests.get(dl_url, headers={"User-Agent": "Mozilla/5.0..."}, timeout=15)
                         if dl_resp.status_code == 200:
-                            srt_text = dl_resp.text
+                            raw_data = dl_resp.content
+                            # --- ZIP handling (fix for corrupted subtitles) ---
+                            if raw_data[:4] == b'PK\x03\x04':   # ZIP file
+                                with zipfile.ZipFile(io.BytesIO(raw_data)) as zf:
+                                    for name in zf.namelist():
+                                        if name.lower().endswith('.srt'):
+                                            srt_text = zf.read(name).decode('utf-8', errors='ignore')
+                                            break
+                            else:
+                                srt_text = raw_data.decode('utf-8', errors='ignore')
         except:
             pass
 
-        if not srt_text:
+        if not srt_text or not srt_text.strip():
             return False
 
+        # Upload to R2
         try:
             safe_id = imdb_id.replace('tt', '')
             r2_filename = f"english_movie_{safe_id}_{os.urandom(4).hex()}.srt"
@@ -996,6 +1011,7 @@ def scheduled_fetch():
         except:
             return False
 
+        # TMDB metadata
         try:
             details = requests.get(f"https://api.themoviedb.org/3/movie/{tmdb_id}?api_key={TMDB_API_KEY}&language=en-US").json()
             title = details.get('title', 'Unknown')
