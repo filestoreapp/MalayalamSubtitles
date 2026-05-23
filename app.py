@@ -180,7 +180,7 @@ def login_required(f):
     return decorated_function
 
 # ------------------ USER ROUTES ------------------
-@@app.route('/')
+@app.route('/')
 def index():
     stat = SiteStat.query.first()
     stat.total_visitors += 1
