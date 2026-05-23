@@ -230,7 +230,7 @@ def index():
 
     # Top Rated Movies – safely handle 'N/A' ratings
     top_rated_movies = Movie.query.filter_by(media_type='movie')\
-                           .order_by(cast(nullif(Movie.rating, 'N/A'), Float).desc().nulls_last())\
+                           .order_by(cast(func.nullif(Movie.rating, 'N/A'), Float).desc().nulls_last())\
                            .limit(12).all()
 
     # Top Rated TV Shows – one card per title (DISTINCT ON, highest rating, NULLs last, tie‑break by newest id)
