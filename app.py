@@ -180,7 +180,7 @@ def login_required(f):
     return decorated_function
 
 # ------------------ USER ROUTES ------------------
-@app.route('/')
+@@app.route('/')
 def index():
     stat = SiteStat.query.first()
     stat.total_visitors += 1
@@ -214,36 +214,37 @@ def index():
     # Trending Movies
     trending_movies = Movie.query.filter_by(media_type='movie').order_by(Movie.views.desc()).limit(12).all()
 
-    # Trending TV Shows (one card per unique title)
-    trending_series_subq = db.session.query(
-        Movie.title,
-        func.max(Movie.views).label('max_views')
-    ).filter_by(media_type='series').group_by(Movie.title).subquery()
-    trending_series = Movie.query.join(
-        trending_series_subq,
-        db.and_(Movie.title == trending_series_subq.c.title,
-                Movie.views == trending_series_subq.c.max_views)
-    ).order_by(Movie.views.desc()).limit(12).all()
+    # Trending TV Shows – one card per title (DISTINCT ON, highest views, tie‑break by newest id)
+    trending_series = Movie.query.from_statement(
+        db.text("""
+            SELECT DISTINCT ON (title) *
+            FROM movie
+            WHERE media_type = 'series'
+            ORDER BY title, views DESC, id DESC
+            LIMIT 12
+        """)
+    ).all()
 
     # Popular Movies
     popular_movies = Movie.query.filter_by(media_type='movie').order_by(Movie.views.desc()).limit(12).all()
 
-    # Top Rated Movies
+    # Top Rated Movies – safely handle 'N/A' ratings
     top_rated_movies = Movie.query.filter_by(media_type='movie')\
-                           .order_by(cast(Movie.rating, Float).desc()).limit(12).all()
+                           .order_by(cast(nullif(Movie.rating, 'N/A'), Float).desc().nulls_last())\
+                           .limit(12).all()
 
-    # Top Rated TV Shows (one card per unique title)
-    top_rated_series_subq = db.session.query(
-        Movie.title,
-        func.max(cast(Movie.rating, Float)).label('max_rating')
-    ).filter_by(media_type='series').group_by(Movie.title).subquery()
-    top_rated_series = Movie.query.join(
-        top_rated_series_subq,
-        db.and_(Movie.title == top_rated_series_subq.c.title,
-                cast(Movie.rating, Float) == top_rated_series_subq.c.max_rating)
-    ).order_by(cast(Movie.rating, Float).desc()).limit(12).all()
+    # Top Rated TV Shows – one card per title (DISTINCT ON, highest rating, NULLs last, tie‑break by newest id)
+    top_rated_series = Movie.query.from_statement(
+        db.text("""
+            SELECT DISTINCT ON (title) *
+            FROM movie
+            WHERE media_type = 'series'
+            ORDER BY title, NULLIF(rating, 'N/A')::float DESC NULLS LAST, id DESC
+            LIMIT 12
+        """)
+    ).all()
 
-    # Recent Uploads (one card per unique title)
+    # Recent Uploads – one card per title (already correct, using max id)
     recent_uploads_subq = db.session.query(
         Movie.title,
         func.max(Movie.id).label('max_id')
