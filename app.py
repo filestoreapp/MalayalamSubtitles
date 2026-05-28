@@ -734,7 +734,7 @@ def auto_fetch_srt():
     custom_headers = {"User-Agent": "Mozilla/5.0 ... Chrome/114.0.0.0 Safari/537.36"}
     error_log = []
 
-    # ---------- SUBDL ----------
+    # ========== SUBDL ==========
     if SUBDL_API_KEY:
         try:
             if media_type == 'series':
@@ -748,7 +748,7 @@ def auto_fetch_srt():
                 if res.get('status') and res.get('subtitles'):
                     subs = res['subtitles']
 
-                    # ---- Filter by exact season/episode if provided ----
+                    # Filter by exact season/episode if provided
                     if media_type == 'series' and season is not None and episode is not None:
                         filtered = []
                         for sub in subs:
@@ -758,7 +758,6 @@ def auto_fetch_srt():
                                 if sub_season == season and sub_episode == episode:
                                     filtered.append(sub)
                             else:
-                                # Fallback: parse release_name for SxxExx pattern
                                 release = sub.get('release_name', '')
                                 match = re.search(r'S(\d+)\s*E(\d+)', release, re.IGNORECASE)
                                 if match:
@@ -768,7 +767,6 @@ def auto_fetch_srt():
                         if not subs:
                             error_log.append("Subdl: No subtitles matching this exact episode")
 
-                    # ---- Intelligent selection ----
                     if subs:
                         def score_sub(sub):
                             if sub.get('hearing_impaired', False):
@@ -810,7 +808,7 @@ def auto_fetch_srt():
         except Exception as e:
             error_log.append(f"Subdl Crash: {str(e)}")
 
-    # ---------- OPENSUBTITLES ----------
+    # ========== OPENSUBTITLES ==========
     if OS_API_KEY:
         try:
             os_headers = {"Api-Key": OS_API_KEY, "Content-Type": "application/json", "User-Agent": "malayalamsubtitles_app v1.0"}
