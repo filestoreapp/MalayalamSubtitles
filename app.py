@@ -318,19 +318,29 @@ def old_series_overview(title):
 
 @app.route('/series/<slug>')
 def series_overview(slug):
-    # Try exact slug first
+    # 1. Try exact slug
     first_ep = Movie.query.filter_by(media_type='series', slug=slug).first()
-    
-    # Fallback: strip trailing year (e.g., -2007) and search by title
+
+    # 2. Strip trailing year (e.g., "-2019")
     if not first_ep:
         clean_title = re.sub(r'-\d{4}$', '', slug).replace('-', ' ')
         first_ep = Movie.query.filter_by(media_type='series', title=clean_title).first()
-    
-    # Fallback: use the slug as title directly
+
+    # 3. Iteratively strip numeric segments from the end
     if not first_ep:
-        title_attempt = slug.replace('-', ' ')
-        first_ep = Movie.query.filter_by(media_type='series', title=title_attempt).first()
-    
+        parts = slug.split('-')
+        for i in range(len(parts)-1, 0, -1):
+            # If the last segment is numeric, try removing it
+            if parts[i].isdigit():
+                potential_title = '-'.join(parts[:i]).replace('-', ' ')
+                first_ep = Movie.query.filter_by(media_type='series', title=potential_title).first()
+                if first_ep:
+                    break
+
+    # 4. Use slug as title (replacing hyphens with spaces)
+    if not first_ep:
+        first_ep = Movie.query.filter_by(media_type='series', title=slug.replace('-', ' ')).first()
+
     if not first_ep:
         return "Series not found", 404
 
