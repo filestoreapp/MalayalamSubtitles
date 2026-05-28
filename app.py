@@ -9,9 +9,10 @@ import time
 import threading
 import random
 from functools import wraps
-from flask import Flask, render_template, request, redirect, url_for, send_file, jsonify, session
+from flask import Flask, render_template, request, redirect, url_for, send_file, jsonify, session, Response
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, or_, cast, Float
+
 app = Flask(__name__)
 
 # ------------------ CONFIG ------------------
@@ -51,7 +52,7 @@ class Movie(db.Model):
     plot = db.Column(db.Text, nullable=True)
     runtime = db.Column(db.String(50), nullable=True)
     imdb_id = db.Column(db.String(20))
-    slug = db.Column(db.String(300), unique=True)
+    slug = db.Column(db.String(300))
     created_at = db.Column(db.DateTime, server_default=func.now())
 
 class TranslationCache(db.Model):
@@ -285,6 +286,10 @@ def keep_alive():
 @app.route('/movie/<int:movie_id>')
 def old_movie_redirect(movie_id):
     movie = Movie.query.get_or_404(movie_id)
+    # If slug is missing, generate one
+    if not movie.slug:
+        movie.slug = generate_slug(movie.title, movie.year)
+        db.session.commit()
     return redirect(url_for('movie_hub', slug=movie.slug), code=301)
 
 @app.route('/movie/<slug>')
@@ -302,19 +307,33 @@ def movie_hub(slug):
 
 @app.route('/series/<string:title>')
 def old_series_overview(title):
+    # Find any episode of this series to get a slug
     first_ep = Movie.query.filter_by(media_type='series', title=title).first()
     if not first_ep:
         return "Series not found", 404
+    if not first_ep.slug:
+        first_ep.slug = generate_slug(first_ep.title, first_ep.year)
+        db.session.commit()
     return redirect(url_for('series_overview', slug=first_ep.slug), code=301)
 
 @app.route('/series/<slug>')
 def series_overview(slug):
+    # Try exact slug first
     first_ep = Movie.query.filter_by(media_type='series', slug=slug).first()
+    
+    # Fallback: strip trailing year (e.g., -2007) and search by title
     if not first_ep:
-        episodes = Movie.query.filter_by(media_type='series', title=slug.replace('-', ' ')).all()
-        if not episodes:
-            return "Series not found", 404
-        first_ep = episodes[0]
+        clean_title = re.sub(r'-\d{4}$', '', slug).replace('-', ' ')
+        first_ep = Movie.query.filter_by(media_type='series', title=clean_title).first()
+    
+    # Fallback: use the slug as title directly
+    if not first_ep:
+        title_attempt = slug.replace('-', ' ')
+        first_ep = Movie.query.filter_by(media_type='series', title=title_attempt).first()
+    
+    if not first_ep:
+        return "Series not found", 404
+
     title = first_ep.title
     episodes = Movie.query.filter_by(media_type='series', title=title)\
                          .order_by(Movie.season.asc(), Movie.episode.asc()).all()
@@ -329,13 +348,24 @@ def old_series_page(title, season):
     first_ep = Movie.query.filter_by(media_type='series', title=title, season=season).first()
     if not first_ep:
         return "Season not found", 404
+    if not first_ep.slug:
+        first_ep.slug = generate_slug(first_ep.title, first_ep.year)
+        db.session.commit()
     return redirect(url_for('series_page', slug=first_ep.slug, season=season), code=301)
 
 @app.route('/series/<slug>/season/<int:season>')
 def series_page(slug, season):
+    # Same robust slug resolution
     first_ep = Movie.query.filter_by(media_type='series', slug=slug, season=season).first()
     if not first_ep:
+        clean_title = re.sub(r'-\d{4}$', '', slug).replace('-', ' ')
+        first_ep = Movie.query.filter_by(media_type='series', title=clean_title, season=season).first()
+    if not first_ep:
+        title_attempt = slug.replace('-', ' ')
+        first_ep = Movie.query.filter_by(media_type='series', title=title_attempt, season=season).first()
+    if not first_ep:
         return "Season not found", 404
+
     title = first_ep.title
     episodes = Movie.query.filter_by(media_type='series', title=title, season=season)\
                          .order_by(Movie.episode.asc()).all()
@@ -568,7 +598,6 @@ def export_csv():
         langs = ', '.join([c.language for c in m.translations])
         writer.writerow([m.title, m.year, m.media_type, m.imdb_id, langs, m.views])
     output.seek(0)
-    from flask import Response
     return Response(output.getvalue(), mimetype="text/csv",
                     headers={"Content-Disposition": "attachment;filename=media_export.csv"})
 
@@ -681,6 +710,14 @@ def tmdb_episode_exists(imdb_id: str, season: int, episode: int) -> bool:
         return ep_resp.status_code == 200
     except:
         return True
+
+# --- SLUG HELPER ---
+def generate_slug(title, year):
+    base = re.sub(r'[^\w\s-]', '', title.lower().strip())
+    base = re.sub(r'[-\s]+', '-', base)
+    slug = f"{base}-{year}" if year else base
+    # Ensure uniqueness in the context where it's used (caller handles)
+    return slug
 
 # --- AUTO FETCHER (CORRECTED) ---
 @app.route('/api/auto_fetch_srt', methods=['POST'])
@@ -912,6 +949,13 @@ def admin():
                 category=category_string, plot=plot, runtime=runtime
             )
             db.session.add(new_media)
+
+            # Generate slug before commit
+            new_media.slug = generate_slug(title, year)
+            # Ensure uniqueness
+            while Movie.query.filter_by(slug=new_media.slug).first():
+                new_media.slug = f"{generate_slug(title, year)}-{os.urandom(2).hex()}"
+
             try:
                 db.session.commit()
             except Exception as e:
@@ -1071,11 +1115,6 @@ def scheduled_fetch():
         10770: "TV Movie", 53: "Thriller", 10752: "War", 37: "Western"
     }
 
-    def generate_slug(title, year):
-        title_slug = re.sub(r'[^\w\s-]', '', title.lower().strip())
-        title_slug = re.sub(r'[-\s]+', '-', title_slug)
-        return f"{title_slug}-{year}" if year else title_slug
-
     def process_movie(tmdb_id, require_digital=False):
         try:
             ext_url = f"https://api.themoviedb.org/3/movie/{tmdb_id}/external_ids?api_key={TMDB_API_KEY}"
@@ -1169,11 +1208,8 @@ def scheduled_fetch():
 
         slug = generate_slug(title, year)
         # Ensure uniqueness
-        base_slug = slug
-        counter = 1
         while Movie.query.filter_by(slug=slug).first():
-            slug = f"{base_slug}-{counter}"
-            counter += 1
+            slug = f"{generate_slug(title, year)}-{os.urandom(2).hex()}"
 
         new_movie = Movie(
             media_type='movie',
