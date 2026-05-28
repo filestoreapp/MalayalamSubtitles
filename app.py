@@ -705,6 +705,7 @@ def auto_fetch_srt():
                                         srt_text = z.read(filename).decode('utf-8', errors='ignore')
                                         break
                         else:
+                            srt_text = dl_res.text
 # --- DUAL-ENGINE AUTO FETCHER (with intelligent Subdl selection and episode verification) ---
 @app.route('/api/auto_fetch_srt', methods=['POST'])
 @login_required
