@@ -362,7 +362,6 @@ def old_series_page(title, season):
         first_ep.slug = generate_slug(first_ep.title, first_ep.year)
         db.session.commit()
     return redirect(url_for('series_page', slug=first_ep.slug, season=season), code=301)
-
 @app.route('/series/<slug>/season/<int:season>')
 def series_page(slug, season):
     # Same robust slug resolution
@@ -371,8 +370,15 @@ def series_page(slug, season):
         clean_title = re.sub(r'-\d{4}$', '', slug).replace('-', ' ')
         first_ep = Movie.query.filter_by(media_type='series', title=clean_title, season=season).first()
     if not first_ep:
-        title_attempt = slug.replace('-', ' ')
-        first_ep = Movie.query.filter_by(media_type='series', title=title_attempt, season=season).first()
+        parts = slug.split('-')
+        for i in range(len(parts)-1, 0, -1):
+            if parts[i].isdigit():
+                potential_title = '-'.join(parts[:i]).replace('-', ' ')
+                first_ep = Movie.query.filter_by(media_type='series', title=potential_title, season=season).first()
+                if first_ep:
+                    break
+    if not first_ep:
+        first_ep = Movie.query.filter_by(media_type='series', title=slug.replace('-', ' '), season=season).first()
     if not first_ep:
         return "Season not found", 404
 
