@@ -595,6 +595,27 @@ def tmdb_details():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+def tmdb_episode_exists(imdb_id: str, season: int, episode: int) -> bool:
+    """Return True if TMDB confirms the episode exists."""
+    api_key = os.environ.get('TMDB_API_KEY')
+    if not api_key:
+        return True   # can't verify, allow it (fail safe)
+    try:
+        # Step 1: get TMDB series ID from IMDb ID
+        find_url = f"https://api.themoviedb.org/3/find/{imdb_id}?api_key={api_key}&external_source=imdb_id"
+        find_data = requests.get(find_url, timeout=10).json()
+        tv_results = find_data.get('tv_results', [])
+        if not tv_results:
+            return True
+        series_id = tv_results[0]['id']
+
+        # Step 2: check the specific episode
+        ep_url = f"https://api.themoviedb.org/3/tv/{series_id}/season/{season}/episode/{episode}?api_key={api_key}"
+        ep_resp = requests.get(ep_url, timeout=10)
+        return ep_resp.status_code == 200
+    except:
+        return True   # if TMDB is down, don't block the fetch
+
 # --- DUAL-ENGINE AUTO FETCHER (with intelligent Subdl selection) ---
 @app.route('/api/auto_fetch_srt', methods=['POST'])
 @login_required
@@ -614,6 +635,10 @@ def auto_fetch_srt():
     if not str(imdb_id).startswith('tt'):
         imdb_id = f"tt{imdb_id}"
     clean_imdb = str(imdb_id).replace('tt', '')
+        # Check if the requested episode actually exists
+    if media_type == 'series' and season and episode:
+        if not tmdb_episode_exists(imdb_id, int(season), int(episode)):
+            return jsonify({"error": f"Episode S{season}E{episode} does not exist (TMDB)"}), 400
 
     custom_headers = {"User-Agent": "Mozilla/5.0 ... Chrome/114.0.0.0 Safari/537.36"}
     error_log = []
@@ -630,6 +655,28 @@ def auto_fetch_srt():
                 res = res_raw.json()
                 if res.get('status') and res.get('subtitles'):
                     subs = res['subtitles']
+    
+
+                    # ---- Filter by exact season/episode if provided ----
+                    if media_type == 'series' and season is not None and episode is not None:
+                        filtered = []
+                        for sub in subs:
+                            sub_season = sub.get('season')
+                            sub_episode = sub.get('episode')
+                            # If Subdl returns season/episode, use them
+                            if sub_season is not None and sub_episode is not None:
+                                if sub_season == season and sub_episode == episode:
+                                    filtered.append(sub)
+                            else:
+                                # Fallback: parse release_name for SxxExx pattern
+                                release = sub.get('release_name', '')
+                                match = re.search(r'S(\d+)\s*E(\d+)', release, re.IGNORECASE)
+                                if match:
+                                    if int(match.group(1)) == season and int(match.group(2)) == episode:
+                                        filtered.append(sub)
+                        subs = filtered
+                        if not subs:
+                            error_log.append("Subdl: No subtitles matching this exact episode")
                     def score_sub(sub):
                         if sub.get('hearing_impaired', False):
                             return -1
@@ -682,6 +729,41 @@ def auto_fetch_srt():
             if search_res_raw.status_code == 200:
                 search_res = search_res_raw.json()
                 if search_res.get('data'):
+                    # Filter by exact episode if series
+                    valid_items = []
+                    for item in search_res['data']:
+                        attrs = item.get('attributes', {})
+                        if media_type == 'series':
+                            if attrs.get('season') == season and attrs.get('episode') == episode:
+                                valid_items.append(item)
+                        else:
+                            valid_items.append(item)
+                    if not valid_items:
+                        error_log.append("OS: No subtitles matching exact episode")
+                    else:
+                        # Use the first valid item
+                        file_id = valid_items[0]['attributes']['files'][0]['file_id']
+                        dl_response_raw = requests.post("https://api.opensubtitles.com/api/v1/download", headers=os_headers, json={"file_id": file_id})
+                        if dl_response_raw.status_code == 200:
+                            dl_response = dl_response_raw.json()
+                            link = dl_response.get('link')
+                            if link:
+                                os_dl = requests.get(link, headers=custom_headers)
+                                srt_text = ""
+                                if link.endswith('.zip') or b'PK\x03\x04' in os_dl.content[:4]:
+                                    with zipfile.ZipFile(io.BytesIO(os_dl.content)) as z:
+                                        for filename in z.namelist():
+                                            if filename.endswith('.srt'):
+                                                srt_text = z.read(filename).decode('utf-8', errors='ignore')
+                                                break
+                                else:
+                                    srt_text = os_dl.text
+                                if srt_text:
+                                    return jsonify({"success": True, "srt_text": srt_text, "source": "OpenSubtitles"})
+                            else:
+                                error_log.append("OS: Download blocked")
+                        else:
+                            error_log.append(f"OS Download HTTP {dl_response_raw.status_code}")
                     file_id = search_res['data'][0]['attributes']['files'][0]['file_id']
                     dl_response_raw = requests.post("https://api.opensubtitles.com/api/v1/download", headers=os_headers, json={"file_id": file_id})
                     if dl_response_raw.status_code == 200:
