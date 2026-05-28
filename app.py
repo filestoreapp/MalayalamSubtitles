@@ -11,8 +11,7 @@ import random
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, send_file, jsonify, session
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import func, or_, cast, Float, nullif
-
+from sqlalchemy import func, or_, cast, Float
 app = Flask(__name__)
 
 # ------------------ CONFIG ------------------
