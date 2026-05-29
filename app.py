@@ -286,7 +286,6 @@ def keep_alive():
 @app.route('/movie/<int:movie_id>')
 def old_movie_redirect(movie_id):
     movie = Movie.query.get_or_404(movie_id)
-    # If slug is missing, generate one
     if not movie.slug:
         movie.slug = generate_slug(movie.title, movie.year)
         db.session.commit()
@@ -304,7 +303,8 @@ def movie_hub(slug):
         Movie.id != movie.id
     ).limit(4).all()
     return render_template('movie.html', movie=movie, ready_languages=ready_languages, related_movies=related_movies)
-    
+
+# --- SERIES ROUTES (ROLLED BACK TO TITLE-BASED) ---
 @app.route('/series/<string:title>')
 def series_overview(title):
     episodes = Movie.query.filter_by(media_type='series', title=title)\
@@ -326,77 +326,6 @@ def series_page(title, season):
         return "Season not found", 404
     show_data = episodes[0]
     return render_template('series.html', title=title, season=season, episodes=episodes, show_data=show_data)
-
-@app.route('/series/<slug>')
-def series_overview(slug):
-    # 1. Try exact slug
-    first_ep = Movie.query.filter_by(media_type='series', slug=slug).first()
-
-    # 2. Strip trailing year (e.g., "-2019")
-    if not first_ep:
-        clean_title = re.sub(r'-\d{4}$', '', slug).replace('-', ' ')
-        first_ep = Movie.query.filter_by(media_type='series', title=clean_title).first()
-
-    # 3. Iteratively strip numeric segments from the end
-    if not first_ep:
-        parts = slug.split('-')
-        for i in range(len(parts)-1, 0, -1):
-            # If the last segment is numeric, try removing it
-            if parts[i].isdigit():
-                potential_title = '-'.join(parts[:i]).replace('-', ' ')
-                first_ep = Movie.query.filter_by(media_type='series', title=potential_title).first()
-                if first_ep:
-                    break
-
-    # 4. Use slug as title (replacing hyphens with spaces)
-    if not first_ep:
-        first_ep = Movie.query.filter_by(media_type='series', title=slug.replace('-', ' ')).first()
-
-    if not first_ep:
-        return "Series not found", 404
-
-    title = first_ep.title
-    episodes = Movie.query.filter_by(media_type='series', title=title)\
-                         .order_by(Movie.season.asc(), Movie.episode.asc()).all()
-    seasons = {}
-    for ep in episodes:
-        s = ep.season or 1
-        seasons.setdefault(s, []).append(ep)
-    return render_template('series_overview.html', title=title, seasons=seasons, show_data=first_ep)
-
-@app.route('/series/<string:title>/<int:season>')
-def old_series_page(title, season):
-    first_ep = Movie.query.filter_by(media_type='series', title=title, season=season).first()
-    if not first_ep:
-        return "Season not found", 404
-    if not first_ep.slug:
-        first_ep.slug = generate_slug(first_ep.title, first_ep.year)
-        db.session.commit()
-    return redirect(url_for('series_page', slug=first_ep.slug, season=season), code=301)
-@app.route('/series/<slug>/season/<int:season>')
-def series_page(slug, season):
-    # Same robust slug resolution
-    first_ep = Movie.query.filter_by(media_type='series', slug=slug, season=season).first()
-    if not first_ep:
-        clean_title = re.sub(r'-\d{4}$', '', slug).replace('-', ' ')
-        first_ep = Movie.query.filter_by(media_type='series', title=clean_title, season=season).first()
-    if not first_ep:
-        parts = slug.split('-')
-        for i in range(len(parts)-1, 0, -1):
-            if parts[i].isdigit():
-                potential_title = '-'.join(parts[:i]).replace('-', ' ')
-                first_ep = Movie.query.filter_by(media_type='series', title=potential_title, season=season).first()
-                if first_ep:
-                    break
-    if not first_ep:
-        first_ep = Movie.query.filter_by(media_type='series', title=slug.replace('-', ' '), season=season).first()
-    if not first_ep:
-        return "Season not found", 404
-
-    title = first_ep.title
-    episodes = Movie.query.filter_by(media_type='series', title=title, season=season)\
-                         .order_by(Movie.episode.asc()).all()
-    return render_template('series.html', title=title, season=season, episodes=episodes, show_data=first_ep)
 
 @app.route('/download/<int:movie_id>/<language>')
 def download(movie_id, language):
@@ -743,7 +672,6 @@ def generate_slug(title, year):
     base = re.sub(r'[^\w\s-]', '', title.lower().strip())
     base = re.sub(r'[-\s]+', '-', base)
     slug = f"{base}-{year}" if year else base
-    # Ensure uniqueness in the context where it's used (caller handles)
     return slug
 
 # --- AUTO FETCHER (CORRECTED) ---
@@ -1133,7 +1061,6 @@ def scheduled_fetch():
     if not TMDB_API_KEY or not SUBDL_API_KEY:
         return jsonify({"error": "API keys missing"}), 500
 
-    # TMDB genre map
     TMDB_GENRE_MAP = {
         28: "Action", 12: "Adventure", 16: "Animation", 35: "Comedy",
         80: "Crime", 99: "Documentary", 18: "Drama", 10751: "Family",
@@ -1234,7 +1161,6 @@ def scheduled_fetch():
             plot = ''; runtime = ''; category = 'General'
 
         slug = generate_slug(title, year)
-        # Ensure uniqueness
         while Movie.query.filter_by(slug=slug).first():
             slug = f"{generate_slug(title, year)}-{os.urandom(2).hex()}"
 
