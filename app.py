@@ -304,17 +304,28 @@ def movie_hub(slug):
         Movie.id != movie.id
     ).limit(4).all()
     return render_template('movie.html', movie=movie, ready_languages=ready_languages, related_movies=related_movies)
-
+    
 @app.route('/series/<string:title>')
-def old_series_overview(title):
-    # Find any episode of this series to get a slug
-    first_ep = Movie.query.filter_by(media_type='series', title=title).first()
-    if not first_ep:
+def series_overview(title):
+    episodes = Movie.query.filter_by(media_type='series', title=title)\
+                         .order_by(Movie.season.asc(), Movie.episode.asc()).all()
+    if not episodes:
         return "Series not found", 404
-    if not first_ep.slug:
-        first_ep.slug = generate_slug(first_ep.title, first_ep.year)
-        db.session.commit()
-    return redirect(url_for('series_overview', slug=first_ep.slug), code=301)
+    show_data = episodes[0]
+    seasons = {}
+    for ep in episodes:
+        s = ep.season or 1
+        seasons.setdefault(s, []).append(ep)
+    return render_template('series_overview.html', title=title, seasons=seasons, show_data=show_data)
+
+@app.route('/series/<string:title>/<int:season>')
+def series_page(title, season):
+    episodes = Movie.query.filter_by(media_type='series', title=title, season=season)\
+                         .order_by(Movie.episode.asc()).all()
+    if not episodes:
+        return "Season not found", 404
+    show_data = episodes[0]
+    return render_template('series.html', title=title, season=season, episodes=episodes, show_data=show_data)
 
 @app.route('/series/<slug>')
 def series_overview(slug):
