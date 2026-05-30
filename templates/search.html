@@ -1,178 +1,206 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Advanced Search – Malayalam Subtitles Hub</title>
-    <style>
-        :root {
-            --bg: #0a0a0a;
-            --card-bg: #1a1a1a;
-            --text: #f1f1f1;
-            --accent: #f04747;
-            --accent-hover: #d93a3a;
-            --accent-soft: #f47b7b;
-            --border: #2a2a2a;
-            --success: #2ecc71;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            font-family: 'Inter', system-ui, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            min-height: 100vh;
-            padding: 20px;
-        }
-        .container { max-width: 1000px; margin: 0 auto; }
-        a { text-decoration: none; color: inherit; }
-        .back { color: var(--accent); display: inline-block; margin-bottom: 15px; }
+{% extends "base.html" %}
+{% block title %}Advanced Search – Malayalam Subtitles Hub{% endblock %}
 
-        .filter-panel {
-            background: var(--card-bg);
-            padding: 20px;
-            border-radius: 12px;
-            margin-bottom: 30px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-        }
-        .filter-panel input, .filter-panel select {
-            padding: 8px 12px;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            background: var(--bg);
-            color: white;
-        }
+{% block extra_head %}
+<style>
+  .search-wrap { max-width: 1200px; margin: 1.5rem auto; padding: 0 1.25rem; }
+  .filter-panel {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 1.25rem; margin-bottom: 1.5rem;
+  }
+  .filter-panel h2 { font-size: .95rem; font-weight: 700; margin-bottom: 1rem; }
+  .filter-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px,1fr)); gap: .75rem; }
+  .filter-label { font-size: .78rem; color: var(--text-muted); margin-bottom: .3rem; display: block; }
+  .filter-input {
+    background: #1a1a1a; border: 1px solid var(--border); color: var(--text-primary);
+    border-radius: 8px; padding: .45rem .75rem; width: 100%; font-size: .85rem;
+  }
+  .filter-input:focus { outline: none; border-color: var(--accent); }
+  .filter-actions { display: flex; gap: .6rem; margin-top: 1rem; flex-wrap: wrap; }
+  .results-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: .5rem; }
+  .results-header h2 { font-size: 1rem; }
+  .sort-select {
+    background: #1a1a1a; border: 1px solid var(--border); color: var(--text-primary);
+    border-radius: 8px; padding: .4rem .75rem; font-size: .82rem;
+  }
+  .pager { display: flex; gap: .4rem; justify-content: center; flex-wrap: wrap; margin-top: 1.5rem; }
+  .pager a, .pager span {
+    background: var(--bg-card); border: 1px solid var(--border); color: var(--text-muted);
+    padding: .4rem .8rem; border-radius: 6px; text-decoration: none; font-size: .85rem;
+  }
+  .pager a:hover { border-color: var(--accent); color: #fff; }
+  .pager .current { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .active-filters { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .75rem; }
+  .af-chip {
+    background: rgba(229,9,20,.15); border: 1px solid rgba(229,9,20,.3);
+    color: var(--accent); font-size: .75rem; border-radius: 20px;
+    padding: .25rem .65rem; display: flex; align-items: center; gap: .4rem;
+  }
+  .af-chip a { color: var(--accent); text-decoration: none; font-size: .9rem; }
+</style>
+{% endblock %}
 
-        .btn {
-            padding: 10px 18px;
-            border-radius: 10px;
-            border: none;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 0.9rem;
-            transition: all 0.2s ease;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            text-decoration: none;
-        }
-        .btn-accent {
-            background: var(--accent);
-            color: white;
-            box-shadow: 0 4px 12px rgba(240,71,71,0.25);
-        }
-        .btn-accent:hover {
-            background: var(--accent-hover);
-            box-shadow: 0 6px 18px rgba(240,71,71,0.35);
-        }
-        .btn-outline {
-            background: transparent;
-            border: 2px solid var(--accent);
-            color: var(--accent);
-        }
-        .btn-outline:hover {
-            background: var(--accent);
-            color: white;
-        }
+{% block content %}
+<div class="search-wrap">
 
-        .media-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-            gap: 16px;
-            margin-top: 20px;
-        }
-        .card {
-            background: var(--card-bg);
-            border-radius: 10px;
-            overflow: hidden;
-            transition: 0.2s;
-        }
-        .card:hover { transform: translateY(-4px); box-shadow: 0 12px 24px rgba(0,0,0,0.5); }
-        .poster {
-            aspect-ratio: 2/3;
-            overflow: hidden;
-            position: relative;
-        }
-        .poster img { width: 100%; height: 100%; object-fit: cover; }
-        .badge {
-            position: absolute;
-            top: 6px;
-            right: 6px;
-            background: rgba(0,0,0,0.7);
-            padding: 3px 6px;
-            border-radius: 5px;
-            font-size: 11px;
-            font-weight: 700;
-        }
-        .info { padding: 10px; }
-        .title {
-            font-weight: 700;
-            font-size: 14px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .meta { font-size: 12px; color: #aaa; margin-top: 3px; }
+  <!-- Filter Panel -->
+  <div class="filter-panel">
+    <h2>🔍 Advanced Search</h2>
+    <form method="get" action="/search">
+      <div class="filter-grid">
 
-        .pagination { display: flex; justify-content: center; gap: 10px; margin: 20px 0; }
-        .pagination a {
-            padding: 8px 14px;
-            background: var(--card-bg);
-            border-radius: 6px;
-            color: var(--accent);
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <a href="/" class="back">← Home</a>
-        <h2>🔍 Advanced Search</h2>
+        <div style="grid-column: span 2 / span 2">
+          <label class="filter-label">Search Title / Plot</label>
+          <input class="filter-input" type="text" name="q" value="{{ current_filters.q or '' }}" placeholder="e.g. Interstellar…">
+        </div>
 
-        <!-- Filter panel (keep your existing form structure, just update classes) -->
-        <form method="GET" action="/search" class="filter-panel">
-            <!-- Your existing filter inputs, but use class="btn-accent" for the submit button -->
-            <!-- Example: -->
-            <input type="text" name="q" placeholder="Keywords..." value="{{ current_filters.q }}">
-            <select name="type">
-                <option value="">All</option>
-                <option value="movie" {% if current_filters.type=='movie' %}selected{% endif %}>Movies</option>
-                <option value="series" {% if current_filters.type=='series' %}selected{% endif %}>TV Series</option>
-            </select>
-            <!-- ... other filters ... -->
-            <button type="submit" class="btn btn-accent">Apply Filters</button>
-            <a href="/search" class="btn btn-outline">Clear All</a>
-        </form>
+        <div>
+          <label class="filter-label">Type</label>
+          <select class="filter-input" name="type">
+            <option value="">All</option>
+            <option value="movie" {{ 'selected' if current_filters.type == 'movie' }}>🎬 Movie</option>
+            <option value="series" {{ 'selected' if current_filters.type == 'series' }}>📺 Series</option>
+          </select>
+        </div>
 
-        <!-- Results grid -->
-        {% if pagination.items %}
-            <p>Found {{ pagination.total }} result(s)</p>
-            <div class="media-grid">
-                {% for media in pagination.items %}
-                <a href="{% if media.media_type == 'series' %}/series/{{ media.title|urlencode }}{% else %}/movie/{{ media.id }}{% endif %}" class="card">
-                    <div class="poster">
-                        <img src="{{ media.poster_url }}" alt="{{ media.title }}">
-                        <div class="badge">⭐ {{ media.rating }}</div>
-                    </div>
-                    <div class="info">
-                        <div class="title">{{ media.title }}</div>
-                        <div class="meta">{{ media.year }} • {{ 'Series' if media.media_type == 'series' else 'Movie' }}</div>
-                    </div>
-                </a>
-                {% endfor %}
-            </div>
+        <div>
+          <label class="filter-label">Genre</label>
+          <select class="filter-input" name="category">
+            <option value="">All Genres</option>
+            {% for cat in categories %}
+            <option value="{{ cat }}" {{ 'selected' if current_filters.category == cat }}>{{ cat }}</option>
+            {% endfor %}
+          </select>
+        </div>
 
-            <!-- Pagination (preserving filters) -->
-            <div class="pagination">
-                {% if pagination.has_prev %}
-                <a href="{{ url_for('advanced_search', q=current_filters.q, type=current_filters.type, page=pagination.prev_num, **current_filters) }}">« Prev</a>
-                {% endif %}
-                <span>Page {{ pagination.page }} of {{ pagination.pages }}</span>
-                {% if pagination.has_next %}
-                <a href="{{ url_for('advanced_search', q=current_filters.q, type=current_filters.type, page=pagination.next_num, **current_filters) }}">Next »</a>
-                {% endif %}
-            </div>
-        {% else %}
-            <p style="text-align:center; margin-top:50px;">No subtitles found. Try different filters or <a href="/search" style="color:var(--accent);">clear all</a>.</p>
-        {% endif %}
-    </div>
-</body>
-</html>
+        <div>
+          <label class="filter-label">Year From</label>
+          <input class="filter-input" type="number" name="year_from" min="1900" max="2030"
+                 value="{{ current_filters.year_from or '' }}" placeholder="e.g. 2010">
+        </div>
+
+        <div>
+          <label class="filter-label">Year To</label>
+          <input class="filter-input" type="number" name="year_to" min="1900" max="2030"
+                 value="{{ current_filters.year_to or '' }}" placeholder="e.g. 2024">
+        </div>
+
+        <div>
+          <label class="filter-label">IMDb Rating Min</label>
+          <input class="filter-input" type="number" name="rating_min" min="0" max="10" step="0.1"
+                 value="{{ current_filters.rating_min or '' }}" placeholder="e.g. 7.0">
+        </div>
+
+        <div>
+          <label class="filter-label">IMDb Rating Max</label>
+          <input class="filter-input" type="number" name="rating_max" min="0" max="10" step="0.1"
+                 value="{{ current_filters.rating_max or '' }}" placeholder="e.g. 9.0">
+        </div>
+
+        <div>
+          <label class="filter-label">Language Available</label>
+          <select class="filter-input" name="lang">
+            <option value="">Any</option>
+            <option value="en" {{ 'selected' if current_filters.lang == 'en' }}>🇬🇧 English</option>
+            <option value="ml" {{ 'selected' if current_filters.lang == 'ml' }}>🇮🇳 Malayalam</option>
+            <option value="ta" {{ 'selected' if current_filters.lang == 'ta' }}>🇮🇳 Tamil</option>
+            <option value="hi" {{ 'selected' if current_filters.lang == 'hi' }}>🇮🇳 Hindi</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="filter-label">IMDb ID</label>
+          <input class="filter-input" type="text" name="imdb" value="{{ current_filters.imdb or '' }}" placeholder="tt1375666">
+        </div>
+
+      </div>
+
+      <div class="filter-actions">
+        <button type="submit" class="btn-accent">Search</button>
+        <a href="/search" class="btn-ghost">Clear All</a>
+      </div>
+    </form>
+  </div>
+
+  <!-- Active filter chips -->
+  {% set af = current_filters %}
+  {% if af.q or af.type or af.category or af.year_from or af.year_to or af.rating_min or af.rating_max or af.lang or af.imdb %}
+  <div class="active-filters">
+    {% if af.q %}<span class="af-chip">Title: {{ af.q }}</span>{% endif %}
+    {% if af.type %}<span class="af-chip">Type: {{ af.type }}</span>{% endif %}
+    {% if af.category %}<span class="af-chip">Genre: {{ af.category }}</span>{% endif %}
+    {% if af.year_from %}<span class="af-chip">From: {{ af.year_from }}</span>{% endif %}
+    {% if af.year_to %}<span class="af-chip">To: {{ af.year_to }}</span>{% endif %}
+    {% if af.rating_min %}<span class="af-chip">Rating ≥ {{ af.rating_min }}</span>{% endif %}
+    {% if af.rating_max %}<span class="af-chip">Rating ≤ {{ af.rating_max }}</span>{% endif %}
+    {% if af.lang %}<span class="af-chip">Lang: {{ af.lang | upper }}</span>{% endif %}
+    {% if af.imdb %}<span class="af-chip">IMDb: {{ af.imdb }}</span>{% endif %}
+  </div>
+  {% endif %}
+
+  <!-- Results -->
+  <div class="results-header">
+    <h2>{{ pagination.total }} results found</h2>
+    <form method="get" action="/search" style="display:flex;gap:.4rem;align-items:center">
+      {% for k,v in current_filters.items() %}{% if v %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endif %}{% endfor %}
+      <label style="font-size:.8rem;color:var(--text-muted)">Sort:</label>
+      <select class="sort-select" name="sort" onchange="this.form.submit()">
+        <option value="newest" {{ 'selected' if current_filters.sort == 'newest' }}>Newest</option>
+        <option value="oldest" {{ 'selected' if current_filters.sort == 'oldest' }}>Oldest</option>
+        <option value="rating_desc" {{ 'selected' if current_filters.sort == 'rating_desc' }}>Rating ↓</option>
+        <option value="rating_asc"  {{ 'selected' if current_filters.sort == 'rating_asc'  }}>Rating ↑</option>
+        <option value="downloads"   {{ 'selected' if current_filters.sort == 'downloads'   }}>Most Viewed</option>
+        <option value="title_asc"   {{ 'selected' if current_filters.sort == 'title_asc'   }}>Title A→Z</option>
+        <option value="title_desc"  {{ 'selected' if current_filters.sort == 'title_desc'  }}>Title Z→A</option>
+      </select>
+    </form>
+  </div>
+
+  {% if pagination.items %}
+  <div class="movie-grid">
+    {% for m in pagination.items %}
+    <a href="{{ '/movie/' + m.slug if m.media_type == 'movie' else '/series/' + m.title | urlencode }}" class="movie-card">
+      <img src="{{ m.poster_url or 'https://via.placeholder.com/300x450/1a1a1a/555?text=No+Poster' }}"
+           alt="{{ m.title }}" loading="lazy"
+           onerror="this.src='https://via.placeholder.com/300x450/1a1a1a/555?text=No+Poster'">
+      <div class="card-body">
+        <div class="card-title">{{ m.title }}</div>
+        <div class="card-meta">
+          <span><span class="rating-star">⭐</span> {{ m.rating or 'N/A' }}</span>
+          <span class="badge-type {{ 'series' if m.media_type == 'series' }}">{{ m.year or '—' }}</span>
+        </div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+
+  <!-- Pagination -->
+  {% if pagination.pages > 1 %}
+  <nav class="pager">
+    {% set args = current_filters.copy() %}
+    {% if pagination.has_prev %}
+    <a href="?{{ args | replace('page','') }}&page={{ pagination.prev_num }}">‹ Prev</a>
+    {% endif %}
+    {% for p in pagination.iter_pages(left_edge=1,right_edge=1,left_current=2,right_current=2) %}
+      {% if p %}
+        {% if p == pagination.page %}<span class="current">{{ p }}</span>
+        {% else %}<a href="?q={{ current_filters.q or '' }}&type={{ current_filters.type or '' }}&category={{ current_filters.category or '' }}&sort={{ current_filters.sort or 'newest' }}&page={{ p }}">{{ p }}</a>{% endif %}
+      {% else %}<span>…</span>{% endif %}
+    {% endfor %}
+    {% if pagination.has_next %}
+    <a href="?q={{ current_filters.q or '' }}&type={{ current_filters.type or '' }}&category={{ current_filters.category or '' }}&sort={{ current_filters.sort or 'newest' }}&page={{ pagination.next_num }}">Next ›</a>
+    {% endif %}
+  </nav>
+  {% endif %}
+
+  {% else %}
+  <div class="alert-dark p-5 text-center rounded-3">
+    <div style="font-size:3rem">🎭</div>
+    <p class="mt-2 mb-3">No results found for your filters.</p>
+    <a href="/search" class="btn-ghost">Clear Filters</a>
+    <a href="/requests" class="btn-accent ms-2">🙋 Request a Subtitle</a>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
