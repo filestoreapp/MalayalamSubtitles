@@ -14,6 +14,7 @@ from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, send_file, jsonify, session, Response
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, or_, cast, Float
+from sqlalchemy.orm import joinedload
 
 app = Flask(__name__)
 
@@ -457,8 +458,12 @@ def movie_hub(slug):
 
 @app.route('/series/<string:title>')
 def series_overview(title):
-    episodes = Movie.query.filter_by(media_type='series', title=title)\
-                         .order_by(Movie.season.asc(), Movie.episode.asc()).all()
+    # joinedload prevents N+1 lazy-load queries for translations (was causing timeout/500)
+    episodes = Movie.query\
+        .filter_by(media_type='series', title=title)\
+        .options(joinedload(Movie.translations))\
+        .order_by(Movie.season.asc(), Movie.episode.asc())\
+        .all()
     if not episodes:
         return "Series not found", 404
     show_data = episodes[0]
@@ -466,22 +471,48 @@ def series_overview(title):
     for ep in episodes:
         s = ep.season or 1
         seasons.setdefault(s, []).append(ep)
-    seo = build_seo_meta(show_data)
+    # Build sorted list of (season_num, episodes) so Jinja2 doesn't need to sort
+    sorted_seasons = sorted(seasons.items())
+    try:
+        seo = build_seo_meta(show_data)
+    except Exception:
+        seo = None
     return render_template('series_overview.html',
-                           title=title, seasons=seasons,
-                           show_data=show_data, seo=seo)
+                           title=title,
+                           seasons=seasons,
+                           sorted_seasons=sorted_seasons,
+                           show_data=show_data,
+                           seo=seo,
+                           categories=get_categories_list())
 
 @app.route('/series/<string:title>/<int:season>')
 def series_page(title, season):
-    episodes = Movie.query.filter_by(media_type='series', title=title, season=season)\
-                         .order_by(Movie.episode.asc()).all()
-    if not episodes:
+    # joinedload prevents N+1 lazy-load queries for each episode's translations
+    eps = Movie.query\
+        .filter_by(media_type='series', title=title, season=season)\
+        .options(joinedload(Movie.translations))\
+        .order_by(Movie.episode.asc())\
+        .all()
+    if not eps:
         return "Season not found", 404
-    show_data = episodes[0]
-    seo       = build_seo_meta(show_data)
+    show_data    = eps[0]
+    # All seasons list for navigation
+    all_seasons  = db.session.query(Movie.season)\
+        .filter_by(media_type='series', title=title)\
+        .distinct().order_by(Movie.season.asc()).all()
+    all_seasons  = [r[0] for r in all_seasons if r[0]]
+    try:
+        seo = build_seo_meta(show_data)
+    except Exception:
+        seo = None
     return render_template('series.html',
-                           title=title, season=season,
-                           episodes=episodes, show_data=show_data, seo=seo)
+                           title=title,
+                           season=season,
+                           episodes=eps,
+                           all_seasons=all_seasons,
+                           show_data=show_data,
+                           seo=seo,
+                           categories=get_categories_list())
 
 # ---------------------------------------------------------------------------
 #  DOWNLOAD
