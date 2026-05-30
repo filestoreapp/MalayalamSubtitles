@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+{% block title %}Subtitle Requests – Malayalam Subtitles Hub{% endblock %}
+
+{% block extra_head %}
+<style>
+  .req-wrap { max-width: 900px; margin: 1.5rem auto; padding: 0 1.25rem; }
+
+  /* Header */
+  .req-page-header { margin-bottom: 1.5rem; }
+  .req-page-header h1 { font-size: 1.5rem; font-weight: 800; margin-bottom: .35rem; }
+  .req-page-header p { color: var(--text-muted); font-size: .9rem; }
+
+  /* Submit card */
+  .submit-card {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 1.25rem; margin-bottom: 1.75rem;
+  }
+  .submit-card h2 { font-size: 1rem; font-weight: 700; margin-bottom: 1rem; }
+  .req-input {
+    background: #1a1a1a; border: 1px solid var(--border); color: var(--text-primary);
+    border-radius: 8px; padding: .55rem .9rem; width: 100%; font-size: .9rem; margin-bottom: .65rem;
+  }
+  .req-input:focus { outline: none; border-color: var(--accent); }
+  textarea.req-input { resize: vertical; min-height: 80px; }
+  .submit-row { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; }
+  .char-count { font-size: .75rem; color: var(--text-muted); }
+  .submit-msg { font-size: .85rem; padding: .6rem .9rem; border-radius: 8px; margin-top: .75rem; display: none; }
+  .submit-msg.ok  { background: rgba(76,175,80,.15); border: 1px solid rgba(76,175,80,.3); color: #81c784; }
+  .submit-msg.err { background: rgba(229,9,20,.15); border: 1px solid rgba(229,9,20,.3); color: #ef9a9a; }
+
+  /* Sort tabs */
+  .sort-tabs { display: flex; gap: .4rem; margin-bottom: 1rem; }
+  .sort-tab {
+    background: var(--bg-card); border: 1px solid var(--border); color: var(--text-muted);
+    border-radius: 8px; padding: .4rem .9rem; text-decoration: none; font-size: .85rem; transition: all .2s;
+  }
+  .sort-tab:hover, .sort-tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  /* Request cards */
+  .req-card {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 1rem 1.25rem; margin-bottom: .75rem;
+    display: flex; align-items: center; gap: 1rem; transition: border-color .2s;
+  }
+  .req-card:hover { border-color: #3a3a3a; }
+
+  /* Vote column */
+  .vote-col { display: flex; flex-direction: column; align-items: center; gap: .2rem; flex-shrink: 0; }
+  .vote-up-btn {
+    background: transparent; border: 2px solid var(--border); color: var(--text-muted);
+    border-radius: 8px; width: 44px; height: 44px; font-size: 1.1rem;
+    cursor: pointer; transition: all .2s; display: flex; align-items: center; justify-content: center;
+  }
+  .vote-up-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); background: rgba(229,9,20,.1); }
+  .vote-up-btn:disabled, .vote-up-btn.voted { border-color: var(--accent); color: var(--accent); background: rgba(229,9,20,.1); cursor: default; }
+  .vote-count { font-size: .82rem; font-weight: 700; color: var(--text-muted); }
+
+  /* Content column */
+  .req-content { flex: 1; min-width: 0; }
+  .req-content .req-title { font-size: .95rem; font-weight: 700; margin-bottom: .25rem; word-break: break-word; }
+  .req-content .req-details { font-size: .82rem; color: var(--text-muted); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .req-content .req-meta { font-size: .74rem; color: #555; margin-top: .4rem; }
+
+  /* Status badge */
+  .status-badge {
+    font-size: .7rem; padding: .2rem .55rem; border-radius: 20px; font-weight: 700;
+    white-space: nowrap; flex-shrink: 0;
+  }
+  .status-Pending    { background: rgba(255,193,7,.15); color: #ffc107; border: 1px solid rgba(255,193,7,.3); }
+  .status-InProgress { background: rgba(33,150,243,.15); color: #64b5f6; border: 1px solid rgba(33,150,243,.3); }
+  .status-Done       { background: rgba(76,175,80,.15); color: #81c784; border: 1px solid rgba(76,175,80,.3); }
+
+  /* Pagination */
+  .pager { display: flex; gap: .4rem; justify-content: center; flex-wrap: wrap; margin-top: 1.5rem; }
+  .pager a, .pager span {
+    background: var(--bg-card); border: 1px solid var(--border); color: var(--text-muted);
+    padding: .4rem .8rem; border-radius: 6px; text-decoration: none; font-size: .85rem;
+  }
+  .pager a:hover { border-color: var(--accent); color: #fff; }
+  .pager .current { background: var(--accent); color: #fff; border-color: var(--accent); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="req-wrap">
+
+  <div class="req-page-header">
+    <h1>🙋 Subtitle Requests</h1>
+    <p>Can't find a subtitle? Request it below and vote for others. Most-voted titles get priority.</p>
+  </div>
+
+  <!-- Submit form -->
+  <div class="submit-card">
+    <h2>➕ Submit a New Request</h2>
+    <input type="text" class="req-input" id="req-title" placeholder="Movie / Series title…" maxlength="200">
+    <textarea class="req-input" id="req-details" placeholder="Any extra details: year, season, language preference… (optional)" maxlength="1000"
+              oninput="document.getElementById('det-count').textContent = this.value.length"></textarea>
+    <div class="submit-row">
+      <button class="btn-accent" onclick="submitReq()">Submit Request</button>
+      <span class="char-count"><span id="det-count">0</span>/1000</span>
+    </div>
+    <div class="submit-msg" id="submit-msg"></div>
+  </div>
+
+  <!-- Sort tabs -->
+  <div class="sort-tabs">
+    <a href="?sort=votes"  class="sort-tab {{ 'active' if sort == 'votes' }}">🔥 Top Voted</a>
+    <a href="?sort=newest" class="sort-tab {{ 'active' if sort == 'newest' }}">🆕 Newest</a>
+  </div>
+
+  <!-- Request list -->
+  {% if pagination.items %}
+  <div id="req-list">
+    {% for req in pagination.items %}
+    <div class="req-card" id="req-card-{{ req.id }}">
+
+      <div class="vote-col">
+        <button class="vote-up-btn {{ 'voted' if req.id in voted }}"
+                id="vote-btn-{{ req.id }}"
+                onclick="voteReq(this, {{ req.id }})"
+                {{ 'disabled' if req.id in voted }}
+                title="{{ 'Already voted' if req.id in voted else 'Upvote this request' }}">
+          🔼
+        </button>
+        <span class="vote-count" id="vote-count-{{ req.id }}">{{ req.votes }}</span>
+      </div>
+
+      <div class="req-content">
+        <div class="req-title">{{ req.title }}</div>
+        {% if req.details %}
+        <div class="req-details">{{ req.details }}</div>
+        {% endif %}
+        <div class="req-meta">
+          🕐 {{ req.created_at.strftime('%b %d, %Y') if req.created_at else 'Unknown' }}
+        </div>
+      </div>
+
+      <span class="status-badge status-{{ req.status }}">
+        {{ '⏳' if req.status == 'Pending' else ('⚙️' if req.status == 'InProgress' else '✅') }}
+        {{ req.status }}
+      </span>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Pagination -->
+  {% if pagination.pages > 1 %}
+  <nav class="pager">
+    {% if pagination.has_prev %}<a href="?sort={{ sort }}&page={{ pagination.prev_num }}">‹ Prev</a>{% endif %}
+    {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+      {% if p %}
+        {% if p == pagination.page %}<span class="current">{{ p }}</span>
+        {% else %}<a href="?sort={{ sort }}&page={{ p }}">{{ p }}</a>{% endif %}
+      {% else %}<span>…</span>{% endif %}
+    {% endfor %}
+    {% if pagination.has_next %}<a href="?sort={{ sort }}&page={{ pagination.next_num }}">Next ›</a>{% endif %}
+  </nav>
+  {% endif %}
+
+  {% else %}
+  <div style="text-align:center;padding:3rem 1rem;background:var(--bg-card);border:1px solid var(--border);border-radius:12px">
+    <div style="font-size:2.5rem">📭</div>
+    <p style="margin-top:.75rem;color:var(--text-muted)">No requests yet. Be the first!</p>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Submit request
+function submitReq() {
+  const title   = document.getElementById('req-title').value.trim();
+  const details = document.getElementById('req-details').value.trim();
+  const msg     = document.getElementById('submit-msg');
+  if (!title) { showMsg('Please enter a movie or series title.', false); return; }
+
+  fetch('/api/submit_request', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({title, details})
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.ok) {
+      showMsg('✅ ' + d.message, true);
+      document.getElementById('req-title').value = '';
+      document.getElementById('req-details').value = '';
+      document.getElementById('det-count').textContent = '0';
+      setTimeout(() => location.reload(), 1500);
+    } else {
+      showMsg('❌ ' + (d.error || 'Something went wrong.'), false);
+    }
+  })
+  .catch(() => showMsg('❌ Network error. Please try again.', false));
+}
+
+function showMsg(text, ok) {
+  const msg = document.getElementById('submit-msg');
+  msg.textContent = text;
+  msg.className = 'submit-msg ' + (ok ? 'ok' : 'err');
+  msg.style.display = 'block';
+}
+
+// Vote
+function voteReq(btn, reqId) {
+  if (btn.disabled) return;
+  btn.disabled = true;
+  fetch('/api/vote_request/' + reqId, {method:'POST'})
+    .then(r => r.json())
+    .then(d => {
+      if (d.ok) {
+        btn.classList.add('voted');
+        document.getElementById('vote-count-' + reqId).textContent = d.votes;
+      } else {
+        btn.disabled = false;
+      }
+    })
+    .catch(() => { btn.disabled = false; });
+}
+
+// Allow submit on Enter in title field
+document.getElementById('req-title').addEventListener('keypress', e => {
+  if (e.key === 'Enter') submitReq();
+});
+</script>
+{% endblock %}
