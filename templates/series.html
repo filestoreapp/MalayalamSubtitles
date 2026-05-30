@@ -1,128 +1,107 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ title }} – Season {{ season }}</title>
-    <style>
-        :root {
-            --bg: #0a0a0a;
-            --card-bg: #1a1a1a;
-            --text: #f1f1f1;
-            --accent: #f04747;
-            --accent-hover: #d93a3a;
-            --accent-soft: #f47b7b;
-            --border: #2a2a2a;
-            --success: #2ecc71;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            font-family: 'Inter', system-ui, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            margin: 0;
-            padding: 20px;
-        }
-        .container { max-width: 900px; margin: 0 auto; }
-        h1 { font-size: 1.8rem; margin-bottom: 5px; }
-        .back { color: var(--accent); display: inline-block; margin-bottom: 15px; }
-        .season-picker { display: flex; gap: 10px; flex-wrap: wrap; margin: 20px 0; }
+{% extends "base.html" %}
+{% block title %}{{ title }} Season {{ season }} Episodes – Malayalam Subtitles Hub{% endblock %}
 
-        .btn {
-            padding: 8px 16px;
-            border-radius: 8px;
-            border: none;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 0.9rem;
-            transition: all 0.2s ease;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-        }
-        .btn-accent {
-            background: var(--accent);
-            color: white;
-            box-shadow: 0 4px 12px rgba(240,71,71,0.25);
-        }
-        .btn-accent:hover {
-            background: var(--accent-hover);
-            box-shadow: 0 6px 18px rgba(240,71,71,0.35);
-        }
-        .btn-outline {
-            background: transparent;
-            border: 2px solid var(--accent);
-            color: var(--accent);
-        }
-        .btn-outline:hover {
-            background: var(--accent);
-            color: white;
-        }
-        .btn-download {
-            background: var(--success);
-            color: white;
-            box-shadow: 0 4px 12px rgba(46,204,113,0.25);
-        }
-        .btn-download:hover {
-            background: #27ae60;
-            box-shadow: 0 6px 18px rgba(46,204,113,0.35);
-        }
+{% block extra_head %}
+<style>
+  .series-header {
+    background: linear-gradient(to bottom, #000820 0%, var(--bg-primary) 100%);
+    border-bottom: 1px solid var(--border); padding: 1.75rem 1.25rem; position: relative; overflow: hidden;
+  }
+  .series-header-bg {
+    position: absolute; inset: 0;
+    background-image: url('{{ show_data.poster_url }}');
+    background-size: cover; background-position: center;
+    filter: blur(50px) brightness(.15); transform: scale(1.1);
+  }
+  .series-header-inner { position: relative; max-width: 1100px; margin: auto; display: flex; gap: 1.5rem; align-items: center; }
+  .series-header img { width: 110px; border-radius: 10px; box-shadow: 0 12px 40px rgba(0,0,0,.8); flex-shrink: 0; }
+  .series-header h1 { font-size: clamp(1.2rem,3vw,1.7rem); font-weight: 800; }
+  .series-header .sub-title { color: var(--text-muted); font-size: .9rem; margin-top: .3rem; }
+  .meta-pill { background: rgba(255,255,255,.07); border: 1px solid var(--border); border-radius: 20px; padding: .3rem .7rem; font-size: .8rem; color: var(--text-muted); display: inline-block; margin-right: .4rem; }
 
-        .episode-list { display: flex; flex-direction: column; gap: 12px; }
-        .episode-card {
-            background: var(--card-bg);
-            border-radius: 12px;
-            padding: 16px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            gap: 12px;
-        }
-        .ep-title { font-weight: 700; }
-        .ep-downloads { display: flex; gap: 8px; flex-wrap: wrap; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <a href="/" class="back">← Home</a>
-        <h1>{{ show_data.title }}</h1>
-        <p style="color:#aaa;">⭐ {{ show_data.rating }} | {{ show_data.year }} | {{ show_data.category }}</p>
+  .episodes-wrap { max-width: 1100px; margin: 1.5rem auto; padding: 0 1.25rem; }
+  .ep-table { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .ep-row {
+    display: flex; align-items: center; gap: 1rem; padding: .9rem 1.25rem;
+    border-bottom: 1px solid var(--border); transition: background .15s;
+    text-decoration: none; color: inherit;
+  }
+  .ep-row:last-child { border-bottom: none; }
+  .ep-row:hover { background: var(--bg-card); color: inherit; }
+  .ep-number { min-width: 48px; font-size: .85rem; font-weight: 700; color: var(--accent); }
+  .ep-info { flex: 1; min-width: 0; }
+  .ep-info .ep-title { font-size: .9rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ep-langs { display: flex; gap: .3rem; flex-shrink: 0; }
+  .lang-dot {
+    width: 28px; height: 28px; border-radius: 50%; font-size: .65rem; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; border: 1.5px solid transparent;
+  }
+  .lang-dot.ready { border-color: #4caf50; color: #4caf50; }
+  .lang-dot.pend  { border-color: #444; color: #555; }
+  .dl-quick { color: var(--text-muted); font-size: .8rem; white-space: nowrap; display: flex; flex-direction: column; gap: .2rem; align-items: flex-end; }
+  .dl-quick a { color: var(--text-muted); text-decoration: none; font-size: .75rem; }
+  .dl-quick a:hover { color: #fff; }
+</style>
+{% endblock %}
 
-        <!-- Season selector -->
-        <div class="season-picker">
-            {% for s in range(1, (show_data.season or 1)+1) %}
-                <a href="/series/{{ title|urlencode }}/{{ s }}"
-                   class="btn {% if s == season %}btn-accent{% else %}btn-outline{% endif %}">
-                    Season {{ s }}
-                </a>
-            {% endfor %}
-        </div>
+{% block content %}
 
-        <!-- Episode list -->
-        <div class="episode-list">
-            {% for ep in episodes %}
-            <div class="episode-card">
-                <div class="ep-title">Episode {{ ep.episode }}</div>
-                <div class="ep-downloads">
-                    {% if ep.english_srt %}
-                    <a href="/download/{{ ep.id }}/en" class="btn btn-download">🇬🇧 EN</a>
-                    {% endif %}
-                    {% for lang in ['ml','ta','hi'] %}
-                        {% if lang in ep.translations|map(attribute='language') %}
-                        <a href="/download/{{ ep.id }}/{{ lang }}" class="btn btn-download">
-                            {% if lang == 'ml' %}🇮🇳 ML
-                            {% elif lang == 'ta' %}🇮🇳 TA
-                            {% else %}🇮🇳 HI
-                            {% endif %}
-                        </a>
-                        {% endif %}
-                    {% endfor %}
-                </div>
-            </div>
-            {% endfor %}
-        </div>
+<div class="series-header">
+  <div class="series-header-bg"></div>
+  <div class="series-header-inner">
+    <a href="/series/{{ title | urlencode }}">
+      <img src="{{ show_data.poster_url or 'https://via.placeholder.com/300x450/1a1a1a/555?text=No+Poster' }}"
+           alt="{{ title }}" onerror="this.src='https://via.placeholder.com/300x450/1a1a1a/555?text=No+Poster'">
+    </a>
+    <div>
+      <a href="/series/{{ title | urlencode }}" style="color:var(--text-muted);font-size:.8rem;text-decoration:none;display:inline-block;margin-bottom:.4rem">← All Seasons</a>
+      <h1>{{ title }}</h1>
+      <div class="sub-title">
+        <span class="meta-pill">📺 Season {{ season }}</span>
+        <span class="meta-pill">{{ episodes | length }} Episodes</span>
+        {% if show_data.rating and show_data.rating not in ('N/A','0') %}
+        <span class="meta-pill" style="background:var(--gold);color:#000;font-weight:700">⭐ {{ show_data.rating }}</span>
+        {% endif %}
+        {% if show_data.year %}<span class="meta-pill">{{ show_data.year }}</span>{% endif %}
+      </div>
     </div>
-</body>
-</html>
+  </div>
+</div>
+
+<div class="episodes-wrap">
+
+  <!-- Season navigation -->
+  <div style="margin-bottom:1rem;display:flex;gap:.5rem;flex-wrap:wrap">
+    <a href="/series/{{ title | urlencode }}" class="btn-ghost" style="font-size:.82rem">All Seasons</a>
+  </div>
+
+  <div class="ep-table" style="background:var(--bg-secondary)">
+    {% for ep in episodes %}
+    <a href="/movie/{{ ep.slug }}" class="ep-row">
+      <div class="ep-number">E{{ '%02d' | format(ep.episode) }}</div>
+      <div class="ep-info">
+        <div class="ep-title">Episode {{ ep.episode }}</div>
+        <div style="font-size:.74rem;color:var(--text-muted);margin-top:.2rem">S{{ '%02d'|format(ep.season) }}E{{ '%02d'|format(ep.episode) }}</div>
+      </div>
+      <div class="ep-langs">
+        {% set ready = ep.translations | map(attribute='language') | list %}
+        <span class="lang-dot {{ 'ready' if ep.english_srt else 'pend' }}" title="English">EN</span>
+        <span class="lang-dot {{ 'ready' if 'ml' in ready else 'pend' }}" title="Malayalam">ML</span>
+        <span class="lang-dot {{ 'ready' if 'ta' in ready else 'pend' }}" title="Tamil">TA</span>
+        <span class="lang-dot {{ 'ready' if 'hi' in ready else 'pend' }}" title="Hindi">HI</span>
+      </div>
+      <div class="dl-quick">
+        {% if ep.english_srt %}
+        <a href="/download/{{ ep.id }}/en" onclick="event.stopPropagation()">⬇ EN</a>
+        {% endif %}
+        {% for t in ep.translations %}
+        <a href="/download/{{ ep.id }}/{{ t.language }}" onclick="event.stopPropagation()">⬇ {{ t.language | upper }}</a>
+        {% endfor %}
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+
+</div>
+
+{% endblock %}
