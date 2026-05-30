@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% block title %}Manage Requests – Admin{% endblock %}
+
+{% block extra_head %}
+<style>
+  .admin-wrap { max-width: 1100px; margin: 1.5rem auto; padding: 0 1.25rem; }
+  .admin-topbar {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 1rem 1.25rem; margin-bottom: 1.5rem;
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .75rem;
+  }
+  .admin-topbar h1 { font-size: 1.2rem; font-weight: 800; }
+  .admin-nav { display: flex; gap: .5rem; flex-wrap: wrap; }
+  .admin-nav a {
+    background: #1a1a1a; border: 1px solid var(--border); color: var(--text-muted);
+    border-radius: 8px; padding: .4rem .9rem; text-decoration: none; font-size: .82rem; transition: all .2s;
+  }
+  .admin-nav a:hover { color: #fff; border-color: #555; }
+  .admin-nav a.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  /* Filter bar */
+  .filter-bar { display: flex; gap: .5rem; margin-bottom: 1rem; flex-wrap: wrap; align-items: center; }
+  .filter-bar a {
+    background: var(--bg-card); border: 1px solid var(--border); color: var(--text-muted);
+    border-radius: 20px; padding: .3rem .8rem; text-decoration: none; font-size: .8rem; transition: all .2s;
+  }
+  .filter-bar a:hover { color: #fff; }
+  .filter-bar a.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .filter-bar .count { background: #2a2a2a; color: #aaa; font-size: .7rem; border-radius: 10px; padding: .1rem .4rem; margin-left: .2rem; }
+
+  /* Table */
+  .req-table { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .req-thead { background: #1e1e1e; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 60px 1fr 160px 90px 100px 130px; padding: .65rem 1rem; font-size: .75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+  .req-row { display: grid; grid-template-columns: 60px 1fr 160px 90px 100px 130px; padding: .75rem 1rem; border-bottom: 1px solid var(--border); align-items: center; transition: background .15s; }
+  .req-row:last-child { border-bottom: none; }
+  .req-row:hover { background: #1e1e1e; }
+  @media(max-width:768px) {
+    .req-thead { display: none; }
+    .req-row { grid-template-columns: 1fr; gap: .4rem; padding: .9rem 1rem; }
+  }
+
+  .req-votes-badge { background: rgba(229,9,20,.15); color: var(--accent); font-size: .8rem; font-weight: 700; border-radius: 6px; padding: .2rem .5rem; text-align: center; }
+  .req-title-cell { font-size: .88rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .req-details-cell { font-size: .78rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .req-date-cell { font-size: .76rem; color: var(--text-muted); }
+  .status-badge { font-size: .7rem; padding: .25rem .6rem; border-radius: 20px; font-weight: 700; }
+  .status-Pending    { background: rgba(255,193,7,.15); color: #ffc107; }
+  .status-InProgress { background: rgba(33,150,243,.15); color: #64b5f6; }
+  .status-Done       { background: rgba(76,175,80,.15); color: #81c784; }
+
+  /* Status form */
+  .status-form { display: flex; gap: .3rem; align-items: center; }
+  .status-select {
+    background: #1a1a1a; border: 1px solid var(--border); color: var(--text-primary);
+    border-radius: 6px; padding: .3rem .5rem; font-size: .75rem;
+  }
+  .status-btn {
+    background: #2a2a2a; border: 1px solid var(--border); color: var(--text-muted);
+    border-radius: 6px; padding: .3rem .6rem; cursor: pointer; font-size: .75rem; transition: all .2s;
+  }
+  .status-btn:hover { background: #3a3a3a; color: #fff; }
+  .del-btn {
+    background: transparent; border: 1px solid #3a1010; color: #ff6b6b;
+    border-radius: 6px; padding: .3rem .6rem; cursor: pointer; font-size: .75rem; transition: all .2s;
+    text-decoration: none;
+  }
+  .del-btn:hover { background: rgba(229,9,20,.2); color: #ff4444; }
+
+  /* Pagination */
+  .pager { display: flex; gap: .4rem; justify-content: center; flex-wrap: wrap; margin-top: 1.5rem; }
+  .pager a, .pager span {
+    background: var(--bg-card); border: 1px solid var(--border); color: var(--text-muted);
+    padding: .4rem .8rem; border-radius: 6px; text-decoration: none; font-size: .85rem;
+  }
+  .pager a:hover { border-color: var(--accent); color: #fff; }
+  .pager .current { background: var(--accent); color: #fff; border-color: var(--accent); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="admin-wrap">
+
+  <div class="admin-topbar">
+    <h1>🛠 Admin Panel</h1>
+    <nav class="admin-nav">
+      <a href="/dashboard">📊 Dashboard</a>
+      <a href="/admin">➕ Upload</a>
+      <a href="/admin/requests" class="active">🙋 Requests</a>
+      <a href="/admin/export_csv">📥 Export CSV</a>
+      <a href="/logout">🚪 Logout</a>
+    </nav>
+  </div>
+
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem">
+    <h2 style="font-size:1.05rem;font-weight:700">🙋 Subtitle Requests
+      <span style="color:var(--text-muted);font-size:.85rem;font-weight:400">({{ pagination.total }} total)</span>
+    </h2>
+    <a href="/requests" target="_blank" class="btn-ghost" style="font-size:.8rem">View Public Page ↗</a>
+  </div>
+
+  <!-- Status filter tabs -->
+  <div class="filter-bar">
+    <a href="/admin/requests" class="{{ 'active' if not status_filter }}">All</a>
+    <a href="/admin/requests?status=Pending" class="{{ 'active' if status_filter == 'Pending' }}">⏳ Pending</a>
+    <a href="/admin/requests?status=InProgress" class="{{ 'active' if status_filter == 'InProgress' }}">⚙️ In Progress</a>
+    <a href="/admin/requests?status=Done" class="{{ 'active' if status_filter == 'Done' }}">✅ Done</a>
+  </div>
+
+  {% if pagination.items %}
+  <div class="req-table">
+    <div class="req-thead">
+      <div>Votes</div><div>Title / Details</div><div>Details</div>
+      <div>Date</div><div>Status</div><div>Actions</div>
+    </div>
+
+    {% for req in pagination.items %}
+    <div class="req-row">
+      <!-- Votes -->
+      <div><span class="req-votes-badge">🔼 {{ req.votes }}</span></div>
+
+      <!-- Title -->
+      <div>
+        <div class="req-title-cell">{{ req.title }}</div>
+        {% if req.details %}
+        <div class="req-details-cell">{{ req.details }}</div>
+        {% endif %}
+      </div>
+
+      <!-- Details (wide screen) -->
+      <div class="req-details-cell" style="display:none">{{ req.details or '—' }}</div>
+
+      <!-- Date -->
+      <div class="req-date-cell">{{ req.created_at.strftime('%b %d, %Y') if req.created_at else '—' }}</div>
+
+      <!-- Status badge -->
+      <div><span class="status-badge status-{{ req.status }}">{{ req.status }}</span></div>
+
+      <!-- Actions -->
+      <div style="display:flex;gap:.35rem;flex-wrap:wrap;align-items:center">
+        <form action="/admin/update_request/{{ req.id }}" method="post" class="status-form">
+          <select name="status" class="status-select">
+            <option value="Pending"    {{ 'selected' if req.status == 'Pending' }}>Pending</option>
+            <option value="InProgress" {{ 'selected' if req.status == 'InProgress' }}>In Progress</option>
+            <option value="Done"       {{ 'selected' if req.status == 'Done' }}>Done</option>
+          </select>
+          <button type="submit" class="status-btn">Save</button>
+        </form>
+        <a href="/admin/delete_request/{{ req.id }}" class="del-btn"
+           onclick="return confirm('Delete request: {{ req.title }}?')">🗑</a>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Pagination -->
+  {% if pagination.pages > 1 %}
+  <nav class="pager">
+    {% if pagination.has_prev %}<a href="?status={{ status_filter }}&page={{ pagination.prev_num }}">‹</a>{% endif %}
+    {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+      {% if p %}
+        {% if p == pagination.page %}<span class="current">{{ p }}</span>
+        {% else %}<a href="?status={{ status_filter }}&page={{ p }}">{{ p }}</a>{% endif %}
+      {% else %}<span>…</span>{% endif %}
+    {% endfor %}
+    {% if pagination.has_next %}<a href="?status={{ status_filter }}&page={{ pagination.next_num }}">›</a>{% endif %}
+  </nav>
+  {% endif %}
+
+  {% else %}
+  <div style="text-align:center;padding:3rem;background:var(--bg-card);border:1px solid var(--border);border-radius:12px">
+    <div style="font-size:2.5rem">📭</div>
+    <p style="margin-top:.75rem;color:var(--text-muted)">No requests found.</p>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
