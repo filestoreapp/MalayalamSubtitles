@@ -1,372 +1,426 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard – Malayalam Subtitles Hub</title>
-    <style>
-        :root {
-            --bg: #0a0a0a;
-            --card-bg: #1a1a1a;
-            --text: #f1f1f1;
-            --accent: #f04747;
-            --accent-hover: #d93a3a;
-            --border: #2a2a2a;
-            --success: #2ecc71;
-            --warning: #f1c40f;
-            --info: #3498db;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            font-family: 'Segoe UI', system-ui, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            min-height: 100vh;
-        }
-        a { text-decoration: none; color: inherit; }
+{% extends "base.html" %}
+{% block title %}Upload Media – Admin{% endblock %}
 
-        /* Navbar */
-        .navbar {
-            background: #111;
-            border-bottom: 1px solid var(--border);
-            padding: 12px 24px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 12px;
-        }
-        .navbar h2 { color: var(--accent); }
-        .nav-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-        .btn {
-            padding: 8px 14px;
-            border-radius: 8px;
-            border: none;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 0.9rem;
-            transition: all 0.2s;
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-            text-decoration: none;
-            background: var(--card-bg);
-            color: var(--text);
-        }
-        .btn:hover { opacity: 0.9; transform: translateY(-1px); }
-        .btn-accent { background: var(--accent); color: white; }
-        .btn-accent:hover { background: var(--accent-hover); }
-        .btn-outline { background: transparent; border: 2px solid var(--accent); color: var(--accent); }
-        .btn-outline:hover { background: var(--accent); color: white; }
-        .btn-danger { background: #e74c3c; color: white; }
-        .btn-success { background: var(--success); color: white; }
+{% block extra_head %}
+<style>
+  .upload-wrap { max-width: 1000px; margin: 1.5rem auto; padding: 0 1.25rem; }
+  .admin-topbar {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 1rem 1.25rem; margin-bottom: 1.25rem;
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .75rem;
+  }
+  .admin-topbar h1 { font-size: 1.2rem; font-weight: 800; }
+  .admin-nav { display: flex; gap: .4rem; flex-wrap: wrap; }
+  .admin-nav a {
+    background: #1a1a1a; border: 1px solid var(--border); color: var(--text-muted);
+    border-radius: 8px; padding: .38rem .85rem; text-decoration: none; font-size: .8rem; transition: all .2s;
+  }
+  .admin-nav a:hover { color: #fff; border-color: #555; }
+  .admin-nav a.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 
-        .container { max-width: 1300px; margin: 0 auto; padding: 20px; }
+  .form-card {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 1.5rem; margin-bottom: 1.25rem;
+  }
+  .form-card h2 { font-size: 1rem; font-weight: 700; margin-bottom: 1.1rem; padding-bottom: .6rem; border-bottom: 1px solid var(--border); }
 
-        /* Stats grid */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 16px;
-            margin-bottom: 24px;
-        }
-        .stat-card {
-            background: var(--card-bg);
-            border-radius: 10px;
-            padding: 16px;
-            border-left: 4px solid var(--accent);
-        }
-        .stat-card h4 { color: #888; font-size: 13px; text-transform: uppercase; margin-bottom: 6px; }
-        .stat-card h2 { font-size: 24px; margin: 0; }
+  .form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: .9rem; }
+  .form-group { display: flex; flex-direction: column; gap: .35rem; }
+  .form-group.full { grid-column: 1 / -1; }
+  .form-label { font-size: .78rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  .form-input {
+    background: #1a1a1a; border: 1px solid var(--border); color: var(--text-primary);
+    border-radius: 8px; padding: .55rem .85rem; font-size: .9rem; width: 100%; transition: border-color .2s;
+  }
+  .form-input:focus { outline: none; border-color: var(--accent); background: #1e1e1e; }
+  textarea.form-input { resize: vertical; min-height: 90px; }
+  select.form-input { cursor: pointer; }
 
-        /* Sections */
-        .section {
-            background: var(--card-bg);
-            border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 24px;
-            overflow-x: auto;
-        }
-        .section h3 {
-            margin-top: 0;
-            margin-bottom: 15px;
-            border-bottom: 1px solid var(--border);
-            padding-bottom: 10px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
+  /* TMDB search */
+  .tmdb-row { display: flex; gap: .5rem; }
+  .tmdb-row .form-input { flex: 1; }
+  .tmdb-btn {
+    background: #f5c518; color: #000; border: none; border-radius: 8px;
+    padding: .55rem 1rem; font-size: .85rem; font-weight: 700; cursor: pointer; white-space: nowrap; transition: opacity .2s;
+  }
+  .tmdb-btn:hover { opacity: .85; }
+  .tmdb-results {
+    background: #111; border: 1px solid var(--border); border-radius: 8px;
+    max-height: 280px; overflow-y: auto; margin-top: .5rem; display: none;
+  }
+  .tmdb-item {
+    display: flex; gap: .75rem; align-items: center; padding: .65rem .9rem;
+    border-bottom: 1px solid var(--border); cursor: pointer; transition: background .15s;
+  }
+  .tmdb-item:last-child { border-bottom: none; }
+  .tmdb-item:hover { background: #1a1a1a; }
+  .tmdb-item img { width: 36px; height: 54px; object-fit: cover; border-radius: 4px; flex-shrink: 0; }
+  .tmdb-item .tmdb-info .tmdb-name { font-size: .88rem; font-weight: 600; }
+  .tmdb-item .tmdb-info .tmdb-year { font-size: .75rem; color: var(--text-muted); }
 
-        /* Tables */
-        table { width: 100%; border-collapse: collapse; min-width: 700px; }
-        th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); }
-        th { color: #888; font-weight: 600; }
-        tr:hover { background: rgba(255,255,255,0.02); }
+  /* Categories */
+  .cat-grid { display: flex; flex-wrap: wrap; gap: .5rem; }
+  .cat-check { display: none; }
+  .cat-label {
+    background: #1a1a1a; border: 1px solid var(--border); color: var(--text-muted);
+    border-radius: 20px; padding: .3rem .75rem; font-size: .8rem; cursor: pointer; transition: all .2s;
+    user-select: none;
+  }
+  .cat-check:checked + .cat-label { background: rgba(229,9,20,.2); border-color: var(--accent); color: var(--accent); }
 
-        .badge {
-            display: inline-block;
-            padding: 3px 8px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: 700;
-        }
-        .badge-movie { background: #34495e; color: #ddd; }
-        .badge-series { background: #8e44ad; color: white; }
-        .badge-pending { background: var(--warning); color: #000; }
-        .badge-processing { background: var(--info); color: white; }
-        .badge-completed { background: var(--success); color: white; }
-        .badge-failed { background: var(--accent); color: white; }
+  /* SRT upload area */
+  .drop-zone {
+    border: 2px dashed var(--border); border-radius: 10px; padding: 1.5rem;
+    text-align: center; color: var(--text-muted); cursor: pointer; transition: all .2s;
+  }
+  .drop-zone:hover, .drop-zone.drag-over { border-color: var(--accent); color: var(--text-primary); }
+  .drop-zone .dz-icon { font-size: 2rem; margin-bottom: .5rem; }
+  .drop-zone input[type="file"] { display: none; }
 
-        .progress-bar {
-            width: 100px;
-            height: 6px;
-            background: #333;
-            border-radius: 6px;
-            overflow: hidden;
-            display: inline-block;
-            vertical-align: middle;
-            margin-right: 8px;
-        }
-        .progress-fill {
-            height: 100%;
-            background: var(--accent);
-            border-radius: 6px;
-            transition: width 0.5s;
-        }
+  /* Episode rows */
+  .ep-row { display: flex; gap: .5rem; align-items: center; margin-bottom: .5rem; }
+  .ep-row input { background: #1a1a1a; border: 1px solid var(--border); color: #fff; border-radius: 6px; padding: .4rem .7rem; flex: 1; font-size: .85rem; }
+  .ep-row input:focus { outline: none; border-color: var(--accent); }
+  .ep-row .ep-num { width: 60px; flex-shrink: 0; text-align: center; }
+  .remove-ep { background: none; border: 1px solid #3a1010; color: #ff6b6b; border-radius: 5px; padding: .3rem .6rem; cursor: pointer; font-size: .8rem; }
+  .remove-ep:hover { background: rgba(229,9,20,.2); }
 
-        /* Filters */
-        .filter-row {
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-            margin-bottom: 16px;
-        }
-        .filter-row input, .filter-row select {
-            padding: 8px 12px;
-            border-radius: 6px;
-            border: 1px solid var(--border);
-            background: var(--bg);
-            color: var(--text);
-        }
+  /* Auto-fetch result box */
+  .fetch-result {
+    background: #111; border: 1px solid var(--border); border-radius: 8px;
+    padding: .75rem 1rem; margin-top: .5rem; display: none; font-size: .82rem;
+  }
+  .fetch-result.ok  { border-color: rgba(76,175,80,.4); color: #81c784; }
+  .fetch-result.err { border-color: rgba(229,9,20,.4); color: #ef9a9a; }
 
-        /* Pagination */
-        .pagination { display: flex; justify-content: center; gap: 8px; margin-top: 16px; }
-        .page-btn {
-            padding: 6px 12px;
-            background: var(--card-bg);
-            border-radius: 6px;
-            border: 1px solid var(--border);
-        }
-        .page-btn:hover { background: var(--accent); color: white; }
+  /* Toggle */
+  .toggle-row { display: flex; align-items: center; gap: .75rem; }
+  .toggle { position: relative; width: 42px; height: 24px; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider {
+    position: absolute; inset: 0; background: #333; border-radius: 24px; cursor: pointer; transition: .2s;
+  }
+  .toggle-slider::before {
+    content: ''; position: absolute; left: 3px; top: 3px;
+    width: 18px; height: 18px; background: #888; border-radius: 50%; transition: .2s;
+  }
+  .toggle input:checked + .toggle-slider { background: rgba(229,9,20,.3); }
+  .toggle input:checked + .toggle-slider::before { background: var(--accent); transform: translateX(18px); }
 
-        .status-dots { display: flex; gap: 4px; }
-        .dot { width: 10px; height: 10px; border-radius: 50%; background: #555; }
-        .dot.done { background: var(--success); }
+  .submit-bar { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; margin-top: .5rem; }
+  .spinner { display: none; width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+{% endblock %}
 
-        @media (max-width: 600px) {
-            .navbar { flex-direction: column; align-items: flex-start; }
-            .stats-grid { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
-        }
-    </style>
-</head>
-<body>
-    <div class="navbar">
-        <h2>⚙️ Dashboard</h2>
-        <div class="nav-actions">
-            <a href="/admin" class="btn btn-accent">➕ New Upload</a>
-            <a href="/" target="_blank" class="btn btn-outline">🌍 View Site</a>
-        </div>
+{% block content %}
+<div class="upload-wrap">
+
+  <div class="admin-topbar">
+    <h1>🛠 Admin Panel</h1>
+    <nav class="admin-nav">
+      <a href="/dashboard">📊 Dashboard</a>
+      <a href="/admin" class="active">➕ Upload</a>
+      <a href="/admin/requests">🙋 Requests</a>
+      <a href="/admin/export_csv">📥 CSV</a>
+      <a href="/logout">🚪 Logout</a>
+    </nav>
+  </div>
+
+  <form action="/admin" method="post" enctype="multipart/form-data" id="upload-form">
+
+    <!-- ── Type selector ── -->
+    <div class="form-card">
+      <h2>📁 Media Type</h2>
+      <div style="display:flex;gap:.75rem">
+        <label style="cursor:pointer;flex:1">
+          <input type="radio" name="media_type" value="movie" id="type-movie" checked onchange="toggleType()" style="display:none">
+          <div class="form-input text-center" id="lbl-movie" style="background:rgba(229,9,20,.2);border-color:var(--accent);color:var(--accent);font-weight:700">🎬 Movie</div>
+        </label>
+        <label style="cursor:pointer;flex:1">
+          <input type="radio" name="media_type" value="series" id="type-series" onchange="toggleType()" style="display:none">
+          <div class="form-input text-center" id="lbl-series" style="font-weight:700">📺 TV Series</div>
+        </label>
+      </div>
     </div>
 
-    <div class="container">
-        <!-- Stats -->
-        <div class="stats-grid">
-            <div class="stat-card"><h4>👥 Visitors</h4><h2>{{ visitors }}</h2></div>
-            <div class="stat-card"><h4>📥 Downloads</h4><h2>{{ downloads }}</h2></div>
-            <div class="stat-card"><h4>✅ Translated</h4><h2>{{ total_subtitles }}</h2></div>
-            <div class="stat-card"><h4>🏆 Top Lang</h4><h2>{{ popular_lang[0]|upper if popular_lang else 'N/A' }}</h2></div>
-            <div class="stat-card"><h4>🎬 Movies</h4><h2>{{ total_movies }}</h2></div>
-            <div class="stat-card"><h4>📺 Series</h4><h2>{{ total_series }}</h2></div>
-            <div class="stat-card"><h4>📜 English SRTs</h4><h2>{{ english_subs }}</h2></div>
-            <div class="stat-card" style="border-left-color: var(--success);">
-                <h4>🗄️ DB Size</h4><h2>{{ db_size }}</h2>
-            </div>
-            <div class="stat-card" style="border-left-color: var(--info);">
-                <h4>☁️ R2 Storage</h4><h2>{{ r2_size_str }}</h2>
-                <p style="font-size:12px; color:#888;">{{ r2_file_count }} files</p>
-            </div>
-        </div>
-
-        <!-- Scheduler & Quick Actions -->
-        <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:20px;">
-            <button onclick="runScheduler()" class="btn btn-accent">⏱ Run OTT Fetcher Now</button>
-            <button onclick="retryFailed()" class="btn btn-danger">🔄 Retry All Failed Jobs</button>
-            <a href="/admin/reset_jobs" class="btn btn-outline">🔁 Reset Stuck Jobs</a>
-        </div>
-
-        <!-- Translation Queue -->
-        <div class="section">
-            <h3>⏳ Translation Queue
-                {% if failed_jobs_count > 0 %}
-                <span style="font-size:14px; color:var(--accent);">{{ failed_jobs_count }} failed</span>
-                {% endif %}
-            </h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Movie</th>
-                        <th>Language</th>
-                        <th>Status</th>
-                        <th>Progress</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for job in jobs %}
-                    <tr>
-                        <td>{{ job.movie.title if job.movie else 'Unknown' }}</td>
-                        <td>{{ job.language|upper }}</td>
-                        <td>
-                            <span class="badge 
-                                {% if job.status == 'Pending' %}badge-pending
-                                {% elif job.status == 'Processing' %}badge-processing
-                                {% elif job.status == 'Completed' %}badge-completed
-                                {% elif job.status == 'Failed' %}badge-failed
-                                {% endif %}">
-                                {{ job.status }}
-                            </span>
-                        </td>
-                        <td>
-                            <div class="progress-bar">
-                                <div class="progress-fill" style="width: {{ job.progress }}%;"></div>
-                            </div>
-                            {{ job.progress }}%
-                        </td>
-                        <td>
-                            <a href="/admin/delete_job/{{ job.id }}" class="btn btn-danger" style="padding:4px 8px; font-size:12px;">Cancel</a>
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr><td colspan="5" style="text-align:center; color:#888;">No active translations</td></tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-
-        <!-- Media Library -->
-        <div class="section">
-            <h3>📚 Media Library</h3>
-            <div class="filter-row">
-                <input type="text" id="searchMedia" placeholder="Search by title..." oninput="filterMedia()">
-                <select id="typeFilter" onchange="filterMedia()">
-                    <option value="">All Types</option>
-                    <option value="movie">Movies</option>
-                    <option value="series">Series</option>
-                </select>
-            </div>
-            <table id="mediaTable">
-                <thead>
-                    <tr>
-                        <th>Poster</th>
-                        <th>Title</th>
-                        <th>Type</th>
-                        <th>Views</th>
-                        <th>Translations</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for media in all_media.items %}
-                    <tr data-type="{{ media.media_type }}" data-title="{{ media.title|lower }}">
-                        <td><img src="{{ media.poster_url }}" style="width:40px; border-radius:4px;"></td>
-                        <td>
-                            <strong>{{ media.title }}</strong><br>
-                            <small style="color:#888;">{{ media.year }} {% if media.media_type == 'series' %}S{{ media.season }}E{{ media.episode }}{% endif %}</small>
-                        </td>
-                        <td><span class="badge {% if media.media_type == 'movie' %}badge-movie{% else %}badge-series{% endif %}">{{ media.media_type|upper }}</span></td>
-                        <td>{{ media.views }}</td>
-                        <td>
-                            <div class="status-dots">
-                                {% for lang in ['ml','ta','hi'] %}
-                                    {% set translated = media.translations|selectattr("language","equalto",lang)|list %}
-                                    <span class="dot {% if translated %}done{% endif %}" title="{{ lang|upper }}"></span>
-                                {% endfor %}
-                            </div>
-                        </td>
-                        <td style="white-space: nowrap;">
-                            <a href="/admin/queue_translations/{{ media.id }}" class="btn" style="background:#f39c12; color:#000; padding:4px 8px; font-size:12px;">🔄 AI</a>
-                            <a href="/admin/edit/{{ media.id }}" class="btn" style="padding:4px 8px; font-size:12px;">✏️</a>
-                            <a href="/delete/{{ media.id }}" class="btn btn-danger" style="padding:4px 8px; font-size:12px;" onclick="return confirm('Delete?')">🗑️</a>
-                            <a href="#" onclick="triggerTelegram({{ media.id }})" class="btn" style="background:#3498db; color:white; padding:4px 8px; font-size:12px;">✈️</a>
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr><td colspan="6" style="text-align:center; color:#888;">No media yet.</td></tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-
-            <!-- Pagination -->
-            <div class="pagination">
-                {% if all_media.has_prev %}
-                    <a href="{{ url_for('dashboard', page=all_media.prev_num) }}" class="page-btn">« Prev</a>
-                {% endif %}
-                <span style="padding:8px;">Page {{ all_media.page }} of {{ all_media.pages }}</span>
-                {% if all_media.has_next %}
-                    <a href="{{ url_for('dashboard', page=all_media.next_num) }}" class="page-btn">Next »</a>
-                {% endif %}
-            </div>
-        </div>
+    <!-- ── TMDB Search ── -->
+    <div class="form-card">
+      <h2>🔍 Auto-fill from TMDB</h2>
+      <div class="tmdb-row">
+        <input class="form-input" type="text" id="tmdb-query" placeholder="Search movie or series title…">
+        <button type="button" class="tmdb-btn" onclick="searchTmdb()">Search TMDB</button>
+      </div>
+      <div class="tmdb-results" id="tmdb-results"></div>
     </div>
 
-    <script>
-        // Telegram trigger (unchanged, but secure the secret)
-        function triggerTelegram(movieId) {
-            fetch(`/api/trigger_telegram/${movieId}?secret={{ TELEGRAM_SECRET }}`)
-                .then(r => r.text())
-                .then(t => alert(t))
-                .catch(e => alert("Error"));
-        }
+    <!-- ── Media details ── -->
+    <div class="form-card">
+      <h2>📋 Media Details</h2>
+      <div class="form-grid">
+        <div class="form-group full">
+          <label class="form-label">Title *</label>
+          <input class="form-input" type="text" name="title" id="f-title" placeholder="Movie or show title" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Year</label>
+          <input class="form-input" type="text" name="year" id="f-year" placeholder="2024" maxlength="4">
+        </div>
+        <div class="form-group">
+          <label class="form-label">IMDb Rating</label>
+          <input class="form-input" type="text" name="rating" id="f-rating" placeholder="8.5">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Runtime</label>
+          <input class="form-input" type="text" name="runtime" id="f-runtime" placeholder="148 min">
+        </div>
+        <div class="form-group" id="season-group" style="display:none">
+          <label class="form-label">Season #</label>
+          <input class="form-input" type="number" name="season" id="f-season" min="1" value="1">
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Poster URL</label>
+          <input class="form-input" type="url" name="poster_url" id="f-poster" placeholder="https://…">
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Plot / Synopsis</label>
+          <textarea class="form-input" name="plot" id="f-plot" placeholder="Short description…"></textarea>
+        </div>
+      </div>
+    </div>
 
-        // Run scheduler
-        function runScheduler() {
-            if (!confirm("Fetch new OTT movies from TMDB & Subdl?")) return;
-            const btn = event.target;
-            btn.disabled = true;
-            btn.textContent = "⏳ Fetching...";
-            fetch(`/api/scheduled_fetch?secret={{ scheduler_secret }}`)
-                .then(r => r.json())
-                .then(data => {
-                    alert(data.message || "Done");
-                    location.reload();
-                })
-                .catch(e => {
-                    alert("Scheduler failed");
-                    btn.disabled = false;
-                    btn.textContent = "⏱ Run OTT Fetcher Now";
-                });
-        }
+    <!-- ── Categories ── -->
+    <div class="form-card">
+      <h2>🎭 Genres</h2>
+      <div class="cat-grid" id="cat-grid">
+        {% for cat in ['Action','Adventure','Animation','Comedy','Crime','Documentary','Drama','Family','Fantasy','History','Horror','Music','Mystery','Romance','Science Fiction','Thriller','War','Western'] %}
+        <input type="checkbox" class="cat-check" name="category" value="{{ cat }}" id="cat-{{ loop.index }}">
+        <label class="cat-label" for="cat-{{ loop.index }}">{{ cat }}</label>
+        {% endfor %}
+      </div>
+    </div>
 
-        // Retry all failed jobs
-        async function retryFailed() {
-            if (!confirm("Retry all failed translation jobs?")) return;
-            // First reset all failed to pending, then re‑trigger
-            await fetch('/admin/reset_jobs');
-            location.reload();
-        }
+    <!-- ── Auto-fetch SRT ── -->
+    <div class="form-card">
+      <h2>⚡ Auto-fetch English SRT</h2>
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+        <input class="form-input" type="text" id="imdb-id-input" placeholder="IMDb ID (e.g. tt1375666)" style="max-width:260px">
+        <div id="ep-inputs" style="display:none;gap:.5rem;align-items:center">
+          <input class="form-input" type="number" id="fetch-season" placeholder="Season" min="1" style="width:90px">
+          <input class="form-input" type="number" id="fetch-episode" placeholder="Ep" min="1" style="width:70px">
+        </div>
+        <button type="button" class="btn-accent" onclick="autoFetchSRT()">⚡ Fetch SRT</button>
+      </div>
+      <div class="fetch-result" id="fetch-result"></div>
+      <div style="font-size:.75rem;color:var(--text-muted);margin-top:.5rem">Tries Subdl then OpenSubtitles automatically.</div>
+    </div>
 
-        // Client‑side media filtering
-        function filterMedia() {
-            const search = document.getElementById('searchMedia').value.toLowerCase();
-            const type = document.getElementById('typeFilter').value;
-            document.querySelectorAll('#mediaTable tbody tr').forEach(row => {
-                const title = row.dataset.title;
-                const rtype = row.dataset.type;
-                const matchSearch = title.includes(search);
-                const matchType = !type || rtype === type;
-                row.style.display = (matchSearch && matchType) ? '' : 'none';
-            });
-        }
-    </script>
-</body>
-</html>
+    <!-- ── SRT Upload ── -->
+    <div class="form-card">
+      <h2>📄 SRT Subtitle Files</h2>
+
+      <!-- Movie: single SRT -->
+      <div id="movie-srt-section">
+        <div class="drop-zone" onclick="document.getElementById('srt-file-single').click()" id="drop-single">
+          <div class="dz-icon">📂</div>
+          <p>Click or drag & drop English <strong>.srt</strong> file here</p>
+          <input type="file" id="srt-file-single" name="files[]" accept=".srt">
+        </div>
+        <input type="hidden" name="episodes[]" value="1">
+        <!-- auto-fetched SRT goes here -->
+        <div id="fetched-single-preview" style="display:none;margin-top:.75rem">
+          <div style="display:flex;align-items:center;justify-content:space-between;background:#0d2010;border:1px solid rgba(76,175,80,.3);border-radius:8px;padding:.65rem 1rem">
+            <span style="color:#81c784;font-size:.85rem">✅ Auto-fetched SRT ready</span>
+            <button type="button" onclick="clearFetchedSRT()" style="background:none;border:none;color:#555;cursor:pointer">✕</button>
+          </div>
+          <input type="hidden" name="fetched_srts[]" id="fetched-srt-single">
+          <input type="hidden" name="fetched_episodes[]" value="1">
+        </div>
+      </div>
+
+      <!-- Series: multiple episodes -->
+      <div id="series-srt-section" style="display:none">
+        <div id="ep-list"></div>
+        <button type="button" class="btn-ghost mt-3" onclick="addEpisode()">+ Add Episode SRT</button>
+      </div>
+    </div>
+
+    <!-- ── Options ── -->
+    <div class="form-card">
+      <h2>⚙️ Upload Options</h2>
+      <div class="toggle-row">
+        <label class="toggle">
+          <input type="checkbox" name="silent_upload" value="yes" id="silent-toggle">
+          <div class="toggle-slider"></div>
+        </label>
+        <div>
+          <div style="font-size:.88rem;font-weight:600">Silent Mode</div>
+          <div style="font-size:.75rem;color:var(--text-muted)">Skip Telegram notification for this upload</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Submit ── -->
+    <div class="submit-bar">
+      <button type="submit" class="btn-accent" style="padding:.65rem 2rem;font-size:1rem" onclick="showSpinner()">
+        ⬆️ Upload & Translate
+      </button>
+      <div class="spinner" id="spinner"></div>
+      <a href="/dashboard" class="btn-ghost">Cancel</a>
+    </div>
+
+  </form>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let fetchedSRTText = '';
+let episodeCount   = 0;
+
+// ── Type toggle ──
+function toggleType() {
+  const isSeries = document.getElementById('type-series').checked;
+  document.getElementById('season-group').style.display   = isSeries ? '' : 'none';
+  document.getElementById('ep-inputs').style.display      = isSeries ? 'flex' : 'none';
+  document.getElementById('movie-srt-section').style.display  = isSeries ? 'none' : '';
+  document.getElementById('series-srt-section').style.display = isSeries ? '' : 'none';
+  document.getElementById('lbl-movie').style.cssText  = isSeries ? '' : 'background:rgba(229,9,20,.2);border-color:var(--accent);color:var(--accent);font-weight:700';
+  document.getElementById('lbl-series').style.cssText = isSeries ? 'background:rgba(21,101,192,.2);border-color:#1565c0;color:#64b5f6;font-weight:700' : 'font-weight:700';
+}
+
+// ── TMDB Search ──
+async function searchTmdb() {
+  const q    = document.getElementById('tmdb-query').value.trim();
+  if (!q) return;
+  const type = document.getElementById('type-series').checked ? 'tv' : 'movie';
+  const res  = await fetch(`/api/tmdb_search?query=${encodeURIComponent(q)}&type=${type}`);
+  const data = await res.json();
+  const box  = document.getElementById('tmdb-results');
+  box.innerHTML = '';
+  box.style.display = 'block';
+  (data.results || []).slice(0, 8).forEach(item => {
+    const name = item.title || item.name || '';
+    const year = (item.release_date || item.first_air_date || '').slice(0,4);
+    const poster = item.poster_path ? `https://image.tmdb.org/t/p/w92${item.poster_path}` : 'https://via.placeholder.com/36x54/1a1a1a/555?text=?';
+    const el = document.createElement('div');
+    el.className = 'tmdb-item';
+    el.innerHTML = `<img src="${poster}" onerror="this.src='https://via.placeholder.com/36x54/1a1a1a/555?text=?'">
+      <div class="tmdb-info"><div class="tmdb-name">${name}</div><div class="tmdb-year">${year}</div></div>`;
+    el.onclick = () => fillFromTmdb(item.id, type, name);
+    box.appendChild(el);
+  });
+  if (!data.results || data.results.length === 0)
+    box.innerHTML = '<div style="padding:.75rem;color:var(--text-muted);font-size:.85rem">No results found.</div>';
+}
+
+async function fillFromTmdb(id, type, name) {
+  document.getElementById('tmdb-results').style.display = 'none';
+  const res  = await fetch(`/api/tmdb_details?id=${id}&type=${type}`);
+  const d    = await res.json();
+  document.getElementById('f-title').value  = d.title || d.name || name;
+  document.getElementById('f-year').value   = (d.release_date || d.first_air_date || '').slice(0,4);
+  document.getElementById('f-rating').value = d.vote_average ? d.vote_average.toFixed(1) : '';
+  document.getElementById('f-runtime').value = d.runtime ? d.runtime + ' min' : (d.episode_run_time?.[0] ? d.episode_run_time[0] + ' min' : '');
+  document.getElementById('f-plot').value   = d.overview || '';
+  if (d.poster_path) document.getElementById('f-poster').value = `https://image.tmdb.org/t/p/w500${d.poster_path}`;
+  const imdbId = d.imdb_id || d.external_ids?.imdb_id || '';
+  if (imdbId) document.getElementById('imdb-id-input').value = imdbId;
+  // Check genres
+  (d.genres || []).forEach(g => {
+    document.querySelectorAll('.cat-check').forEach(cb => {
+      if (cb.value === g.name) cb.checked = true;
+    });
+  });
+}
+
+// ── Auto-fetch SRT ──
+async function autoFetchSRT() {
+  const imdb    = document.getElementById('imdb-id-input').value.trim();
+  const isSeries = document.getElementById('type-series').checked;
+  const season  = document.getElementById('fetch-season')?.value;
+  const episode = document.getElementById('fetch-episode')?.value;
+  const resBox  = document.getElementById('fetch-result');
+
+  if (!imdb) { showFetchMsg('Please enter an IMDb ID first.', false); return; }
+
+  resBox.textContent = '⏳ Fetching subtitle…';
+  resBox.className = 'fetch-result';
+  resBox.style.display = 'block';
+
+  const body = { imdb_id: imdb, media_type: isSeries ? 'series' : 'movie' };
+  if (isSeries && season && episode) { body.season = parseInt(season); body.episode = parseInt(episode); }
+
+  const r = await fetch('/api/auto_fetch_srt', {
+    method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)
+  });
+  const d = await r.json();
+  if (d.success) {
+    fetchedSRTText = d.srt_text;
+    showFetchMsg(`✅ SRT fetched from ${d.source} (${(d.srt_text.length/1024).toFixed(1)} KB)`, true);
+    if (isSeries) addEpisodeWithSRT(episode || '1', d.srt_text);
+    else {
+      document.getElementById('fetched-srt-single').value = d.srt_text;
+      document.getElementById('fetched-single-preview').style.display = 'block';
+    }
+  } else {
+    showFetchMsg('❌ ' + (d.error || 'Not found on any source.'), false);
+  }
+}
+
+function showFetchMsg(msg, ok) {
+  const r = document.getElementById('fetch-result');
+  r.textContent = msg; r.className = 'fetch-result ' + (ok ? 'ok' : 'err'); r.style.display = 'block';
+}
+function clearFetchedSRT() {
+  document.getElementById('fetched-srt-single').value = '';
+  document.getElementById('fetched-single-preview').style.display = 'none';
+}
+
+// ── Episode management (series) ──
+function addEpisode(ep, srtText) {
+  episodeCount++;
+  const n   = ep || episodeCount;
+  const div = document.createElement('div');
+  div.className = 'ep-row';
+  div.id = 'ep-row-' + episodeCount;
+  div.innerHTML = `
+    <input type="number" class="form-input ep-num" placeholder="Ep #" value="${n}" name="episodes[]" min="1">
+    <input type="hidden" name="fetched_srts[]" id="fsrt-${episodeCount}" value="${srtText || ''}">
+    <input type="file" name="files[]" accept=".srt" style="display:none" id="ef-${episodeCount}">
+    <button type="button" class="btn-ghost" style="font-size:.8rem;padding:.4rem .8rem"
+            onclick="document.getElementById('ef-${episodeCount}').click()">📂 File</button>
+    ${srtText ? `<span style="color:#81c784;font-size:.78rem">✅ Auto-fetched</span>` : ''}
+    <button type="button" class="remove-ep" onclick="document.getElementById('ep-row-${episodeCount}').remove()">✕</button>`;
+  document.getElementById('ep-list').appendChild(div);
+}
+function addEpisodeWithSRT(ep, srtText) { addEpisode(ep, srtText); }
+
+// Drop zone drag events
+const dz = document.getElementById('drop-single');
+if (dz) {
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+  dz.addEventListener('drop', e => {
+    e.preventDefault(); dz.classList.remove('drag-over');
+    const f = e.dataTransfer.files[0];
+    if (f && f.name.endsWith('.srt')) {
+      document.getElementById('srt-file-single').files = e.dataTransfer.files;
+      dz.querySelector('p').textContent = '✅ ' + f.name;
+    }
+  });
+}
+document.getElementById('srt-file-single')?.addEventListener('change', function() {
+  if (this.files[0]) dz.querySelector('p').textContent = '✅ ' + this.files[0].name;
+});
+
+function showSpinner() {
+  document.getElementById('spinner').style.display = 'inline-block';
+}
+
+// TMDB query on Enter
+document.getElementById('tmdb-query').addEventListener('keypress', e => {
+  if (e.key === 'Enter') { e.preventDefault(); searchTmdb(); }
+});
+</script>
+{% endblock %}
