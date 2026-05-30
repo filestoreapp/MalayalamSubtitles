@@ -1,107 +1,128 @@
 {% extends "base.html" %}
-{% block title %}{{ title }} Season {{ season }} Episodes – Malayalam Subtitles Hub{% endblock %}
+{% block title %}{{ title }} Season {{ season }} – Malayalam Subtitles Hub{% endblock %}
 
 {% block extra_head %}
 <style>
-  .series-header {
-    background: linear-gradient(to bottom, #000820 0%, var(--bg-primary) 100%);
-    border-bottom: 1px solid var(--border); padding: 1.75rem 1.25rem; position: relative; overflow: hidden;
-  }
-  .series-header-bg {
-    position: absolute; inset: 0;
-    background-image: url('{{ show_data.poster_url }}');
-    background-size: cover; background-position: center;
-    filter: blur(50px) brightness(.15); transform: scale(1.1);
-  }
-  .series-header-inner { position: relative; max-width: 1100px; margin: auto; display: flex; gap: 1.5rem; align-items: center; }
-  .series-header img { width: 110px; border-radius: 10px; box-shadow: 0 12px 40px rgba(0,0,0,.8); flex-shrink: 0; }
-  .series-header h1 { font-size: clamp(1.2rem,3vw,1.7rem); font-weight: 800; }
-  .series-header .sub-title { color: var(--text-muted); font-size: .9rem; margin-top: .3rem; }
-  .meta-pill { background: rgba(255,255,255,.07); border: 1px solid var(--border); border-radius: 20px; padding: .3rem .7rem; font-size: .8rem; color: var(--text-muted); display: inline-block; margin-right: .4rem; }
+/* Hero (compact) */
+.shero-sm{position:relative;overflow:hidden;background:#020818;border-bottom:1px solid var(--border);padding:1.1rem 1rem}
+.shero-sm-bg{position:absolute;inset:0;
+  {% if show_data.poster_url %}background-image:url('{{ show_data.poster_url | replace("'","%27") }}');{% endif %}
+  background-size:cover;background-position:center;
+  filter:blur(40px) brightness(.12);transform:scale(1.1)}
+.shero-sm-inner{position:relative;max-width:1100px;margin:0 auto;display:flex;gap:1rem;align-items:center}
+.shero-sm img{width:72px;height:108px;object-fit:cover;border-radius:8px;flex-shrink:0;box-shadow:0 8px 24px rgba(0,0,0,.8)}
+.shero-sm h1{font-size:clamp(1rem,3.5vw,1.4rem);font-weight:800;line-height:1.25}
+.mpill{display:inline-flex;align-items:center;background:rgba(255,255,255,.07);border:1px solid var(--border);border-radius:20px;padding:.24rem .6rem;font-size:.74rem;color:var(--muted);margin:.2rem .2rem 0 0}
+.imdb-pill{background:var(--gold);color:#000;font-weight:800;border-radius:6px;padding:.24rem .6rem;font-size:.74rem}
 
-  .episodes-wrap { max-width: 1100px; margin: 1.5rem auto; padding: 0 1.25rem; }
-  .ep-table { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
-  .ep-row {
-    display: flex; align-items: center; gap: 1rem; padding: .9rem 1.25rem;
-    border-bottom: 1px solid var(--border); transition: background .15s;
-    text-decoration: none; color: inherit;
-  }
-  .ep-row:last-child { border-bottom: none; }
-  .ep-row:hover { background: var(--bg-card); color: inherit; }
-  .ep-number { min-width: 48px; font-size: .85rem; font-weight: 700; color: var(--accent); }
-  .ep-info { flex: 1; min-width: 0; }
-  .ep-info .ep-title { font-size: .9rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .ep-langs { display: flex; gap: .3rem; flex-shrink: 0; }
-  .lang-dot {
-    width: 28px; height: 28px; border-radius: 50%; font-size: .65rem; font-weight: 700;
-    display: flex; align-items: center; justify-content: center; border: 1.5px solid transparent;
-  }
-  .lang-dot.ready { border-color: #4caf50; color: #4caf50; }
-  .lang-dot.pend  { border-color: #444; color: #555; }
-  .dl-quick { color: var(--text-muted); font-size: .8rem; white-space: nowrap; display: flex; flex-direction: column; gap: .2rem; align-items: flex-end; }
-  .dl-quick a { color: var(--text-muted); text-decoration: none; font-size: .75rem; }
-  .dl-quick a:hover { color: #fff; }
+/* Season nav */
+.sn-wrap{max-width:1100px;margin:.85rem auto 0;padding:0 1rem;display:flex;gap:.4rem;overflow-x:auto;scrollbar-width:none}
+.sn-wrap::-webkit-scrollbar{display:none}
+.sn-btn{background:var(--card);border:1px solid var(--border);color:var(--muted);border-radius:7px;padding:.35rem .75rem;font-size:.78rem;text-decoration:none;white-space:nowrap;transition:all .15s;flex-shrink:0}
+.sn-btn:hover{color:#fff;border-color:#555}
+.sn-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+
+/* Episode list */
+.ep-list-wrap{max-width:1100px;margin:1rem auto 1.5rem;padding:0 1rem}
+.ep-table{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--bg2)}
+
+.ep-row{
+  display:grid;
+  grid-template-columns:52px 1fr auto auto;
+  gap:.5rem;padding:.75rem .9rem;border-bottom:1px solid var(--border);
+  align-items:center;text-decoration:none;color:inherit;transition:background .13s;
+}
+.ep-row:last-child{border-bottom:none}
+.ep-row:hover{background:var(--card);color:inherit}
+
+.ep-num{font-size:.82rem;font-weight:700;color:var(--accent);text-align:center}
+.ep-info .ep-title{font-size:.88rem;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.ep-info .ep-sub{font-size:.72rem;color:var(--muted);margin-top:.15rem}
+
+/* Language dots */
+.lang-dots{display:flex;gap:.22rem;flex-shrink:0}
+.ld{width:26px;height:26px;border-radius:50%;font-size:.58rem;font-weight:700;display:flex;align-items:center;justify-content:center;border:1.5px solid transparent;flex-shrink:0}
+.ld-ready-en{border-color:#888;color:#aaa}
+.ld-ready-ml{border-color:#4caf50;color:#4caf50}
+.ld-ready-ta{border-color:#ef5350;color:#ef5350}
+.ld-ready-hi{border-color:#42a5f5;color:#42a5f5}
+.ld-pend{border-color:#333;color:#444}
+
+/* Quick download links */
+.ep-dls{display:flex;flex-direction:column;gap:.18rem;align-items:flex-end;flex-shrink:0}
+.ep-dls a{color:var(--muted);font-size:.7rem;text-decoration:none;white-space:nowrap;padding:.15rem .3rem;border-radius:4px;border:1px solid var(--border);transition:all .13s}
+.ep-dls a:hover{color:#fff;border-color:#666}
+
+/* Mobile: hide download links, show only dots */
+@media(max-width:480px){
+  .ep-row{grid-template-columns:42px 1fr auto}
+  .ep-dls{display:none}
+}
 </style>
 {% endblock %}
 
 {% block content %}
 
-<div class="series-header">
-  <div class="series-header-bg"></div>
-  <div class="series-header-inner">
+<!-- Compact hero -->
+<div class="shero-sm">
+  <div class="shero-sm-bg"></div>
+  <div class="shero-sm-inner">
     <a href="/series/{{ title | urlencode }}">
-      <img src="{{ show_data.poster_url or 'https://via.placeholder.com/300x450/1a1a1a/555?text=No+Poster' }}"
-           alt="{{ title }}" onerror="this.src='https://via.placeholder.com/300x450/1a1a1a/555?text=No+Poster'">
+      <img src="{{ show_data.poster_url or 'https://placehold.co/300x450/1a1a1a/555?text=?' }}"
+           alt="{{ title }}"
+           onerror="this.src='https://placehold.co/300x450/1a1a1a/555?text=?'">
     </a>
     <div>
-      <a href="/series/{{ title | urlencode }}" style="color:var(--text-muted);font-size:.8rem;text-decoration:none;display:inline-block;margin-bottom:.4rem">← All Seasons</a>
+      <a href="/series/{{ title | urlencode }}" style="color:var(--muted);font-size:.72rem;display:inline-block;margin-bottom:.3rem">← All Seasons</a>
       <h1>{{ title }}</h1>
-      <div class="sub-title">
-        <span class="meta-pill">📺 Season {{ season }}</span>
-        <span class="meta-pill">{{ episodes | length }} Episodes</span>
-        {% if show_data.rating and show_data.rating not in ('N/A','0') %}
-        <span class="meta-pill" style="background:var(--gold);color:#000;font-weight:700">⭐ {{ show_data.rating }}</span>
-        {% endif %}
-        {% if show_data.year %}<span class="meta-pill">{{ show_data.year }}</span>{% endif %}
+      <div style="margin-top:.35rem">
+        {% if show_data.rating and show_data.rating not in ('N/A','0') %}<span class="imdb-pill">⭐ {{ show_data.rating }}</span>{% endif %}
+        <span class="mpill">📺 Season {{ season }}</span>
+        <span class="mpill">{{ episodes | length }} Episodes</span>
+        {% if show_data.year %}<span class="mpill">{{ show_data.year }}</span>{% endif %}
       </div>
     </div>
   </div>
 </div>
 
-<div class="episodes-wrap">
+<!-- Season navigation -->
+{% if all_seasons and all_seasons | length > 1 %}
+<div class="sn-wrap">
+  {% for s in all_seasons %}
+  <a href="/series/{{ title | urlencode }}/{{ s }}" class="sn-btn {{ 'active' if s == season }}">Season {{ s }}</a>
+  {% endfor %}
+</div>
+{% endif %}
 
-  <!-- Season navigation -->
-  <div style="margin-bottom:1rem;display:flex;gap:.5rem;flex-wrap:wrap">
-    <a href="/series/{{ title | urlencode }}" class="btn-ghost" style="font-size:.82rem">All Seasons</a>
-  </div>
-
-  <div class="ep-table" style="background:var(--bg-secondary)">
+<!-- Episode list -->
+<div class="ep-list-wrap">
+  <div class="ep-table">
     {% for ep in episodes %}
-    <a href="/movie/{{ ep.slug }}" class="ep-row">
-      <div class="ep-number">E{{ '%02d' | format(ep.episode) }}</div>
+    {% set tlangs = ep.translations | map(attribute='language') | list %}
+    <a href="/movie/{{ ep.slug or ep.id }}" class="ep-row">
+
+      <div class="ep-num">E{{ '%02d' | format(ep.episode or 1) }}</div>
+
       <div class="ep-info">
-        <div class="ep-title">Episode {{ ep.episode }}</div>
-        <div style="font-size:.74rem;color:var(--text-muted);margin-top:.2rem">S{{ '%02d'|format(ep.season) }}E{{ '%02d'|format(ep.episode) }}</div>
+        <div class="ep-title">Episode {{ ep.episode or '?' }}</div>
+        <div class="ep-sub">S{{ '%02d'|format(ep.season or 1) }}E{{ '%02d'|format(ep.episode or 1) }}</div>
       </div>
-      <div class="ep-langs">
-        {% set ready = ep.translations | map(attribute='language') | list %}
-        <span class="lang-dot {{ 'ready' if ep.english_srt else 'pend' }}" title="English">EN</span>
-        <span class="lang-dot {{ 'ready' if 'ml' in ready else 'pend' }}" title="Malayalam">ML</span>
-        <span class="lang-dot {{ 'ready' if 'ta' in ready else 'pend' }}" title="Tamil">TA</span>
-        <span class="lang-dot {{ 'ready' if 'hi' in ready else 'pend' }}" title="Hindi">HI</span>
+
+      <div class="lang-dots">
+        <span class="ld {{ 'ld-ready-en' if ep.english_srt else 'ld-pend' }}" title="English">EN</span>
+        <span class="ld {{ 'ld-ready-ml' if 'ml' in tlangs else 'ld-pend' }}" title="Malayalam">ML</span>
+        <span class="ld {{ 'ld-ready-ta' if 'ta' in tlangs else 'ld-pend' }}" title="Tamil">TA</span>
+        <span class="ld {{ 'ld-ready-hi' if 'hi' in tlangs else 'ld-pend' }}" title="Hindi">HI</span>
       </div>
-      <div class="dl-quick">
-        {% if ep.english_srt %}
-        <a href="/download/{{ ep.id }}/en" onclick="event.stopPropagation()">⬇ EN</a>
-        {% endif %}
-        {% for t in ep.translations %}
-        <a href="/download/{{ ep.id }}/{{ t.language }}" onclick="event.stopPropagation()">⬇ {{ t.language | upper }}</a>
-        {% endfor %}
+
+      <div class="ep-dls" onclick="event.stopPropagation()">
+        {% if ep.english_srt %}<a href="/download/{{ ep.id }}/en">⬇ EN</a>{% endif %}
+        {% for t in ep.translations %}<a href="/download/{{ ep.id }}/{{ t.language }}">⬇ {{ t.language | upper }}</a>{% endfor %}
       </div>
+
     </a>
     {% endfor %}
   </div>
-
 </div>
 
 {% endblock %}

@@ -1,323 +1,213 @@
 {% extends "base.html" %}
-{% block title %}{{ movie.title }} ({{ movie.year }}) – Malayalam Subtitles Hub{% endblock %}
+{% block title %}{{ movie.title }} ({{ movie.year }}) – Malayalam Subtitles{% endblock %}
 
 {% block extra_head %}
 <style>
-  /* ── Hero backdrop ── */
-  .movie-hero {
-    position: relative;
-    background: linear-gradient(to bottom, #1a0000 0%, var(--bg-primary) 100%);
-    padding: 2rem 1.25rem;
-    overflow: hidden;
-  }
-  .movie-hero-bg {
-    position: absolute; inset: 0;
-    background-image: url('{{ movie.poster_url }}');
-    background-size: cover; background-position: center top;
-    filter: blur(60px) brightness(.18);
-    transform: scale(1.1);
-  }
-  .movie-hero-inner {
-    position: relative; max-width: 1100px; margin: auto;
-    display: flex; gap: 2rem; align-items: flex-start;
-  }
-  @media(max-width:640px) { .movie-hero-inner { flex-direction: column; align-items: center; text-align: center; } }
+/* ── Hero ── */
+.mhero{position:relative;overflow:hidden;background:#0a0a0a}
+.mhero-bg{position:absolute;inset:0;background-image:url('{{ (movie.poster_url or "") | replace("'","%27") }}');background-size:cover;background-position:center top;filter:blur(50px) brightness(.15);transform:scale(1.1)}
+.mhero-inner{position:relative;max-width:1100px;margin:0 auto;padding:1.5rem 1rem;display:flex;gap:1.25rem;align-items:flex-start}
+@media(max-width:520px){.mhero-inner{flex-direction:column;align-items:center;text-align:center}}
 
-  /* Poster */
-  .poster-wrap { flex-shrink: 0; }
-  .poster-wrap img {
-    width: 200px; border-radius: 12px;
-    box-shadow: 0 20px 60px rgba(0,0,0,.8);
-  }
-  @media(max-width:640px) { .poster-wrap img { width: 160px; } }
+.poster-img{width:140px;flex-shrink:0;border-radius:10px;box-shadow:0 16px 48px rgba(0,0,0,.85)}
+@media(min-width:521px){.poster-img{width:160px}}
+@media(min-width:768px){.poster-img{width:200px}}
 
-  /* Info */
-  .movie-info { flex: 1; min-width: 0; }
-  .movie-info h1 { font-size: clamp(1.4rem, 4vw, 2.2rem); font-weight: 800; margin-bottom: .35rem; }
-  .movie-info .tagline { color: var(--text-muted); font-style: italic; font-size: .9rem; margin-bottom: .75rem; }
-  .meta-row { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-bottom: .9rem; }
-  .meta-pill {
-    display: inline-flex; align-items: center; gap: .3rem;
-    background: rgba(255,255,255,.07); border: 1px solid var(--border);
-    border-radius: 20px; padding: .3rem .7rem; font-size: .82rem; color: var(--text-muted);
-  }
-  .imdb-badge {
-    background: var(--gold); color: #000; font-weight: 800;
-    border-radius: 6px; padding: .3rem .65rem; font-size: .85rem;
-  }
-  .plot-text { color: #ccc; font-size: .92rem; line-height: 1.65; max-width: 680px; margin-bottom: 1rem; }
+.minfo h1{font-size:clamp(1.2rem,4vw,1.9rem);font-weight:800;line-height:1.2;margin-bottom:.5rem}
+.meta-row{display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;margin-bottom:.65rem}
+.mpill{display:inline-flex;align-items:center;gap:.25rem;background:rgba(255,255,255,.07);border:1px solid var(--border);border-radius:20px;padding:.26rem .65rem;font-size:.78rem;color:var(--muted)}
+.imdb-pill{background:var(--gold);color:#000;font-weight:800;border-radius:6px;padding:.26rem .6rem;font-size:.8rem}
+.plot{color:#ccc;font-size:.88rem;line-height:1.65;max-width:640px;margin-bottom:.85rem}
+@media(max-width:520px){.plot{text-align:left}}
 
-  /* Action buttons row */
-  .action-row { display: flex; gap: .6rem; flex-wrap: wrap; }
-  .fav-btn {
-    background: rgba(255,255,255,.08); border: 1px solid var(--border);
-    color: #fff; border-radius: 8px; padding: .5rem 1rem;
-    cursor: pointer; font-size: .9rem; transition: all .2s;
-  }
-  .fav-btn.active, .fav-btn:hover { background: rgba(229,9,20,.2); border-color: var(--accent); }
-  .share-btn {
-    background: rgba(255,255,255,.08); border: 1px solid var(--border);
-    color: #fff; border-radius: 8px; padding: .5rem 1rem;
-    cursor: pointer; font-size: .9rem; transition: all .2s;
-  }
-  .share-btn:hover { border-color: #aaa; }
+/* Action row */
+.action-row{display:flex;gap:.5rem;flex-wrap:wrap}
+@media(max-width:520px){.action-row{justify-content:center}}
+.fav-btn{background:rgba(255,255,255,.07);border:1px solid var(--border);color:#fff;border-radius:8px;padding:.46rem .9rem;font-size:.84rem;transition:all .18s}
+.fav-btn.active,.fav-btn:hover{background:rgba(229,9,20,.18);border-color:var(--accent)}
+.share-btn{background:rgba(255,255,255,.07);border:1px solid var(--border);color:#fff;border-radius:8px;padding:.46rem .9rem;font-size:.84rem;transition:all .18s}
+.share-btn:hover{border-color:#aaa}
 
-  /* ── Download section ── */
-  .download-section { max-width: 1100px; margin: 1.5rem auto; padding: 0 1.25rem; }
-  .dl-card {
-    background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
-    overflow: hidden; margin-bottom: 1.5rem;
-  }
-  .dl-card-header {
-    background: #1e1e1e; padding: .9rem 1.25rem;
-    display: flex; align-items: center; justify-content: space-between;
-    border-bottom: 1px solid var(--border);
-  }
-  .dl-card-header h2 { font-size: 1rem; font-weight: 700; }
-  .dl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1px; background: var(--border); }
-  .dl-item { background: var(--bg-card); padding: 1rem 1.25rem; transition: background .15s; }
-  .dl-item:hover { background: var(--bg-card-hover); }
-  .dl-lang { display: flex; align-items: center; gap: .6rem; margin-bottom: .6rem; }
-  .dl-lang .flag { font-size: 1.4rem; }
-  .dl-lang .lang-name { font-weight: 700; font-size: .95rem; }
-  .dl-lang .lang-badge { font-size: .68rem; padding: .15rem .4rem; border-radius: 4px; }
-  .lang-ml { background: var(--badge-ml); color: #6dffaa; }
-  .lang-ta { background: var(--badge-ta); color: #ffaaaa; }
-  .lang-hi { background: var(--badge-hi); color: #aaccff; }
-  .lang-en { background: #333; color: #ccc; }
-  .dl-btn {
-    display: flex; align-items: center; gap: .5rem; justify-content: center;
-    background: var(--accent); color: #fff; border-radius: 8px; padding: .5rem;
-    text-decoration: none; font-size: .85rem; font-weight: 600; transition: background .2s;
-  }
-  .dl-btn:hover { background: var(--accent-hover); color: #fff; }
-  .dl-btn.pending {
-    background: #252525; color: var(--text-muted); cursor: default; pointer-events: none;
-  }
-  .rating-mini { font-size: .75rem; color: var(--text-muted); margin-top: .4rem; }
-  .stars { color: var(--gold); letter-spacing: 1px; }
+/* ── Download section ── */
+.dl-wrap{max-width:1100px;margin:1.25rem auto 0;padding:0 1rem}
+.dl-card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:1.25rem}
+.dl-card-head{background:#1e1e1e;padding:.8rem 1.1rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.dl-card-head h2{font-size:.95rem;font-weight:700}
 
-  /* ── Ratings widget ── */
-  .rate-section { padding: 1.25rem; border-top: 1px solid var(--border); }
-  .rate-section h3 { font-size: .95rem; font-weight: 700; margin-bottom: .9rem; }
-  .star-picker { display: flex; gap: .3rem; margin-bottom: .75rem; }
-  .star-picker label { font-size: 1.6rem; cursor: pointer; color: #444; transition: color .15s; }
-  .star-picker input:checked ~ label,
-  .star-picker label:hover,
-  .star-picker label:hover ~ label { color: var(--gold); }
-  .star-picker { flex-direction: row-reverse; }
-  .star-picker label:hover,
-  .star-picker label:hover ~ label { color: var(--gold); }
-  .comment-box {
-    background: #1e1e1e; border: 1px solid var(--border); color: #fff;
-    border-radius: 8px; padding: .6rem .9rem; width: 100%; resize: vertical;
-    font-size: .85rem; min-height: 70px;
-  }
-  .comment-box:focus { outline: none; border-color: var(--accent); }
-  .review-card {
-    background: #1e1e1e; border: 1px solid var(--border); border-radius: 10px;
-    padding: .75rem 1rem; margin-top: .75rem;
-  }
-  .review-card .rev-stars { color: var(--gold); font-size: .85rem; }
-  .review-card .rev-comment { font-size: .85rem; color: #ccc; margin-top: .3rem; }
-  .review-card .rev-date { font-size: .72rem; color: var(--text-muted); margin-top: .25rem; }
+/* Download grid – 2 cols mobile, 4 desktop */
+.dl-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border)}
+@media(min-width:640px){.dl-grid{grid-template-columns:repeat(4,1fr)}}
 
-  /* ── Related movies ── */
-  .related-section { max-width: 1100px; margin: 0 auto 2rem; padding: 0 1.25rem; }
+.dl-item{background:var(--card);padding:.85rem 1rem}
+.dl-item:hover{background:var(--card2)}
+.dl-lang-row{display:flex;align-items:center;gap:.45rem;margin-bottom:.55rem}
+.flag{font-size:1.25rem}
+.lang-name{font-weight:700;font-size:.88rem}
+.lang-tag{font-size:.62rem;padding:.14rem .38rem;border-radius:4px;font-weight:700}
+.ml-tag{background:#1a4d30;color:#6dffaa}
+.ta-tag{background:#4d1a1a;color:#ffaaaa}
+.hi-tag{background:#1a2f4d;color:#aaccff}
+.en-tag{background:#333;color:#ccc}
+
+.dl-btn{display:flex;align-items:center;justify-content:center;gap:.4rem;background:var(--accent);color:#fff;border-radius:7px;padding:.48rem .6rem;font-size:.82rem;font-weight:600;transition:background .18s;text-decoration:none}
+.dl-btn:hover{background:var(--acc2);color:#fff}
+.dl-btn.pend{background:#252525;color:var(--muted);pointer-events:none}
+.dl-btn.rate-btn{background:transparent;border:1px solid var(--border);color:var(--muted);margin-top:.35rem;font-size:.75rem;padding:.35rem}
+.dl-btn.rate-btn:hover{border-color:var(--accent);color:var(--accent);background:rgba(229,9,20,.08)}
+.rating-row{font-size:.72rem;color:var(--muted);margin-bottom:.35rem}
+.stars{color:var(--gold)}
+
+/* Progress bar */
+.prog-bar{height:3px;background:#222;border-radius:2px;margin-top:.35rem;overflow:hidden}
+.prog-fill{height:100%;background:var(--accent);border-radius:2px;width:0;transition:width .3s}
+
+/* Reviews section */
+.reviews-sec{padding:.9rem 1.1rem;border-top:1px solid var(--border)}
+.reviews-sec h3{font-size:.88rem;font-weight:700;margin-bottom:.6rem}
+.review-card{background:#1c1c1c;border:1px solid var(--border);border-radius:8px;padding:.65rem .85rem;margin-bottom:.5rem}
+.review-card .stars{font-size:.82rem}
+.review-text{font-size:.82rem;color:#ccc;margin-top:.25rem}
+.review-date{font-size:.7rem;color:var(--muted);margin-top:.2rem}
+
+/* ── Related ── */
+.related-wrap{max-width:1100px;margin:0 auto 1.5rem;padding:0 1rem}
+
+/* ── Rating modal ── */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:2000;align-items:center;justify-content:center;padding:1rem}
+.modal-box{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.35rem 1.25rem;width:min(400px,100%);max-height:90vh;overflow-y:auto}
+.modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem}
+.modal-head h3{font-size:.95rem;font-weight:700}
+.close-btn{background:none;border:none;color:#fff;font-size:1.2rem;cursor:pointer;padding:.2rem .5rem}
+.star-picker{display:flex;flex-direction:row-reverse;gap:.25rem;margin-bottom:.75rem}
+.star-picker input{display:none}
+.star-picker label{font-size:1.8rem;cursor:pointer;color:#333;transition:color .12s}
+.star-picker input:checked ~ label,
+.star-picker label:hover,
+.star-picker label:hover ~ label{color:var(--gold)}
+.cbox{background:#1a1a1a;border:1px solid var(--border);color:#fff;border-radius:8px;padding:.55rem .85rem;width:100%;resize:vertical;font-size:.85rem;min-height:70px;font-family:inherit}
+.cbox:focus{outline:none;border-color:var(--accent)}
+.rate-msg{font-size:.82rem;padding:.5rem .75rem;border-radius:7px;margin-top:.6rem;display:none}
+.rate-ok{background:rgba(76,175,80,.15);border:1px solid rgba(76,175,80,.3);color:#81c784}
+.rate-err{background:rgba(229,9,20,.12);border:1px solid rgba(229,9,20,.3);color:#ef9a9a}
 </style>
 {% endblock %}
 
 {% block content %}
 
 <!-- ── Hero ── -->
-<div class="movie-hero">
-  <div class="movie-hero-bg"></div>
-  <div class="movie-hero-inner">
+<div class="mhero">
+  <div class="mhero-bg"></div>
+  <div class="mhero-inner">
+    <img class="poster-img"
+         src="{{ movie.poster_url or 'https://placehold.co/300x450/1a1a1a/555?text=?' }}"
+         alt="{{ movie.title }}"
+         onerror="this.src='https://placehold.co/300x450/1a1a1a/555?text=?'">
 
-    <div class="poster-wrap">
-      <img src="{{ movie.poster_url or 'https://via.placeholder.com/300x450/1a1a1a/555?text=No+Poster' }}"
-           alt="{{ movie.title }}"
-           onerror="this.src='https://via.placeholder.com/300x450/1a1a1a/555?text=No+Poster'">
-    </div>
-
-    <div class="movie-info">
-      <a href="/" style="color:var(--text-muted);font-size:.82rem;text-decoration:none;margin-bottom:.75rem;display:inline-block">← Back</a>
+    <div class="minfo">
+      <a href="/" style="color:var(--muted);font-size:.78rem;display:inline-block;margin-bottom:.6rem">← Back</a>
       <h1>{{ movie.title }}</h1>
 
       <div class="meta-row">
-        {% if movie.rating and movie.rating not in ('N/A','0') %}
-        <span class="imdb-badge">⭐ {{ movie.rating }}</span>
-        {% endif %}
-        {% if movie.year %}<span class="meta-pill">📅 {{ movie.year }}</span>{% endif %}
-        {% if movie.runtime %}<span class="meta-pill">⏱ {{ movie.runtime }}</span>{% endif %}
-        <span class="meta-pill">{{ '📺 Series' if movie.media_type == 'series' else '🎬 Movie' }}</span>
-        {% if movie.season %}<span class="meta-pill">S{{ '%02d'|format(movie.season) }}{% if movie.episode %} E{{ '%02d'|format(movie.episode) }}{% endif %}</span>{% endif %}
+        {% if movie.rating and movie.rating not in ('N/A','0') %}<span class="imdb-pill">⭐ {{ movie.rating }}</span>{% endif %}
+        {% if movie.year %}<span class="mpill">📅 {{ movie.year }}</span>{% endif %}
+        {% if movie.runtime %}<span class="mpill">⏱ {{ movie.runtime }}</span>{% endif %}
+        <span class="mpill">{{ '📺 Series' if movie.media_type=='series' else '🎬 Movie' }}</span>
+        {% if movie.season %}<span class="mpill">S{{ '%02d'|format(movie.season) }}{% if movie.episode %}/E{{ '%02d'|format(movie.episode) }}{% endif %}</span>{% endif %}
       </div>
 
       {% if movie.category %}
-      <div style="margin-bottom:.85rem">
-        {% for cat in movie.category.replace('SilentMode','').split(',') %}
-          {% set c = cat.strip() %}{% if c %}
-          <a href="/?cat={{ c | urlencode }}" class="tag-badge" style="text-decoration:none">{{ c }}</a>
-          {% endif %}
-        {% endfor %}
+      <div style="margin-bottom:.7rem">
+        {% for c in movie.category.replace('SilentMode','').split(',') %}{% set ct=c.strip() %}{% if ct %}<a href="/?cat={{ ct|urlencode }}" class="tag">{{ ct }}</a>{% endif %}{% endfor %}
       </div>
       {% endif %}
 
-      {% if movie.plot %}
-      <p class="plot-text">{{ movie.plot }}</p>
-      {% endif %}
+      {% if movie.plot %}<p class="plot">{{ movie.plot }}</p>{% endif %}
 
       <div class="action-row">
         <button class="fav-btn {{ 'active' if is_favorite }}" id="fav-btn"
-                onclick="toggleFav(this, {{ movie.id }})"
-                title="{{ 'Remove from Watchlist' if is_favorite else 'Add to Watchlist' }}">
+                onclick="toggleFav(this,{{ movie.id }})">
           {{ '❤️ Saved' if is_favorite else '🤍 Watchlist' }}
         </button>
         <button class="share-btn" onclick="shareMovie()">📤 Share</button>
-        {% if movie.imdb_id %}
-        <a href="https://www.imdb.com/title/{{ movie.imdb_id }}" target="_blank" class="share-btn" style="text-decoration:none">
-          🎞 IMDb
-        </a>
-        {% endif %}
+        {% if movie.imdb_id %}<a href="https://www.imdb.com/title/{{ movie.imdb_id }}" target="_blank" rel="noopener" class="share-btn">🎞 IMDb</a>{% endif %}
       </div>
     </div>
   </div>
 </div>
 
 <!-- ── Downloads ── -->
-<div class="download-section">
+<div class="dl-wrap">
   <div class="dl-card">
-    <div class="dl-card-header">
+    <div class="dl-card-head">
       <h2>📥 Download Subtitles</h2>
-      <span style="font-size:.8rem;color:var(--text-muted)">SRT format</span>
+      <span style="font-size:.75rem;color:var(--muted)">.srt format</span>
     </div>
     <div class="dl-grid">
 
       <!-- English -->
       {% if movie.english_srt %}
       <div class="dl-item">
-        <div class="dl-lang">
-          <span class="flag">🇬🇧</span>
-          <span class="lang-name">English</span>
-          <span class="dl-lang lang-badge lang-en">EN</span>
-        </div>
-        {% if lang_ratings.get('en') %}
-        <div class="rating-mini">
-          <span class="stars">{{ '★' * (lang_ratings['en']['avg'] | int) }}{{ '☆' * (5 - lang_ratings['en']['avg'] | int) }}</span>
-          {{ lang_ratings['en']['avg'] }}/5 ({{ lang_ratings['en']['count'] }} reviews)
-        </div>
-        {% endif %}
-        <a href="/download/{{ movie.id }}/en" class="dl-btn mt-2">⬇ Download</a>
-        <button onclick="openRateModal('en','English')" class="fav-btn w-100 mt-2" style="font-size:.78rem;padding:.35rem">⭐ Rate this subtitle</button>
+        <div class="dl-lang-row"><span class="flag">🇬🇧</span><span class="lang-name">English</span><span class="lang-tag en-tag">EN</span></div>
+        {% if lang_ratings.get('en') %}<div class="rating-row"><span class="stars">{{ '★'*(lang_ratings['en']['avg']|int) }}{{ '☆'*(5-lang_ratings['en']['avg']|int) }}</span> {{ lang_ratings['en']['avg'] }}/5</div>{% endif %}
+        <a href="/download/{{ movie.id }}/en" class="dl-btn">⬇ Download</a>
+        <button onclick="openRateModal('en','English')" class="dl-btn rate-btn">⭐ Rate</button>
       </div>
       {% endif %}
 
       <!-- Malayalam -->
       <div class="dl-item">
-        <div class="dl-lang">
-          <span class="flag">🇮🇳</span>
-          <span class="lang-name">Malayalam</span>
-          <span class="dl-lang lang-badge lang-ml">ML</span>
-        </div>
-        {% if lang_ratings.get('ml') %}
-        <div class="rating-mini">
-          <span class="stars">{{ '★' * (lang_ratings['ml']['avg'] | int) }}{{ '☆' * (5 - lang_ratings['ml']['avg'] | int) }}</span>
-          {{ lang_ratings['ml']['avg'] }}/5 ({{ lang_ratings['ml']['count'] }} reviews)
-        </div>
-        {% endif %}
-        {% if 'ml' in ready_languages %}
-        <a href="/download/{{ movie.id }}/ml" class="dl-btn mt-2">⬇ Download</a>
-        <button onclick="openRateModal('ml','Malayalam')" class="fav-btn w-100 mt-2" style="font-size:.78rem;padding:.35rem">⭐ Rate</button>
-        {% else %}
-        <div class="dl-btn pending mt-2" id="ml-status">⏳ Translating…</div>
-        <div class="progress mt-2" style="height:4px;background:#222;border-radius:2px"><div class="progress-bar bg-danger" id="ml-bar" style="width:0%"></div></div>
-        {% endif %}
+        <div class="dl-lang-row"><span class="flag">🇮🇳</span><span class="lang-name">Malayalam</span><span class="lang-tag ml-tag">ML</span></div>
+        {% if lang_ratings.get('ml') %}<div class="rating-row"><span class="stars">{{ '★'*(lang_ratings['ml']['avg']|int) }}{{ '☆'*(5-lang_ratings['ml']['avg']|int) }}</span> {{ lang_ratings['ml']['avg'] }}/5</div>{% endif %}
+        {% if 'ml' in ready_languages %}<a href="/download/{{ movie.id }}/ml" class="dl-btn">⬇ Download</a><button onclick="openRateModal('ml','Malayalam')" class="dl-btn rate-btn">⭐ Rate</button>
+        {% else %}<div class="dl-btn pend" id="ml-st">⏳ Translating…</div><div class="prog-bar"><div class="prog-fill" id="ml-bar"></div></div>{% endif %}
       </div>
 
       <!-- Tamil -->
       <div class="dl-item">
-        <div class="dl-lang">
-          <span class="flag">🇮🇳</span>
-          <span class="lang-name">Tamil</span>
-          <span class="dl-lang lang-badge lang-ta">TA</span>
-        </div>
-        {% if lang_ratings.get('ta') %}
-        <div class="rating-mini">
-          <span class="stars">{{ '★' * (lang_ratings['ta']['avg'] | int) }}{{ '☆' * (5 - lang_ratings['ta']['avg'] | int) }}</span>
-          {{ lang_ratings['ta']['avg'] }}/5 ({{ lang_ratings['ta']['count'] }} reviews)
-        </div>
-        {% endif %}
-        {% if 'ta' in ready_languages %}
-        <a href="/download/{{ movie.id }}/ta" class="dl-btn mt-2">⬇ Download</a>
-        <button onclick="openRateModal('ta','Tamil')" class="fav-btn w-100 mt-2" style="font-size:.78rem;padding:.35rem">⭐ Rate</button>
-        {% else %}
-        <div class="dl-btn pending mt-2" id="ta-status">⏳ Translating…</div>
-        <div class="progress mt-2" style="height:4px;background:#222;border-radius:2px"><div class="progress-bar bg-danger" id="ta-bar" style="width:0%"></div></div>
-        {% endif %}
+        <div class="dl-lang-row"><span class="flag">🇮🇳</span><span class="lang-name">Tamil</span><span class="lang-tag ta-tag">TA</span></div>
+        {% if lang_ratings.get('ta') %}<div class="rating-row"><span class="stars">{{ '★'*(lang_ratings['ta']['avg']|int) }}{{ '☆'*(5-lang_ratings['ta']['avg']|int) }}</span> {{ lang_ratings['ta']['avg'] }}/5</div>{% endif %}
+        {% if 'ta' in ready_languages %}<a href="/download/{{ movie.id }}/ta" class="dl-btn">⬇ Download</a><button onclick="openRateModal('ta','Tamil')" class="dl-btn rate-btn">⭐ Rate</button>
+        {% else %}<div class="dl-btn pend" id="ta-st">⏳ Translating…</div><div class="prog-bar"><div class="prog-fill" id="ta-bar"></div></div>{% endif %}
       </div>
 
       <!-- Hindi -->
       <div class="dl-item">
-        <div class="dl-lang">
-          <span class="flag">🇮🇳</span>
-          <span class="lang-name">Hindi</span>
-          <span class="dl-lang lang-badge lang-hi">HI</span>
-        </div>
-        {% if lang_ratings.get('hi') %}
-        <div class="rating-mini">
-          <span class="stars">{{ '★' * (lang_ratings['hi']['avg'] | int) }}{{ '☆' * (5 - lang_ratings['hi']['avg'] | int) }}</span>
-          {{ lang_ratings['hi']['avg'] }}/5 ({{ lang_ratings['hi']['count'] }} reviews)
-        </div>
-        {% endif %}
-        {% if 'hi' in ready_languages %}
-        <a href="/download/{{ movie.id }}/hi" class="dl-btn mt-2">⬇ Download</a>
-        <button onclick="openRateModal('hi','Hindi')" class="fav-btn w-100 mt-2" style="font-size:.78rem;padding:.35rem">⭐ Rate</button>
-        {% else %}
-        <div class="dl-btn pending mt-2" id="hi-status">⏳ Translating…</div>
-        <div class="progress mt-2" style="height:4px;background:#222;border-radius:2px"><div class="progress-bar bg-danger" id="hi-bar" style="width:0%"></div></div>
-        {% endif %}
+        <div class="dl-lang-row"><span class="flag">🇮🇳</span><span class="lang-name">Hindi</span><span class="lang-tag hi-tag">HI</span></div>
+        {% if lang_ratings.get('hi') %}<div class="rating-row"><span class="stars">{{ '★'*(lang_ratings['hi']['avg']|int) }}{{ '☆'*(5-lang_ratings['hi']['avg']|int) }}</span> {{ lang_ratings['hi']['avg'] }}/5</div>{% endif %}
+        {% if 'hi' in ready_languages %}<a href="/download/{{ movie.id }}/hi" class="dl-btn">⬇ Download</a><button onclick="openRateModal('hi','Hindi')" class="dl-btn rate-btn">⭐ Rate</button>
+        {% else %}<div class="dl-btn pend" id="hi-st">⏳ Translating…</div><div class="prog-bar"><div class="prog-fill" id="hi-bar"></div></div>{% endif %}
       </div>
 
-    </div><!-- /dl-grid -->
+    </div>
 
-    <!-- Community Reviews per language -->
-    {% for lang_code, data in lang_ratings.items() %}
-    {% if data.comments %}
-    <div class="rate-section">
-      <h3>💬 Community Reviews – {{ {'en':'English','ml':'Malayalam','ta':'Tamil','hi':'Hindi'}.get(lang_code, lang_code) }}</h3>
+    <!-- Community reviews -->
+    {% for lc, data in lang_ratings.items() %}{% if data.comments %}
+    <div class="reviews-sec">
+      <h3>💬 {{ {'en':'English','ml':'Malayalam','ta':'Tamil','hi':'Hindi'}.get(lc,lc) }} Reviews</h3>
       {% for rev in data.comments %}
       <div class="review-card">
-        <div class="rev-stars">{{ '★' * rev.rating }}{{ '☆' * (5 - rev.rating) }}</div>
-        {% if rev.comment %}<div class="rev-comment">{{ rev.comment }}</div>{% endif %}
-        <div class="rev-date">{{ rev.created_at.strftime('%b %d, %Y') if rev.created_at else '' }}</div>
+        <div class="stars">{{ '★'*rev.rating }}{{ '☆'*(5-rev.rating) }}</div>
+        {% if rev.comment %}<div class="review-text">{{ rev.comment }}</div>{% endif %}
+        <div class="review-date">{{ rev.created_at.strftime('%b %d, %Y') if rev.created_at else '' }}</div>
       </div>
       {% endfor %}
     </div>
-    {% endif %}
-    {% endfor %}
-
-  </div><!-- /dl-card -->
+    {% endif %}{% endfor %}
+  </div>
 </div>
 
-<!-- ── Related Movies ── -->
+<!-- ── Related ── -->
 {% if related_movies %}
-<div class="related-section">
-  <div class="section-head">
-    <h2>📌 You Might Also Like</h2>
-  </div>
+<div class="related-wrap">
+  <div class="sec-head"><h2>📌 You Might Also Like</h2></div>
   <div class="scroll-row">
     {% for m in related_movies %}
-    <a href="{{ '/movie/' + m.slug if m.media_type == 'movie' else '/series/' + m.title | urlencode }}" class="movie-card">
-      <img src="{{ m.poster_url or 'https://via.placeholder.com/300x450/1a1a1a/555?text=No+Poster' }}"
-           alt="{{ m.title }}" loading="lazy"
-           onerror="this.src='https://via.placeholder.com/300x450/1a1a1a/555?text=No+Poster'">
+    <a href="{{ '/movie/'+m.slug if m.slug and m.media_type=='movie' else ('/series/'+m.title|urlencode if m.media_type=='series' else '/movie/'+m.id|string) }}" class="movie-card">
+      <img src="{{ m.poster_url or 'https://placehold.co/300x450/1a1a1a/555?text=?' }}" alt="{{ m.title }}" loading="lazy"
+           onerror="this.src='https://placehold.co/300x450/1a1a1a/555?text=?'">
       <div class="card-body">
         <div class="card-title">{{ m.title }}</div>
-        <div class="card-meta">
-          <span><span class="rating-star">⭐</span> {{ m.rating or 'N/A' }}</span>
-          <span class="badge-type">{{ m.year or '—' }}</span>
-        </div>
+        <div class="card-meta"><span class="star">⭐</span><span>{{ m.rating or 'N/A' }}</span><span class="badge-type">{{ m.year or '—' }}</span></div>
       </div>
     </a>
     {% endfor %}
@@ -325,23 +215,23 @@
 </div>
 {% endif %}
 
-<!-- ── Rate Subtitle Modal ── -->
-<div id="rate-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2000;align-items:center;justify-content:center">
-  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:1.5rem;width:min(420px,95vw)">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
-      <h3 style="font-size:1rem" id="rate-modal-title">Rate Subtitle</h3>
-      <button onclick="closeRateModal()" style="background:none;border:none;color:#fff;font-size:1.3rem;cursor:pointer">✕</button>
+<!-- ── Rating Modal ── -->
+<div id="rate-modal" class="modal-bg" onclick="if(event.target===this)closeRateModal()">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="modal-title">Rate Subtitle</h3>
+      <button class="close-btn" onclick="closeRateModal()">✕</button>
     </div>
     <input type="hidden" id="rate-lang">
     <div class="star-picker" id="star-picker">
-      {% for i in range(5, 0, -1) %}
-      <input type="radio" name="star" id="star{{ i }}" value="{{ i }}" style="display:none">
-      <label for="star{{ i }}" title="{{ i }} star">★</label>
+      {% for i in range(5,0,-1) %}
+      <input type="radio" name="mstar" id="mstar{{ i }}" value="{{ i }}">
+      <label for="mstar{{ i }}" title="{{ i }} star">★</label>
       {% endfor %}
     </div>
-    <textarea class="comment-box mt-3" id="rate-comment" placeholder="Optional comment (max 500 chars)…" maxlength="500"></textarea>
-    <button onclick="submitRating()" class="btn-accent w-100 mt-3">Submit Review</button>
-    <div id="rate-msg" style="margin-top:.75rem;font-size:.85rem;color:var(--gold);display:none"></div>
+    <textarea class="cbox" id="rate-comment" placeholder="Optional comment…" maxlength="500"></textarea>
+    <button onclick="submitRating()" class="btn-red" style="width:100%;margin-top:.75rem">Submit Review</button>
+    <div id="rate-msg" class="rate-msg"></div>
   </div>
 </div>
 
@@ -349,65 +239,38 @@
 
 {% block extra_scripts %}
 <script>
-const MOVIE_ID = {{ movie.id }};
-const PENDING_LANGS = {{ (ready_languages | tojson) }};
-
-// ── Progress polling for pending translations ──
-function pollStatus() {
-  ['ml','ta','hi'].forEach(lang => {
-    if (!PENDING_LANGS.includes(lang)) {
-      fetch('/api/ratings/' + MOVIE_ID + '/' + lang);
-      const statusEl = document.getElementById(lang + '-status');
-      const barEl    = document.getElementById(lang + '-bar');
-      if (!statusEl) return;
-      // Mock progress check (real implementation via your /api/job_status endpoint)
-      statusEl.textContent = '⏳ Processing…';
-    }
+const MID={{ movie.id }};
+function shareMovie(){
+  if(navigator.share){navigator.share({title:'{{ movie.title }}',url:location.href})}
+  else{navigator.clipboard.writeText(location.href).then(()=>alert('Link copied!'))}
+}
+function openRateModal(lang,name){
+  document.getElementById('rate-lang').value=lang;
+  document.getElementById('modal-title').textContent='Rate '+name+' Subtitle';
+  document.getElementById('rate-comment').value='';
+  document.getElementById('rate-msg').style.display='none';
+  document.querySelectorAll('#star-picker input').forEach(i=>i.checked=false);
+  const m=document.getElementById('rate-modal');m.style.display='flex';
+  document.body.style.overflow='hidden';
+}
+function closeRateModal(){
+  document.getElementById('rate-modal').style.display='none';
+  document.body.style.overflow='';
+}
+function submitRating(){
+  const lang=document.getElementById('rate-lang').value;
+  const star=document.querySelector('#star-picker input:checked');
+  const comment=document.getElementById('rate-comment').value;
+  const msg=document.getElementById('rate-msg');
+  if(!star){msg.className='rate-msg rate-err';msg.textContent='Please select a star rating.';msg.style.display='block';return}
+  fetch('/api/rate_subtitle',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({movie_id:MID,language:lang,rating:parseInt(star.value),comment})})
+  .then(r=>r.json()).then(d=>{
+    msg.className='rate-msg '+(d.ok?'rate-ok':'rate-err');
+    msg.textContent=d.ok?'✅ Thanks for your review!':'❌ '+(d.error||'Error');
+    msg.style.display='block';
+    if(d.ok)setTimeout(closeRateModal,1500);
   });
 }
-pollStatus();
-
-// ── Share ──
-function shareMovie() {
-  if (navigator.share) {
-    navigator.share({ title: '{{ movie.title }}', url: location.href });
-  } else {
-    navigator.clipboard.writeText(location.href);
-    alert('Link copied!');
-  }
-}
-
-// ── Rate modal ──
-function openRateModal(lang, langName) {
-  document.getElementById('rate-lang').value = lang;
-  document.getElementById('rate-modal-title').textContent = `Rate ${langName} Subtitle`;
-  document.getElementById('rate-comment').value = '';
-  document.getElementById('rate-msg').style.display = 'none';
-  document.querySelectorAll('#star-picker input').forEach(i => i.checked = false);
-  document.getElementById('rate-modal').style.display = 'flex';
-}
-function closeRateModal() {
-  document.getElementById('rate-modal').style.display = 'none';
-}
-function submitRating() {
-  const lang    = document.getElementById('rate-lang').value;
-  const star    = document.querySelector('#star-picker input:checked');
-  const comment = document.getElementById('rate-comment').value;
-  const msg     = document.getElementById('rate-msg');
-  if (!star) { msg.textContent = 'Please select a star rating.'; msg.style.display = 'block'; return; }
-  fetch('/api/rate_subtitle', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({movie_id: MOVIE_ID, language: lang, rating: parseInt(star.value), comment})
-  }).then(r => r.json()).then(d => {
-    msg.textContent = d.ok ? '✅ Thanks for your review!' : '❌ ' + (d.error || 'Error');
-    msg.style.display = 'block';
-    if (d.ok) setTimeout(closeRateModal, 1500);
-  });
-}
-// Close modal on backdrop click
-document.getElementById('rate-modal').addEventListener('click', function(e) {
-  if (e.target === this) closeRateModal();
-});
 </script>
 {% endblock %}
