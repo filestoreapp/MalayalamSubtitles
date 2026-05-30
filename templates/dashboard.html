@@ -1,15 +1,18 @@
 {% extends "base.html" %}
-{% block title %}Upload Media – Admin{% endblock %}
+{% block title %}Dashboard – Admin{% endblock %}
 
 {% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 <style>
-  .upload-wrap { max-width: 1000px; margin: 1.5rem auto; padding: 0 1.25rem; }
-  .admin-topbar {
+  .dash-wrap { max-width: 1300px; margin: 1.25rem auto; padding: 0 1.25rem; }
+
+  /* Top bar */
+  .dash-topbar {
     background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
     padding: 1rem 1.25rem; margin-bottom: 1.25rem;
     display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .75rem;
   }
-  .admin-topbar h1 { font-size: 1.2rem; font-weight: 800; }
+  .dash-topbar h1 { font-size: 1.2rem; font-weight: 800; }
   .admin-nav { display: flex; gap: .4rem; flex-wrap: wrap; }
   .admin-nav a {
     background: #1a1a1a; border: 1px solid var(--border); color: var(--text-muted);
@@ -18,409 +21,416 @@
   .admin-nav a:hover { color: #fff; border-color: #555; }
   .admin-nav a.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 
-  .form-card {
-    background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
-    padding: 1.5rem; margin-bottom: 1.25rem;
+  /* Stat cards */
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px,1fr)); gap: .75rem; margin-bottom: 1.25rem; }
+  .stat-card {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 1rem 1.1rem; position: relative; overflow: hidden;
   }
-  .form-card h2 { font-size: 1rem; font-weight: 700; margin-bottom: 1.1rem; padding-bottom: .6rem; border-bottom: 1px solid var(--border); }
+  .stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--accent); }
+  .stat-card.blue::before  { background: #1565c0; }
+  .stat-card.green::before { background: #2e7d32; }
+  .stat-card.gold::before  { background: var(--gold); }
+  .stat-card.purple::before{ background: #6a1b9a; }
+  .stat-card.teal::before  { background: #00695c; }
+  .stat-icon { font-size: 1.6rem; margin-bottom: .4rem; }
+  .stat-value { font-size: 1.6rem; font-weight: 800; line-height: 1; margin-bottom: .2rem; }
+  .stat-label { font-size: .75rem; color: var(--text-muted); }
 
-  .form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: .9rem; }
-  .form-group { display: flex; flex-direction: column; gap: .35rem; }
-  .form-group.full { grid-column: 1 / -1; }
-  .form-label { font-size: .78rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
-  .form-input {
-    background: #1a1a1a; border: 1px solid var(--border); color: var(--text-primary);
-    border-radius: 8px; padding: .55rem .85rem; font-size: .9rem; width: 100%; transition: border-color .2s;
+  /* Charts */
+  .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem; }
+  @media(max-width:768px) { .charts-grid { grid-template-columns: 1fr; } }
+  .chart-card {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 1.1rem 1.25rem;
   }
-  .form-input:focus { outline: none; border-color: var(--accent); background: #1e1e1e; }
-  textarea.form-input { resize: vertical; min-height: 90px; }
-  select.form-input { cursor: pointer; }
+  .chart-card.full { grid-column: span 2; }
+  @media(max-width:768px) { .chart-card.full { grid-column: span 1; } }
+  .chart-card h3 { font-size: .88rem; font-weight: 700; margin-bottom: 1rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
+  .chart-wrap { position: relative; }
 
-  /* TMDB search */
-  .tmdb-row { display: flex; gap: .5rem; }
-  .tmdb-row .form-input { flex: 1; }
-  .tmdb-btn {
-    background: #f5c518; color: #000; border: none; border-radius: 8px;
-    padding: .55rem 1rem; font-size: .85rem; font-weight: 700; cursor: pointer; white-space: nowrap; transition: opacity .2s;
-  }
-  .tmdb-btn:hover { opacity: .85; }
-  .tmdb-results {
-    background: #111; border: 1px solid var(--border); border-radius: 8px;
-    max-height: 280px; overflow-y: auto; margin-top: .5rem; display: none;
-  }
-  .tmdb-item {
-    display: flex; gap: .75rem; align-items: center; padding: .65rem .9rem;
-    border-bottom: 1px solid var(--border); cursor: pointer; transition: background .15s;
-  }
-  .tmdb-item:last-child { border-bottom: none; }
-  .tmdb-item:hover { background: #1a1a1a; }
-  .tmdb-item img { width: 36px; height: 54px; object-fit: cover; border-radius: 4px; flex-shrink: 0; }
-  .tmdb-item .tmdb-info .tmdb-name { font-size: .88rem; font-weight: 600; }
-  .tmdb-item .tmdb-info .tmdb-year { font-size: .75rem; color: var(--text-muted); }
-
-  /* Categories */
-  .cat-grid { display: flex; flex-wrap: wrap; gap: .5rem; }
-  .cat-check { display: none; }
-  .cat-label {
+  /* Actions bar */
+  .actions-bar { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
+  .action-btn {
     background: #1a1a1a; border: 1px solid var(--border); color: var(--text-muted);
-    border-radius: 20px; padding: .3rem .75rem; font-size: .8rem; cursor: pointer; transition: all .2s;
-    user-select: none;
+    border-radius: 8px; padding: .45rem .9rem; text-decoration: none; font-size: .82rem; transition: all .2s; cursor: pointer;
   }
-  .cat-check:checked + .cat-label { background: rgba(229,9,20,.2); border-color: var(--accent); color: var(--accent); }
+  .action-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .action-btn.danger:hover { border-color: #ff4444; color: #ff4444; }
 
-  /* SRT upload area */
-  .drop-zone {
-    border: 2px dashed var(--border); border-radius: 10px; padding: 1.5rem;
-    text-align: center; color: var(--text-muted); cursor: pointer; transition: all .2s;
+  /* Failed jobs alert */
+  .failed-alert {
+    background: rgba(229,9,20,.1); border: 1px solid rgba(229,9,20,.3);
+    border-radius: 10px; padding: .75rem 1rem; margin-bottom: 1rem;
+    display: flex; align-items: center; justify-content: space-between; gap: .75rem;
   }
-  .drop-zone:hover, .drop-zone.drag-over { border-color: var(--accent); color: var(--text-primary); }
-  .drop-zone .dz-icon { font-size: 2rem; margin-bottom: .5rem; }
-  .drop-zone input[type="file"] { display: none; }
+  .failed-alert p { font-size: .85rem; margin: 0; }
+  .failed-alert .fix-btn { background: var(--accent); color: #fff; border: none; border-radius: 6px; padding: .35rem .8rem; text-decoration: none; font-size: .8rem; white-space: nowrap; }
 
-  /* Episode rows */
-  .ep-row { display: flex; gap: .5rem; align-items: center; margin-bottom: .5rem; }
-  .ep-row input { background: #1a1a1a; border: 1px solid var(--border); color: #fff; border-radius: 6px; padding: .4rem .7rem; flex: 1; font-size: .85rem; }
-  .ep-row input:focus { outline: none; border-color: var(--accent); }
-  .ep-row .ep-num { width: 60px; flex-shrink: 0; text-align: center; }
-  .remove-ep { background: none; border: 1px solid #3a1010; color: #ff6b6b; border-radius: 5px; padding: .3rem .6rem; cursor: pointer; font-size: .8rem; }
-  .remove-ep:hover { background: rgba(229,9,20,.2); }
-
-  /* Auto-fetch result box */
-  .fetch-result {
-    background: #111; border: 1px solid var(--border); border-radius: 8px;
-    padding: .75rem 1rem; margin-top: .5rem; display: none; font-size: .82rem;
+  /* Media table */
+  .media-table-wrap { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 1.25rem; }
+  .table-head-row { background: #1e1e1e; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 54px 1fr 90px 70px 80px 90px 100px; padding: .6rem 1rem; font-size: .72rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+  .table-body-row {
+    display: grid; grid-template-columns: 54px 1fr 90px 70px 80px 90px 100px;
+    padding: .65rem 1rem; border-bottom: 1px solid var(--border); align-items: center; transition: background .15s;
   }
-  .fetch-result.ok  { border-color: rgba(76,175,80,.4); color: #81c784; }
-  .fetch-result.err { border-color: rgba(229,9,20,.4); color: #ef9a9a; }
-
-  /* Toggle */
-  .toggle-row { display: flex; align-items: center; gap: .75rem; }
-  .toggle { position: relative; width: 42px; height: 24px; }
-  .toggle input { opacity: 0; width: 0; height: 0; }
-  .toggle-slider {
-    position: absolute; inset: 0; background: #333; border-radius: 24px; cursor: pointer; transition: .2s;
+  .table-body-row:last-child { border-bottom: none; }
+  .table-body-row:hover { background: #1e1e1e; }
+  @media(max-width:900px) {
+    .table-head-row, .table-body-row { grid-template-columns: 54px 1fr auto; }
+    .hide-sm { display: none; }
   }
-  .toggle-slider::before {
-    content: ''; position: absolute; left: 3px; top: 3px;
-    width: 18px; height: 18px; background: #888; border-radius: 50%; transition: .2s;
+  .poster-thumb { width: 38px; height: 56px; border-radius: 4px; object-fit: cover; }
+  .media-title { font-size: .85rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .media-meta  { font-size: .75rem; color: var(--text-muted); margin-top: .15rem; }
+  .type-badge { font-size: .68rem; border-radius: 4px; padding: .15rem .4rem; font-weight: 700; }
+  .type-movie  { background: rgba(229,9,20,.2); color: var(--accent); }
+  .type-series { background: rgba(21,101,192,.2); color: #64b5f6; }
+  .lang-dots { display: flex; gap: .2rem; flex-wrap: wrap; }
+  .ld { font-size: .65rem; border-radius: 4px; padding: .15rem .35rem; font-weight: 700; }
+  .ld.ml { background: var(--badge-ml); color: #6dffaa; }
+  .ld.ta { background: var(--badge-ta); color: #ffaaaa; }
+  .ld.hi { background: var(--badge-hi); color: #aaccff; }
+  .ld.en { background: #333; color: #aaa; }
+  .row-actions { display: flex; gap: .3rem; }
+  .row-actions a {
+    font-size: .72rem; border-radius: 5px; padding: .25rem .55rem;
+    text-decoration: none; border: 1px solid var(--border); color: var(--text-muted); transition: all .15s;
   }
-  .toggle input:checked + .toggle-slider { background: rgba(229,9,20,.3); }
-  .toggle input:checked + .toggle-slider::before { background: var(--accent); transform: translateX(18px); }
+  .row-actions a:hover { color: #fff; border-color: #555; }
+  .row-actions .del { border-color: #3a1010; color: #ff6b6b; }
+  .row-actions .del:hover { background: rgba(229,9,20,.2); }
 
-  .submit-bar { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; margin-top: .5rem; }
-  .spinner { display: none; width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
+  /* Jobs */
+  .jobs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px,1fr)); gap: .6rem; margin-bottom: 1.25rem; }
+  .job-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: .75rem 1rem; display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+  .job-info .job-title { font-size: .82rem; font-weight: 600; }
+  .job-info .job-meta  { font-size: .72rem; color: var(--text-muted); margin-top: .15rem; }
+  .job-status { font-size: .72rem; font-weight: 700; border-radius: 20px; padding: .2rem .6rem; white-space: nowrap; }
+  .st-Pending    { background: rgba(255,193,7,.15); color: #ffc107; }
+  .st-Processing { background: rgba(33,150,243,.15); color: #64b5f6; }
+  .st-Failed     { background: rgba(229,9,20,.15); color: var(--accent); }
+  .st-Completed  { background: rgba(76,175,80,.15); color: #81c784; }
+
+  /* Pagination */
+  .pager { display: flex; gap: .35rem; justify-content: center; flex-wrap: wrap; margin: .75rem 0; }
+  .pager a, .pager span {
+    background: var(--bg-card); border: 1px solid var(--border); color: var(--text-muted);
+    padding: .35rem .75rem; border-radius: 6px; text-decoration: none; font-size: .8rem;
+  }
+  .pager a:hover { border-color: var(--accent); color: #fff; }
+  .pager .current { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  /* Scheduler logs */
+  .log-row { display: flex; gap: .75rem; align-items: center; padding: .5rem 0; border-bottom: 1px solid var(--border); font-size: .8rem; }
+  .log-row:last-child { border-bottom: none; }
+  .log-ok   { color: #81c784; }
+  .log-fail { color: var(--accent); }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="upload-wrap">
+<div class="dash-wrap">
 
-  <div class="admin-topbar">
-    <h1>🛠 Admin Panel</h1>
+  <!-- Top bar -->
+  <div class="dash-topbar">
+    <h1>📊 Dashboard</h1>
     <nav class="admin-nav">
-      <a href="/dashboard">📊 Dashboard</a>
-      <a href="/admin" class="active">➕ Upload</a>
-      <a href="/admin/requests">🙋 Requests</a>
+      <a href="/dashboard" class="active">📊 Dashboard</a>
+      <a href="/admin">➕ Upload</a>
+      <a href="/admin/requests">🙋 Requests{% if pending_requests %} <span style="background:var(--accent);color:#fff;border-radius:10px;padding:.05rem .35rem;font-size:.65rem">{{ pending_requests }}</span>{% endif %}</a>
       <a href="/admin/export_csv">📥 CSV</a>
       <a href="/logout">🚪 Logout</a>
     </nav>
   </div>
 
-  <form action="/admin" method="post" enctype="multipart/form-data" id="upload-form">
-
-    <!-- ── Type selector ── -->
-    <div class="form-card">
-      <h2>📁 Media Type</h2>
-      <div style="display:flex;gap:.75rem">
-        <label style="cursor:pointer;flex:1">
-          <input type="radio" name="media_type" value="movie" id="type-movie" checked onchange="toggleType()" style="display:none">
-          <div class="form-input text-center" id="lbl-movie" style="background:rgba(229,9,20,.2);border-color:var(--accent);color:var(--accent);font-weight:700">🎬 Movie</div>
-        </label>
-        <label style="cursor:pointer;flex:1">
-          <input type="radio" name="media_type" value="series" id="type-series" onchange="toggleType()" style="display:none">
-          <div class="form-input text-center" id="lbl-series" style="font-weight:700">📺 TV Series</div>
-        </label>
-      </div>
+  <!-- Stats -->
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="stat-icon">👁</div>
+      <div class="stat-value">{{ visitors | default(0) | int | string }}</div>
+      <div class="stat-label">Total Visitors</div>
     </div>
-
-    <!-- ── TMDB Search ── -->
-    <div class="form-card">
-      <h2>🔍 Auto-fill from TMDB</h2>
-      <div class="tmdb-row">
-        <input class="form-input" type="text" id="tmdb-query" placeholder="Search movie or series title…">
-        <button type="button" class="tmdb-btn" onclick="searchTmdb()">Search TMDB</button>
-      </div>
-      <div class="tmdb-results" id="tmdb-results"></div>
+    <div class="stat-card blue">
+      <div class="stat-icon">🎬</div>
+      <div class="stat-value">{{ total_movies }}</div>
+      <div class="stat-label">Movies</div>
     </div>
-
-    <!-- ── Media details ── -->
-    <div class="form-card">
-      <h2>📋 Media Details</h2>
-      <div class="form-grid">
-        <div class="form-group full">
-          <label class="form-label">Title *</label>
-          <input class="form-input" type="text" name="title" id="f-title" placeholder="Movie or show title" required>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Year</label>
-          <input class="form-input" type="text" name="year" id="f-year" placeholder="2024" maxlength="4">
-        </div>
-        <div class="form-group">
-          <label class="form-label">IMDb Rating</label>
-          <input class="form-input" type="text" name="rating" id="f-rating" placeholder="8.5">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Runtime</label>
-          <input class="form-input" type="text" name="runtime" id="f-runtime" placeholder="148 min">
-        </div>
-        <div class="form-group" id="season-group" style="display:none">
-          <label class="form-label">Season #</label>
-          <input class="form-input" type="number" name="season" id="f-season" min="1" value="1">
-        </div>
-        <div class="form-group full">
-          <label class="form-label">Poster URL</label>
-          <input class="form-input" type="url" name="poster_url" id="f-poster" placeholder="https://…">
-        </div>
-        <div class="form-group full">
-          <label class="form-label">Plot / Synopsis</label>
-          <textarea class="form-input" name="plot" id="f-plot" placeholder="Short description…"></textarea>
-        </div>
-      </div>
+    <div class="stat-card green">
+      <div class="stat-icon">📺</div>
+      <div class="stat-value">{{ total_series }}</div>
+      <div class="stat-label">TV Series</div>
     </div>
-
-    <!-- ── Categories ── -->
-    <div class="form-card">
-      <h2>🎭 Genres</h2>
-      <div class="cat-grid" id="cat-grid">
-        {% for cat in ['Action','Adventure','Animation','Comedy','Crime','Documentary','Drama','Family','Fantasy','History','Horror','Music','Mystery','Romance','Science Fiction','Thriller','War','Western'] %}
-        <input type="checkbox" class="cat-check" name="category" value="{{ cat }}" id="cat-{{ loop.index }}">
-        <label class="cat-label" for="cat-{{ loop.index }}">{{ cat }}</label>
-        {% endfor %}
-      </div>
+    <div class="stat-card gold">
+      <div class="stat-icon">📥</div>
+      <div class="stat-value">{{ downloads }}</div>
+      <div class="stat-label">Downloads</div>
     </div>
-
-    <!-- ── Auto-fetch SRT ── -->
-    <div class="form-card">
-      <h2>⚡ Auto-fetch English SRT</h2>
-      <div style="display:flex;gap:.5rem;flex-wrap:wrap">
-        <input class="form-input" type="text" id="imdb-id-input" placeholder="IMDb ID (e.g. tt1375666)" style="max-width:260px">
-        <div id="ep-inputs" style="display:none;gap:.5rem;align-items:center">
-          <input class="form-input" type="number" id="fetch-season" placeholder="Season" min="1" style="width:90px">
-          <input class="form-input" type="number" id="fetch-episode" placeholder="Ep" min="1" style="width:70px">
-        </div>
-        <button type="button" class="btn-accent" onclick="autoFetchSRT()">⚡ Fetch SRT</button>
-      </div>
-      <div class="fetch-result" id="fetch-result"></div>
-      <div style="font-size:.75rem;color:var(--text-muted);margin-top:.5rem">Tries Subdl then OpenSubtitles automatically.</div>
+    <div class="stat-card purple">
+      <div class="stat-icon">🌐</div>
+      <div class="stat-value">{{ total_subtitles }}</div>
+      <div class="stat-label">Translations</div>
     </div>
-
-    <!-- ── SRT Upload ── -->
-    <div class="form-card">
-      <h2>📄 SRT Subtitle Files</h2>
-
-      <!-- Movie: single SRT -->
-      <div id="movie-srt-section">
-        <div class="drop-zone" onclick="document.getElementById('srt-file-single').click()" id="drop-single">
-          <div class="dz-icon">📂</div>
-          <p>Click or drag & drop English <strong>.srt</strong> file here</p>
-          <input type="file" id="srt-file-single" name="files[]" accept=".srt">
-        </div>
-        <input type="hidden" name="episodes[]" value="1">
-        <!-- auto-fetched SRT goes here -->
-        <div id="fetched-single-preview" style="display:none;margin-top:.75rem">
-          <div style="display:flex;align-items:center;justify-content:space-between;background:#0d2010;border:1px solid rgba(76,175,80,.3);border-radius:8px;padding:.65rem 1rem">
-            <span style="color:#81c784;font-size:.85rem">✅ Auto-fetched SRT ready</span>
-            <button type="button" onclick="clearFetchedSRT()" style="background:none;border:none;color:#555;cursor:pointer">✕</button>
-          </div>
-          <input type="hidden" name="fetched_srts[]" id="fetched-srt-single">
-          <input type="hidden" name="fetched_episodes[]" value="1">
-        </div>
-      </div>
-
-      <!-- Series: multiple episodes -->
-      <div id="series-srt-section" style="display:none">
-        <div id="ep-list"></div>
-        <button type="button" class="btn-ghost mt-3" onclick="addEpisode()">+ Add Episode SRT</button>
-      </div>
+    <div class="stat-card teal">
+      <div class="stat-icon">⭐</div>
+      <div class="stat-value">{{ total_ratings }}</div>
+      <div class="stat-label">User Ratings</div>
     </div>
+    <div class="stat-card">
+      <div class="stat-icon">🙋</div>
+      <div class="stat-value">{{ pending_requests }}</div>
+      <div class="stat-label">Pending Requests</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">🗄</div>
+      <div class="stat-value" style="font-size:1rem">{{ db_size }}</div>
+      <div class="stat-label">DB Size</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">☁️</div>
+      <div class="stat-value" style="font-size:1rem">{{ r2_size_str }}</div>
+      <div class="stat-label">R2 Storage ({{ r2_file_count }} files)</div>
+    </div>
+    {% if failed_jobs_count > 0 %}
+    <div class="stat-card" style="border-color:rgba(229,9,20,.3)">
+      <div class="stat-icon">❌</div>
+      <div class="stat-value" style="color:var(--accent)">{{ failed_jobs_count }}</div>
+      <div class="stat-label">Failed Jobs</div>
+    </div>
+    {% endif %}
+  </div>
 
-    <!-- ── Options ── -->
-    <div class="form-card">
-      <h2>⚙️ Upload Options</h2>
-      <div class="toggle-row">
-        <label class="toggle">
-          <input type="checkbox" name="silent_upload" value="yes" id="silent-toggle">
-          <div class="toggle-slider"></div>
-        </label>
-        <div>
-          <div style="font-size:.88rem;font-weight:600">Silent Mode</div>
-          <div style="font-size:.75rem;color:var(--text-muted)">Skip Telegram notification for this upload</div>
+  <!-- Failed jobs alert -->
+  {% if failed_jobs_count > 0 %}
+  <div class="failed-alert">
+    <p>⚠️ <strong>{{ failed_jobs_count }} translation job{{ 's' if failed_jobs_count > 1 }} failed.</strong> Retry them to re-queue.</p>
+    <a href="/admin/retry_failed" class="fix-btn">🔁 Retry All Failed</a>
+  </div>
+  {% endif %}
+
+  <!-- Quick actions -->
+  <div class="actions-bar">
+    <a href="/admin" class="action-btn">➕ Upload Media</a>
+    <a href="/admin/reset_jobs" class="action-btn">🔄 Reset Stuck Jobs</a>
+    <a href="/admin/retry_failed" class="action-btn">🔁 Retry Failed</a>
+    <a href="/admin/queue_all_missing" class="action-btn">📤 Queue Missing Translations</a>
+    <a href="/admin/export_csv" class="action-btn">📥 Export CSV</a>
+    <a href="/admin/requests" class="action-btn">🙋 Manage Requests</a>
+  </div>
+
+  <!-- ── Analytics Charts ── -->
+  <div class="charts-grid">
+    <div class="chart-card full">
+      <h3>📈 Uploads Per Month (Last 12 Months)</h3>
+      <div class="chart-wrap" style="height:220px"><canvas id="chart-uploads"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>💾 Downloads by Language</h3>
+      <div class="chart-wrap" style="height:220px"><canvas id="chart-langs"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>⚙️ Translation Job Status</h3>
+      <div class="chart-wrap" style="height:220px"><canvas id="chart-jobs"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>👁 Top 10 Movies by Views</h3>
+      <div class="chart-wrap" style="height:280px"><canvas id="chart-views"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>🔥 Top 10 Subtitle Requests</h3>
+      <div class="chart-wrap" style="height:280px"><canvas id="chart-requests"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ── Media list ── -->
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;flex-wrap:wrap;gap:.5rem">
+    <h2 style="font-size:1rem;font-weight:700">🗂 All Media</h2>
+    <span style="font-size:.8rem;color:var(--text-muted)">{{ all_media.total }} entries</span>
+  </div>
+
+  <div class="media-table-wrap">
+    <div class="table-head-row">
+      <div></div><div>Title</div>
+      <div class="hide-sm">Type</div><div class="hide-sm">Year</div>
+      <div class="hide-sm">Languages</div><div class="hide-sm">Views</div>
+      <div>Actions</div>
+    </div>
+    {% for m in all_media.items %}
+    <div class="table-body-row">
+      <!-- Poster -->
+      <div>
+        <img src="{{ m.poster_url or 'https://via.placeholder.com/54x80/1a1a1a/555?text=?' }}"
+             class="poster-thumb"
+             onerror="this.src='https://via.placeholder.com/54x80/1a1a1a/555?text=?'"
+             alt="{{ m.title }}">
+      </div>
+      <!-- Title -->
+      <div>
+        <div class="media-title">{{ m.title }}</div>
+        <div class="media-meta">
+          {% if m.media_type == 'series' %}S{{ m.season or '?' }}E{{ m.episode or '?' }} · {% endif %}
+          ⭐ {{ m.rating or 'N/A' }}
         </div>
       </div>
+      <!-- Type -->
+      <div class="hide-sm">
+        <span class="type-badge {{ 'type-' + m.media_type }}">{{ '🎬' if m.media_type == 'movie' else '📺' }} {{ m.media_type }}</span>
+      </div>
+      <!-- Year -->
+      <div class="hide-sm" style="font-size:.82rem;color:var(--text-muted)">{{ m.year or '—' }}</div>
+      <!-- Languages -->
+      <div class="hide-sm">
+        <div class="lang-dots">
+          {% if m.english_srt %}<span class="ld en">EN</span>{% endif %}
+          {% for t in m.translations %}
+          <span class="ld {{ t.language }}">{{ t.language | upper }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      <!-- Views -->
+      <div class="hide-sm" style="font-size:.82rem;color:var(--text-muted)">👁 {{ m.views }}</div>
+      <!-- Actions -->
+      <div class="row-actions">
+        <a href="{{ '/movie/' + m.slug if m.media_type == 'movie' else '/series/' + m.title|urlencode }}" target="_blank">View</a>
+        <a href="/admin/edit/{{ m.id }}">Edit</a>
+        <a href="/admin/queue_translations/{{ m.id }}" title="Retrigger translation">⟳</a>
+        <a href="/delete/{{ m.id }}" class="del" onclick="return confirm('Delete {{ m.title }}?')">🗑</a>
+      </div>
     </div>
+    {% endfor %}
+  </div>
 
-    <!-- ── Submit ── -->
-    <div class="submit-bar">
-      <button type="submit" class="btn-accent" style="padding:.65rem 2rem;font-size:1rem" onclick="showSpinner()">
-        ⬆️ Upload & Translate
-      </button>
-      <div class="spinner" id="spinner"></div>
-      <a href="/dashboard" class="btn-ghost">Cancel</a>
+  <!-- Media pagination -->
+  {% if all_media.pages > 1 %}
+  <nav class="pager">
+    {% if all_media.has_prev %}<a href="?page={{ all_media.prev_num }}">‹</a>{% endif %}
+    {% for p in all_media.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+      {% if p %}
+        {% if p == all_media.page %}<span class="current">{{ p }}</span>
+        {% else %}<a href="?page={{ p }}">{{ p }}</a>{% endif %}
+      {% else %}<span>…</span>{% endif %}
+    {% endfor %}
+    {% if all_media.has_next %}<a href="?page={{ all_media.next_num }}">›</a>{% endif %}
+  </nav>
+  {% endif %}
+
+  <!-- ── Active Jobs ── -->
+  {% if jobs %}
+  <h2 style="font-size:1rem;font-weight:700;margin-bottom:.75rem">⚙️ Active Translation Jobs</h2>
+  <div class="jobs-grid">
+    {% for job in jobs %}
+    <div class="job-card">
+      <div class="job-info">
+        <div class="job-title">{{ job.movie.title if job.movie else 'Unknown' }}</div>
+        <div class="job-meta">{{ job.language | upper }} · Progress: {{ job.progress }}%</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:.5rem">
+        <span class="job-status st-{{ job.status }}">{{ job.status }}</span>
+        <a href="/admin/delete_job/{{ job.id }}" style="color:#555;font-size:.75rem;text-decoration:none" title="Remove job">✕</a>
+      </div>
     </div>
+    {% endfor %}
+  </div>
+  {% endif %}
 
-  </form>
+  <!-- ── Scheduler Logs ── -->
+  {% if scheduler_logs %}
+  <h2 style="font-size:1rem;font-weight:700;margin:.5rem 0 .75rem">🕐 Recent Scheduler Runs</h2>
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:.75rem 1.25rem">
+    {% for log in scheduler_logs %}
+    <div class="log-row">
+      <span class="{{ 'log-ok' if log.result == 'success' else 'log-fail' }}">{{ '✅' if log.result == 'success' else '⚠️' }}</span>
+      <span style="color:var(--text-muted)">{{ log.run_at.strftime('%b %d %H:%M') if log.run_at else '—' }}</span>
+      <span>{{ log.message }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
 </div>
 {% endblock %}
 
 {% block extra_scripts %}
 <script>
-let fetchedSRTText = '';
-let episodeCount   = 0;
-
-// ── Type toggle ──
-function toggleType() {
-  const isSeries = document.getElementById('type-series').checked;
-  document.getElementById('season-group').style.display   = isSeries ? '' : 'none';
-  document.getElementById('ep-inputs').style.display      = isSeries ? 'flex' : 'none';
-  document.getElementById('movie-srt-section').style.display  = isSeries ? 'none' : '';
-  document.getElementById('series-srt-section').style.display = isSeries ? '' : 'none';
-  document.getElementById('lbl-movie').style.cssText  = isSeries ? '' : 'background:rgba(229,9,20,.2);border-color:var(--accent);color:var(--accent);font-weight:700';
-  document.getElementById('lbl-series').style.cssText = isSeries ? 'background:rgba(21,101,192,.2);border-color:#1565c0;color:#64b5f6;font-weight:700' : 'font-weight:700';
-}
-
-// ── TMDB Search ──
-async function searchTmdb() {
-  const q    = document.getElementById('tmdb-query').value.trim();
-  if (!q) return;
-  const type = document.getElementById('type-series').checked ? 'tv' : 'movie';
-  const res  = await fetch(`/api/tmdb_search?query=${encodeURIComponent(q)}&type=${type}`);
-  const data = await res.json();
-  const box  = document.getElementById('tmdb-results');
-  box.innerHTML = '';
-  box.style.display = 'block';
-  (data.results || []).slice(0, 8).forEach(item => {
-    const name = item.title || item.name || '';
-    const year = (item.release_date || item.first_air_date || '').slice(0,4);
-    const poster = item.poster_path ? `https://image.tmdb.org/t/p/w92${item.poster_path}` : 'https://via.placeholder.com/36x54/1a1a1a/555?text=?';
-    const el = document.createElement('div');
-    el.className = 'tmdb-item';
-    el.innerHTML = `<img src="${poster}" onerror="this.src='https://via.placeholder.com/36x54/1a1a1a/555?text=?'">
-      <div class="tmdb-info"><div class="tmdb-name">${name}</div><div class="tmdb-year">${year}</div></div>`;
-    el.onclick = () => fillFromTmdb(item.id, type, name);
-    box.appendChild(el);
-  });
-  if (!data.results || data.results.length === 0)
-    box.innerHTML = '<div style="padding:.75rem;color:var(--text-muted);font-size:.85rem">No results found.</div>';
-}
-
-async function fillFromTmdb(id, type, name) {
-  document.getElementById('tmdb-results').style.display = 'none';
-  const res  = await fetch(`/api/tmdb_details?id=${id}&type=${type}`);
-  const d    = await res.json();
-  document.getElementById('f-title').value  = d.title || d.name || name;
-  document.getElementById('f-year').value   = (d.release_date || d.first_air_date || '').slice(0,4);
-  document.getElementById('f-rating').value = d.vote_average ? d.vote_average.toFixed(1) : '';
-  document.getElementById('f-runtime').value = d.runtime ? d.runtime + ' min' : (d.episode_run_time?.[0] ? d.episode_run_time[0] + ' min' : '');
-  document.getElementById('f-plot').value   = d.overview || '';
-  if (d.poster_path) document.getElementById('f-poster').value = `https://image.tmdb.org/t/p/w500${d.poster_path}`;
-  const imdbId = d.imdb_id || d.external_ids?.imdb_id || '';
-  if (imdbId) document.getElementById('imdb-id-input').value = imdbId;
-  // Check genres
-  (d.genres || []).forEach(g => {
-    document.querySelectorAll('.cat-check').forEach(cb => {
-      if (cb.value === g.name) cb.checked = true;
-    });
-  });
-}
-
-// ── Auto-fetch SRT ──
-async function autoFetchSRT() {
-  const imdb    = document.getElementById('imdb-id-input').value.trim();
-  const isSeries = document.getElementById('type-series').checked;
-  const season  = document.getElementById('fetch-season')?.value;
-  const episode = document.getElementById('fetch-episode')?.value;
-  const resBox  = document.getElementById('fetch-result');
-
-  if (!imdb) { showFetchMsg('Please enter an IMDb ID first.', false); return; }
-
-  resBox.textContent = '⏳ Fetching subtitle…';
-  resBox.className = 'fetch-result';
-  resBox.style.display = 'block';
-
-  const body = { imdb_id: imdb, media_type: isSeries ? 'series' : 'movie' };
-  if (isSeries && season && episode) { body.season = parseInt(season); body.episode = parseInt(episode); }
-
-  const r = await fetch('/api/auto_fetch_srt', {
-    method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)
-  });
-  const d = await r.json();
-  if (d.success) {
-    fetchedSRTText = d.srt_text;
-    showFetchMsg(`✅ SRT fetched from ${d.source} (${(d.srt_text.length/1024).toFixed(1)} KB)`, true);
-    if (isSeries) addEpisodeWithSRT(episode || '1', d.srt_text);
-    else {
-      document.getElementById('fetched-srt-single').value = d.srt_text;
-      document.getElementById('fetched-single-preview').style.display = 'block';
-    }
-  } else {
-    showFetchMsg('❌ ' + (d.error || 'Not found on any source.'), false);
+const CHART_DEFAULTS = {
+  plugins: { legend: { labels: { color: '#999', boxWidth: 12, font: { size: 11 } } } },
+  scales: {
+    x: { ticks: { color: '#666', font: { size: 10 } }, grid: { color: '#1e1e1e' } },
+    y: { ticks: { color: '#666', font: { size: 10 } }, grid: { color: '#1e1e1e' } }
   }
-}
+};
+const ACCENT = '#e50914';
+const COLORS = ['#e50914','#1565c0','#2e7d32','#f5c518','#6a1b9a','#00695c','#e65100','#37474f'];
 
-function showFetchMsg(msg, ok) {
-  const r = document.getElementById('fetch-result');
-  r.textContent = msg; r.className = 'fetch-result ' + (ok ? 'ok' : 'err'); r.style.display = 'block';
-}
-function clearFetchedSRT() {
-  document.getElementById('fetched-srt-single').value = '';
-  document.getElementById('fetched-single-preview').style.display = 'none';
-}
+fetch('/api/analytics_data')
+  .then(r => r.json())
+  .then(data => {
 
-// ── Episode management (series) ──
-function addEpisode(ep, srtText) {
-  episodeCount++;
-  const n   = ep || episodeCount;
-  const div = document.createElement('div');
-  div.className = 'ep-row';
-  div.id = 'ep-row-' + episodeCount;
-  div.innerHTML = `
-    <input type="number" class="form-input ep-num" placeholder="Ep #" value="${n}" name="episodes[]" min="1">
-    <input type="hidden" name="fetched_srts[]" id="fsrt-${episodeCount}" value="${srtText || ''}">
-    <input type="file" name="files[]" accept=".srt" style="display:none" id="ef-${episodeCount}">
-    <button type="button" class="btn-ghost" style="font-size:.8rem;padding:.4rem .8rem"
-            onclick="document.getElementById('ef-${episodeCount}').click()">📂 File</button>
-    ${srtText ? `<span style="color:#81c784;font-size:.78rem">✅ Auto-fetched</span>` : ''}
-    <button type="button" class="remove-ep" onclick="document.getElementById('ep-row-${episodeCount}').remove()">✕</button>`;
-  document.getElementById('ep-list').appendChild(div);
-}
-function addEpisodeWithSRT(ep, srtText) { addEpisode(ep, srtText); }
+    // 1. Uploads per month
+    new Chart(document.getElementById('chart-uploads'), {
+      type: 'bar',
+      data: {
+        labels: data.uploads_by_month.labels,
+        datasets: [{ label: 'Uploads', data: data.uploads_by_month.data, backgroundColor: ACCENT, borderRadius: 4 }]
+      },
+      options: { ...CHART_DEFAULTS, responsive: true, maintainAspectRatio: false }
+    });
 
-// Drop zone drag events
-const dz = document.getElementById('drop-single');
-if (dz) {
-  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
-  dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
-  dz.addEventListener('drop', e => {
-    e.preventDefault(); dz.classList.remove('drag-over');
-    const f = e.dataTransfer.files[0];
-    if (f && f.name.endsWith('.srt')) {
-      document.getElementById('srt-file-single').files = e.dataTransfer.files;
-      dz.querySelector('p').textContent = '✅ ' + f.name;
-    }
-  });
-}
-document.getElementById('srt-file-single')?.addEventListener('change', function() {
-  if (this.files[0]) dz.querySelector('p').textContent = '✅ ' + this.files[0].name;
-});
+    // 2. Downloads by language
+    new Chart(document.getElementById('chart-langs'), {
+      type: 'doughnut',
+      data: {
+        labels: data.downloads_by_lang.labels,
+        datasets: [{ data: data.downloads_by_lang.data, backgroundColor: COLORS, borderWidth: 0 }]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#999', font: { size: 11 } } } } }
+    });
 
-function showSpinner() {
-  document.getElementById('spinner').style.display = 'inline-block';
-}
+    // 3. Job status
+    new Chart(document.getElementById('chart-jobs'), {
+      type: 'doughnut',
+      data: {
+        labels: data.jobs_summary.labels,
+        datasets: [{ data: data.jobs_summary.data, backgroundColor: ['#f5c518','#64b5f6','#e50914','#81c784'], borderWidth: 0 }]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#999', font: { size: 11 } } } } }
+    });
 
-// TMDB query on Enter
-document.getElementById('tmdb-query').addEventListener('keypress', e => {
-  if (e.key === 'Enter') { e.preventDefault(); searchTmdb(); }
-});
+    // 4. Top views (horizontal bar)
+    new Chart(document.getElementById('chart-views'), {
+      type: 'bar',
+      data: {
+        labels: data.views_top10.labels,
+        datasets: [{ label: 'Views', data: data.views_top10.data, backgroundColor: '#1565c0', borderRadius: 4 }]
+      },
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#666', font: { size: 10 } }, grid: { color: '#1e1e1e' } },
+          y: { ticks: { color: '#aaa', font: { size: 10 } }, grid: { display: false } }
+        }
+      }
+    });
+
+    // 5. Top requests
+    new Chart(document.getElementById('chart-requests'), {
+      type: 'bar',
+      data: {
+        labels: data.requests_top10.labels,
+        datasets: [{ label: 'Votes', data: data.requests_top10.data, backgroundColor: '#6a1b9a', borderRadius: 4 }]
+      },
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#666', font: { size: 10 } }, grid: { color: '#1e1e1e' } },
+          y: { ticks: { color: '#aaa', font: { size: 10 } }, grid: { display: false } }
+        }
+      }
+    });
+
+  })
+  .catch(err => console.warn('Analytics load failed:', err));
 </script>
 {% endblock %}
