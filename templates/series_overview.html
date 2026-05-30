@@ -1,117 +1,126 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ title }} – All Episodes</title>
-    <style>
-        :root {
-            --bg: #0a0a0a;
-            --card-bg: #1a1a1a;
-            --text: #f1f1f1;
-            --accent: #f04747;
-            --accent-hover: #d93a3a;
-            --accent-soft: #f47b7b;
-            --border: #2a2a2a;
-            --success: #2ecc71;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            font-family: 'Inter', system-ui, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            margin: 0;
-            padding: 20px;
-        }
-        .container { max-width: 900px; margin: 0 auto; }
-        h1 { font-size: 1.8rem; margin-bottom: 5px; }
-        .back { color: var(--accent); text-decoration: none; display: inline-block; margin-bottom: 15px; }
-        .poster-large {
-            width: 200px;
-            border-radius: 12px;
-            margin-right: 20px;
-            float: left;
-        }
-        .meta { color: #aaa; margin-bottom: 20px; }
-        .season-title {
-            font-size: 1.4rem;
-            margin-top: 30px;
-            border-left: 4px solid var(--accent);
-            padding-left: 10px;
-        }
-        .episode-list { display: flex; flex-direction: column; gap: 12px; margin-top: 15px; }
-        .episode-card {
-            background: var(--card-bg);
-            border-radius: 12px;
-            padding: 16px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            gap: 12px;
-        }
-        .ep-title { font-weight: 700; }
-        .ep-downloads { display: flex; gap: 8px; flex-wrap: wrap; }
+{% extends "base.html" %}
+{% block title %}{{ title }} – Seasons & Episodes | Malayalam Subtitles Hub{% endblock %}
 
-        .btn {
-            padding: 8px 14px;
-            border-radius: 8px;
-            border: none;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 0.85rem;
-            transition: all 0.2s ease;
-            text-decoration: none;
-            color: white;
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-        }
-        .btn-download {
-            background: var(--success);
-            box-shadow: 0 4px 12px rgba(46,204,113,0.25);
-        }
-        .btn-download:hover {
-            background: #27ae60;
-            box-shadow: 0 6px 18px rgba(46,204,113,0.35);
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <a href="/" class="back">← Home</a>
-        <div style="overflow: auto;">
-            <img src="{{ show_data.poster_url }}" class="poster-large" alt="{{ title }}">
-            <h1>{{ title }}</h1>
-            <div class="meta">⭐ {{ show_data.rating }} | {{ show_data.year }}</div>
-        </div>
+{% block extra_head %}
+<style>
+  .series-hero {
+    background: linear-gradient(to bottom, #000820 0%, var(--bg-primary) 100%);
+    border-bottom: 1px solid var(--border); padding: 2rem 1.25rem; position: relative; overflow: hidden;
+  }
+  .series-hero-bg {
+    position: absolute; inset: 0;
+    background-image: url('{{ show_data.poster_url }}');
+    background-size: cover; background-position: center top;
+    filter: blur(60px) brightness(.15); transform: scale(1.1);
+  }
+  .series-hero-inner { position: relative; max-width: 1100px; margin: auto; display: flex; gap: 2rem; align-items: flex-start; }
+  @media(max-width:640px) { .series-hero-inner { flex-direction: column; align-items: center; text-align: center; } }
+  .series-hero img { width: 180px; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,.8); flex-shrink: 0; }
+  .series-hero h1 { font-size: clamp(1.4rem,4vw,2rem); font-weight: 800; margin-bottom: .5rem; }
+  .meta-row { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-bottom: .9rem; }
+  .meta-pill { background: rgba(255,255,255,.07); border: 1px solid var(--border); border-radius: 20px; padding: .3rem .7rem; font-size: .82rem; color: var(--text-muted); }
+  .imdb-badge { background: var(--gold); color: #000; font-weight: 800; border-radius: 6px; padding: .3rem .65rem; font-size: .85rem; }
 
-        {% for season_num, eps in seasons.items() %}
-            <div class="season-title">Season {{ season_num }}</div>
-            <div class="episode-list">
-                {% for ep in eps %}
-                <div class="episode-card">
-                    <div class="ep-title">Episode {{ ep.episode }}</div>
-                    <div class="ep-downloads">
-                        {% if ep.english_srt %}
-                        <a href="/download/{{ ep.id }}/en" class="btn btn-download">🇬🇧 EN</a>
-                        {% endif %}
-                        {% for lang in ['ml','ta','hi'] %}
-                            {% if lang in ep.translations|map(attribute='language') %}
-                            <a href="/download/{{ ep.id }}/{{ lang }}" class="btn btn-download">
-                                {% if lang == 'ml' %}🇮🇳 ML
-                                {% elif lang == 'ta' %}🇮🇳 TA
-                                {% else %}🇮🇳 HI
-                                {% endif %}
-                            </a>
-                            {% endif %}
-                        {% endfor %}
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
+  .seasons-wrap { max-width: 1100px; margin: 1.5rem auto; padding: 0 1.25rem; }
+  .season-block { margin-bottom: 2rem; }
+  .season-head {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px 10px 0 0;
+    padding: .9rem 1.25rem; cursor: pointer;
+  }
+  .season-head h2 { font-size: 1rem; font-weight: 700; }
+  .season-head .toggle-icon { color: var(--text-muted); font-size: 1.1rem; transition: transform .2s; }
+  .ep-grid {
+    background: var(--bg-secondary); border: 1px solid var(--border);
+    border-top: none; border-radius: 0 0 10px 10px; padding: .75rem;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: .75rem;
+  }
+  .ep-card {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;
+    padding: .75rem; text-decoration: none; color: inherit; transition: all .2s; display: block;
+  }
+  .ep-card:hover { border-color: var(--accent); background: var(--bg-card-hover); color: inherit; transform: translateY(-2px); }
+  .ep-num { font-size: .72rem; color: var(--accent); font-weight: 700; margin-bottom: .3rem; }
+  .ep-avail { font-size: .7rem; margin-top: .4rem; }
+  .ep-avail .avail { color: #4caf50; }
+  .ep-avail .pend  { color: var(--text-muted); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="series-hero">
+  <div class="series-hero-bg"></div>
+  <div class="series-hero-inner">
+    <img src="{{ show_data.poster_url or 'https://via.placeholder.com/300x450/1a1a1a/555?text=No+Poster' }}"
+         alt="{{ title }}" onerror="this.src='https://via.placeholder.com/300x450/1a1a1a/555?text=No+Poster'">
+    <div>
+      <a href="/" style="color:var(--text-muted);font-size:.82rem;text-decoration:none;display:inline-block;margin-bottom:.75rem">← Back</a>
+      <h1>📺 {{ title }}</h1>
+      <div class="meta-row">
+        {% if show_data.rating and show_data.rating not in ('N/A','0') %}
+        <span class="imdb-badge">⭐ {{ show_data.rating }}</span>
+        {% endif %}
+        {% if show_data.year %}<span class="meta-pill">📅 {{ show_data.year }}</span>{% endif %}
+        <span class="meta-pill">📺 {{ seasons | length }} Season{{ 's' if seasons | length > 1 }}</span>
+      </div>
+      {% if show_data.plot %}
+      <p style="color:#ccc;font-size:.9rem;line-height:1.6;max-width:600px">{{ show_data.plot }}</p>
+      {% endif %}
+      {% if show_data.category %}
+      <div style="margin-top:.75rem">
+        {% for cat in show_data.category.replace('SilentMode','').split(',') %}
+          {% set c = cat.strip() %}{% if c %}
+          <a href="/?cat={{ c|urlencode }}" class="tag-badge" style="text-decoration:none">{{ c }}</a>
+          {% endif %}
         {% endfor %}
+      </div>
+      {% endif %}
     </div>
-</body>
-</html>
+  </div>
+</div>
+
+<div class="seasons-wrap">
+  {% for season_num, episodes in seasons.items() | sort %}
+  <div class="season-block">
+    <div class="season-head" onclick="toggleSeason({{ season_num }})">
+      <h2>📂 Season {{ season_num }} <small style="color:var(--text-muted);font-weight:400">({{ episodes|length }} episodes)</small></h2>
+      <span class="toggle-icon" id="icon-{{ season_num }}">▼</span>
+    </div>
+    <div class="ep-grid" id="season-{{ season_num }}">
+      {% for ep in episodes %}
+      <a href="/movie/{{ ep.slug }}" class="ep-card">
+        <div class="ep-num">S{{ '%02d'|format(ep.season) }} E{{ '%02d'|format(ep.episode) }}</div>
+        <div style="font-size:.82rem;font-weight:600;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">
+          Episode {{ ep.episode }}
+        </div>
+        <div class="ep-avail">
+          {% if ep.english_srt %}
+            <span class="avail">✓ EN</span>
+          {% endif %}
+          {% for t in ep.translations %}
+            <span class="avail"> ✓ {{ t.language | upper }}</span>
+          {% endfor %}
+          {% if not ep.english_srt %}<span class="pend">⏳ Pending</span>{% endif %}
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function toggleSeason(num) {
+  const grid = document.getElementById('season-' + num);
+  const icon = document.getElementById('icon-' + num);
+  const hidden = grid.style.display === 'none';
+  grid.style.display = hidden ? 'grid' : 'none';
+  icon.textContent = hidden ? '▼' : '▶';
+  icon.style.transform = hidden ? '' : '';
+}
+</script>
+{% endblock %}
