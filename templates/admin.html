@@ -1,320 +1,426 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Admin Dashboard - Smart Upload</title>
-    <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 40px; background-color: #f4f6f9; color: #333; }
-        .upload-box { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); max-width: 700px; margin: auto; }
-        .form-group { margin-bottom: 20px; }
-        label { display: block; font-weight: bold; margin-bottom: 8px; color: #2c3e50; }
-        input[type="text"], input[type="number"], select, textarea { width: 100%; padding: 12px; border: 1px solid #dcdde1; border-radius: 6px; box-sizing: border-box; font-family: inherit; }
-        .optional-label { color: #7f8c8d; font-weight: normal; font-size: 0.85em; }
-        .silent-box { background: #fff3cd; padding: 15px; border-radius: 6px; border: 1px dashed #ffeaa7; margin: 20px 0; }
-        
-        .episode-row { display: flex; gap: 15px; margin-bottom: 12px; align-items: center; background: white; padding: 12px; border: 1px solid #dee2e6; border-radius: 6px; }
-        .episode-row input[type="number"] { width: 120px; }
-        
-        button { background-color: #0984e3; color: white; border: none; padding: 14px 20px; border-radius: 6px; cursor: pointer; font-size: 16px; width: 100%; font-weight: bold; transition: background 0.3s; }
-        button:hover { background-color: #74b9ff; }
-        
-        .btn-add { background-color: #27ae60; width: auto; font-size: 14px; padding: 10px 20px; margin-top: 10px; }
-        .btn-add:hover { background-color: #2ecc71; }
-        
-        .btn-autofill { background-color: #6c5ce7; width: auto; font-size: 14px; padding: 12px 20px; }
-        .btn-autofill:hover { background-color: #a29bfe; }
-        
-        .header-link { display: inline-block; margin-bottom: 20px; color: #0984e3; text-decoration: none; font-weight: bold; }
-        
-        #tmdb-results { margin-top: 10px; display: flex; flex-direction: column; gap: 5px; }
-        .tmdb-result-btn { background: #f1f2f6; color: #2f3640; border: 1px solid #dcdde1; padding: 8px 12px; border-radius: 5px; text-align: left; cursor: pointer; font-weight: bold; font-size: 13px; transition: 0.2s; }
-        .tmdb-result-btn:hover { background: #dfe4ea; border-color: #ced6e0; }
-    </style>
-</head>
-<body>
+{% extends "base.html" %}
+{% block title %}Upload Media – Admin{% endblock %}
 
-    <div class="upload-box">
-        <a href="/dashboard" class="header-link">← Back to Dashboard</a>
-        <h2 style="margin-top: 0; color: #2c3e50;">🎬 Advanced Smart Upload</h2>
-        
-        <form action="/admin" method="POST" enctype="multipart/form-data">
-            
-            <div class="form-group">
-                <label>Media Type:</label>
-                <select name="media_type" id="media-type-select" required onchange="toggleMediaMode()">
-                    <option value="movie">Movie</option>
-                    <option value="series">TV Series (Batch Upload)</option>
-                </select>
-            </div>
+{% block extra_head %}
+<style>
+  .upload-wrap { max-width: 1000px; margin: 1.5rem auto; padding: 0 1.25rem; }
+  .admin-topbar {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 1rem 1.25rem; margin-bottom: 1.25rem;
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .75rem;
+  }
+  .admin-topbar h1 { font-size: 1.2rem; font-weight: 800; }
+  .admin-nav { display: flex; gap: .4rem; flex-wrap: wrap; }
+  .admin-nav a {
+    background: #1a1a1a; border: 1px solid var(--border); color: var(--text-muted);
+    border-radius: 8px; padding: .38rem .85rem; text-decoration: none; font-size: .8rem; transition: all .2s;
+  }
+  .admin-nav a:hover { color: #fff; border-color: #555; }
+  .admin-nav a.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 
-            <div class="form-group">
-                <label>Title:</label>
-                <div style="display: flex; gap: 10px;">
-                    <input type="text" name="title" id="media-title" placeholder="e.g., The Matrix" required>
-                    <button type="button" class="btn-autofill" onclick="fetchTMDB()">✨ Auto-Fill</button>
-                </div>
-                
-                <div id="tmdb-results"></div>
-                <small style="color: #7f8c8d; display: block; margin-top: 8px;">Type the title and click Auto-Fill to grab all data from TMDB instantly!</small>
-            </div>
+  .form-card {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 1.5rem; margin-bottom: 1.25rem;
+  }
+  .form-card h2 { font-size: 1rem; font-weight: 700; margin-bottom: 1.1rem; padding-bottom: .6rem; border-bottom: 1px solid var(--border); }
 
-            <div class="form-group">
-                <label>Plot Summary <span class="optional-label">(Optional)</span></label>
-                <textarea name="plot" rows="3" placeholder="A brief description of the movie or show..."></textarea>
-            </div>
-            
-            <div class="form-group" style="display: flex; gap: 15px;">
-                <div style="flex: 1;">
-                    <label>Release Year:</label>
-                    <input type="text" name="year" placeholder="e.g., 2024" required>
-                </div>
-                <div style="flex: 1;">
-                    <label>Rating (Out of 10):</label>
-                    <input type="text" name="rating" placeholder="e.g., 8.5" required>
-                </div>
-                <div style="flex: 1;">
-                    <label>Runtime <span class="optional-label">(Optional)</span></label>
-                    <input type="text" name="runtime" placeholder="e.g., 2h 15m">
-                </div>
-            </div>
+  .form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: .9rem; }
+  .form-group { display: flex; flex-direction: column; gap: .35rem; }
+  .form-group.full { grid-column: 1 / -1; }
+  .form-label { font-size: .78rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  .form-input {
+    background: #1a1a1a; border: 1px solid var(--border); color: var(--text-primary);
+    border-radius: 8px; padding: .55rem .85rem; font-size: .9rem; width: 100%; transition: border-color .2s;
+  }
+  .form-input:focus { outline: none; border-color: var(--accent); background: #1e1e1e; }
+  textarea.form-input { resize: vertical; min-height: 90px; }
+  select.form-input { cursor: pointer; }
 
-            <div class="form-group">
-                <label>Category/Genre (Comma separated):</label>
-                <input type="text" name="category" placeholder="e.g., Action, Sci-Fi" required>
-            </div>
+  /* TMDB search */
+  .tmdb-row { display: flex; gap: .5rem; }
+  .tmdb-row .form-input { flex: 1; }
+  .tmdb-btn {
+    background: #f5c518; color: #000; border: none; border-radius: 8px;
+    padding: .55rem 1rem; font-size: .85rem; font-weight: 700; cursor: pointer; white-space: nowrap; transition: opacity .2s;
+  }
+  .tmdb-btn:hover { opacity: .85; }
+  .tmdb-results {
+    background: #111; border: 1px solid var(--border); border-radius: 8px;
+    max-height: 280px; overflow-y: auto; margin-top: .5rem; display: none;
+  }
+  .tmdb-item {
+    display: flex; gap: .75rem; align-items: center; padding: .65rem .9rem;
+    border-bottom: 1px solid var(--border); cursor: pointer; transition: background .15s;
+  }
+  .tmdb-item:last-child { border-bottom: none; }
+  .tmdb-item:hover { background: #1a1a1a; }
+  .tmdb-item img { width: 36px; height: 54px; object-fit: cover; border-radius: 4px; flex-shrink: 0; }
+  .tmdb-item .tmdb-info .tmdb-name { font-size: .88rem; font-weight: 600; }
+  .tmdb-item .tmdb-info .tmdb-year { font-size: .75rem; color: var(--text-muted); }
 
-            <div class="form-group">
-                <label>Poster Image URL:</label>
-                <input type="text" name="poster_url" placeholder="https://..." required>
-            </div>
+  /* Categories */
+  .cat-grid { display: flex; flex-wrap: wrap; gap: .5rem; }
+  .cat-check { display: none; }
+  .cat-label {
+    background: #1a1a1a; border: 1px solid var(--border); color: var(--text-muted);
+    border-radius: 20px; padding: .3rem .75rem; font-size: .8rem; cursor: pointer; transition: all .2s;
+    user-select: none;
+  }
+  .cat-check:checked + .cat-label { background: rgba(229,9,20,.2); border-color: var(--accent); color: var(--accent); }
 
-            <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; border: 1px solid #e9ecef; margin-bottom: 20px;">
-                <h3 style="margin-top:0; color: #2c3e50;">📥 Subtitle Source</h3>
-                
-                <div id="series-meta" style="display: none; gap: 15px; margin-bottom: 15px;">
-                    <div style="flex: 1;">
-                        <label>Season Number:</label>
-                        <input type="number" name="season" id="season-input" placeholder="e.g., 1">
-                    </div>
-                    <div style="flex: 1;">
-                        <label>Total Episodes to Fetch:</label>
-                        <input type="number" id="total-eps-input" placeholder="e.g., 10">
-                    </div>
-                </div>
+  /* SRT upload area */
+  .drop-zone {
+    border: 2px dashed var(--border); border-radius: 10px; padding: 1.5rem;
+    text-align: center; color: var(--text-muted); cursor: pointer; transition: all .2s;
+  }
+  .drop-zone:hover, .drop-zone.drag-over { border-color: var(--accent); color: var(--text-primary); }
+  .drop-zone .dz-icon { font-size: 2rem; margin-bottom: .5rem; }
+  .drop-zone input[type="file"] { display: none; }
 
-                <div id="fetched-srts-container"></div>
-                <input type="hidden" id="hidden-imdb-id">
+  /* Episode rows */
+  .ep-row { display: flex; gap: .5rem; align-items: center; margin-bottom: .5rem; }
+  .ep-row input { background: #1a1a1a; border: 1px solid var(--border); color: #fff; border-radius: 6px; padding: .4rem .7rem; flex: 1; font-size: .85rem; }
+  .ep-row input:focus { outline: none; border-color: var(--accent); }
+  .ep-row .ep-num { width: 60px; flex-shrink: 0; text-align: center; }
+  .remove-ep { background: none; border: 1px solid #3a1010; color: #ff6b6b; border-radius: 5px; padding: .3rem .6rem; cursor: pointer; font-size: .8rem; }
+  .remove-ep:hover { background: rgba(229,9,20,.2); }
 
-                <button type="button" id="fetch-srt-btn" onclick="autoFetchSRT()" style="background: #6c5ce7; margin-bottom: 15px;">✨ Auto-Fetch English Subtitles</button>
-                <div id="fetch-status" style="font-size: 13px; margin-bottom: 20px; line-height: 1.6;"></div>
+  /* Auto-fetch result box */
+  .fetch-result {
+    background: #111; border: 1px solid var(--border); border-radius: 8px;
+    padding: .75rem 1rem; margin-top: .5rem; display: none; font-size: .82rem;
+  }
+  .fetch-result.ok  { border-color: rgba(76,175,80,.4); color: #81c784; }
+  .fetch-result.err { border-color: rgba(229,9,20,.4); color: #ef9a9a; }
 
-                <hr style="border: 0; border-top: 1px dashed #ced4da; margin: 20px 0;">
+  /* Toggle */
+  .toggle-row { display: flex; align-items: center; gap: .75rem; }
+  .toggle { position: relative; width: 42px; height: 24px; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider {
+    position: absolute; inset: 0; background: #333; border-radius: 24px; cursor: pointer; transition: .2s;
+  }
+  .toggle-slider::before {
+    content: ''; position: absolute; left: 3px; top: 3px;
+    width: 18px; height: 18px; background: #888; border-radius: 50%; transition: .2s;
+  }
+  .toggle input:checked + .toggle-slider { background: rgba(229,9,20,.3); }
+  .toggle input:checked + .toggle-slider::before { background: var(--accent); transform: translateX(18px); }
 
-                <label style="color: #7f8c8d; font-size: 14px; margin-bottom: 10px;"><b>OR</b> Upload Manually (If API Fails):</label>
-                <div id="episode-container" style="display: none;">
-                    <div class="episode-row">
-                        <input type="number" name="episodes[]" placeholder="Ep 1">
-                        <input type="file" name="files[]" accept=".srt">
-                    </div>
-                </div>
-                <div id="movie-manual-container">
-                    <input type="file" name="files[]" accept=".srt">
-                </div>
-                
-                <button type="button" id="add-ep-btn" class="btn-add" onclick="addEpisodeRow()" style="display: none;">➕ Add Another Manual Episode</button>
-            </div>
+  .submit-bar { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; margin-top: .5rem; }
+  .spinner { display: none; width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+{% endblock %}
 
-            <div class="form-group silent-box">
-                <label style="color: #d63031; cursor: pointer; margin: 0;">
-                    <input type="checkbox" name="silent_upload" value="yes" style="width: auto;"> 
-                    🤫 <b>Silent Upload</b> (Translate in background without posting to Telegram)
-                </label>
-            </div>
+{% block content %}
+<div class="upload-wrap">
 
-            <button type="submit">Upload & Start Processing</button>
-        </form>
+  <div class="admin-topbar">
+    <h1>🛠 Admin Panel</h1>
+    <nav class="admin-nav">
+      <a href="/dashboard">📊 Dashboard</a>
+      <a href="/admin" class="active">➕ Upload</a>
+      <a href="/admin/requests">🙋 Requests</a>
+      <a href="/admin/export_csv">📥 CSV</a>
+      <a href="/logout">🚪 Logout</a>
+    </nav>
+  </div>
+
+  <form action="/admin" method="post" enctype="multipart/form-data" id="upload-form">
+
+    <!-- ── Type selector ── -->
+    <div class="form-card">
+      <h2>📁 Media Type</h2>
+      <div style="display:flex;gap:.75rem">
+        <label style="cursor:pointer;flex:1">
+          <input type="radio" name="media_type" value="movie" id="type-movie" checked onchange="toggleType()" style="display:none">
+          <div class="form-input text-center" id="lbl-movie" style="background:rgba(229,9,20,.2);border-color:var(--accent);color:var(--accent);font-weight:700">🎬 Movie</div>
+        </label>
+        <label style="cursor:pointer;flex:1">
+          <input type="radio" name="media_type" value="series" id="type-series" onchange="toggleType()" style="display:none">
+          <div class="form-input text-center" id="lbl-series" style="font-weight:700">📺 TV Series</div>
+        </label>
+      </div>
     </div>
 
-    <script>
-        async function fetchTMDB() {
-            const title = document.getElementById('media-title').value;
-            const type = document.getElementById('media-type-select').value;
-            const resultsBox = document.getElementById('tmdb-results');
-            
-            if(!title) { alert("Please type a movie or series title first!"); return; }
-            
-            resultsBox.innerHTML = '<span style="color: #0984e3; margin-top: 10px; display: inline-block;">Searching TMDB securely...</span>';
-            const tmdbType = type === 'series' ? 'tv' : 'movie';
-            
-            try {
-                // Fetching securely via Render backend private proxy
-                const res = await fetch(`/api/tmdb_search?type=${tmdbType}&query=${encodeURIComponent(title)}`);
-                const data = await res.json();
-                
-                if(data.results && data.results.length > 0) {
-                    resultsBox.innerHTML = ''; 
-                    
-                    data.results.slice(0, 5).forEach(item => {
-                        const year = (item.release_date || item.first_air_date || 'N/A').substring(0, 4);
-                        const displayTitle = item.title || item.name;
-                        
-                        const btn = document.createElement('button');
-                        btn.type = 'button';
-                        btn.className = 'tmdb-result-btn';
-                        btn.innerHTML = `📌 ${displayTitle} (${year})`;
-                        
-                        btn.onclick = () => fetchSpecificDetails(item.id, tmdbType, displayTitle);
-                        resultsBox.appendChild(btn);
-                    });
-                } else {
-                    resultsBox.innerHTML = '<span style="color: #e74c3c; margin-top: 10px; display: inline-block;">No results found. Try checking the spelling!</span>';
-                }
-            } catch (e) {
-                resultsBox.innerHTML = '<span style="color: #e74c3c; margin-top: 10px; display: inline-block;">Error connecting to Render backend.</span>';
-            }
-        }
+    <!-- ── TMDB Search ── -->
+    <div class="form-card">
+      <h2>🔍 Auto-fill from TMDB</h2>
+      <div class="tmdb-row">
+        <input class="form-input" type="text" id="tmdb-query" placeholder="Search movie or series title…">
+        <button type="button" class="tmdb-btn" onclick="searchTmdb()">Search TMDB</button>
+      </div>
+      <div class="tmdb-results" id="tmdb-results"></div>
+    </div>
 
-        async function fetchSpecificDetails(tmdbId, tmdbType, exactTitle) {
-            const resultsBox = document.getElementById('tmdb-results');
-            resultsBox.innerHTML = '<span style="color: #0984e3; margin-top: 10px; display: inline-block;">Fetching details...</span>';
-            
-            try {
-                // Fetching securely via Render backend private proxy
-                const detailRes = await fetch(`/api/tmdb_details?type=${tmdbType}&id=${tmdbId}`);
-                const details = await detailRes.json();
-                
-                document.getElementById('media-title').value = exactTitle;
-                
-                // Get IMDb ID properly for both Movies and Series
-                let finalImdbId = details.imdb_id;
-                if (tmdbType === 'tv' && details.external_ids && details.external_ids.imdb_id) {
-                    finalImdbId = details.external_ids.imdb_id;
-                }
-                document.getElementById('hidden-imdb-id').value = finalImdbId || '';
-                
-                document.querySelector('textarea[name="plot"]').value = details.overview || '';
-                document.querySelector('input[name="year"]').value = (details.release_date || details.first_air_date || '').substring(0, 4);
-                document.querySelector('input[name="rating"]').value = (details.vote_average || 0).toFixed(1);
-                
-                if (details.poster_path) {
-                    document.querySelector('input[name="poster_url"]').value = `https://image.tmdb.org/t/p/w500${details.poster_path}`;
-                }
-                
-                const type = document.getElementById('media-type-select').value;
-                if (type === 'movie' && details.runtime) {
-                    const hours = Math.floor(details.runtime / 60);
-                    const mins = details.runtime % 60;
-                    document.querySelector('input[name="runtime"]').value = `${hours}h ${mins}m`;
-                } else if (type === 'series' && details.episode_run_time && details.episode_run_time.length > 0) {
-                    document.querySelector('input[name="runtime"]').value = `${details.episode_run_time[0]}m`;
-                }
-                
-                if(details.genres) {
-                    const genres = details.genres.map(g => g.name).join(', ');
-                    document.querySelector('input[name="category"]').value = genres;
-                }
-                
-                if (!finalImdbId) {
-                    resultsBox.innerHTML = '<span style="color: #e17055; font-weight: bold; margin-top: 10px; display: inline-block;">⚠️ Auto-Fill Complete, but TMDB has no IMDb ID for this title! Auto-fetch may fail.</span>';
-                } else {
-                    resultsBox.innerHTML = '<span style="color: #27ae60; font-weight: bold; margin-top: 10px; display: inline-block;">✅ Auto-Fill Complete!</span>';
-                    setTimeout(() => { resultsBox.innerHTML = ''; }, 3000); 
-                }
-                
-            } catch (e) {
-                resultsBox.innerHTML = '<span style="color: #e74c3c; margin-top: 10px; display: inline-block;">Error fetching details.</span>';
-            }
-        }
+    <!-- ── Media details ── -->
+    <div class="form-card">
+      <h2>📋 Media Details</h2>
+      <div class="form-grid">
+        <div class="form-group full">
+          <label class="form-label">Title *</label>
+          <input class="form-input" type="text" name="title" id="f-title" placeholder="Movie or show title" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Year</label>
+          <input class="form-input" type="text" name="year" id="f-year" placeholder="2024" maxlength="4">
+        </div>
+        <div class="form-group">
+          <label class="form-label">IMDb Rating</label>
+          <input class="form-input" type="text" name="rating" id="f-rating" placeholder="8.5">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Runtime</label>
+          <input class="form-input" type="text" name="runtime" id="f-runtime" placeholder="148 min">
+        </div>
+        <div class="form-group" id="season-group" style="display:none">
+          <label class="form-label">Season #</label>
+          <input class="form-input" type="number" name="season" id="f-season" min="1" value="1">
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Poster URL</label>
+          <input class="form-input" type="url" name="poster_url" id="f-poster" placeholder="https://…">
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Plot / Synopsis</label>
+          <textarea class="form-input" name="plot" id="f-plot" placeholder="Short description…"></textarea>
+        </div>
+      </div>
+    </div>
 
-        function toggleMediaMode() {
-            const isSeries = document.getElementById('media-type-select').value === 'series';
-            document.getElementById('series-meta').style.display = isSeries ? 'flex' : 'none';
-            document.getElementById('add-ep-btn').style.display = isSeries ? 'block' : 'none';
-            document.getElementById('episode-container').style.display = isSeries ? 'block' : 'none';
-            document.getElementById('movie-manual-container').style.display = isSeries ? 'none' : 'block';
-        }
+    <!-- ── Categories ── -->
+    <div class="form-card">
+      <h2>🎭 Genres</h2>
+      <div class="cat-grid" id="cat-grid">
+        {% for cat in ['Action','Adventure','Animation','Comedy','Crime','Documentary','Drama','Family','Fantasy','History','Horror','Music','Mystery','Romance','Science Fiction','Thriller','War','Western'] %}
+        <input type="checkbox" class="cat-check" name="category" value="{{ cat }}" id="cat-{{ loop.index }}">
+        <label class="cat-label" for="cat-{{ loop.index }}">{{ cat }}</label>
+        {% endfor %}
+      </div>
+    </div>
 
-        function addEpisodeRow() {
-            const container = document.getElementById('episode-container');
-            const newRow = document.createElement('div');
-            newRow.className = 'episode-row';
-            newRow.innerHTML = `<input type="number" name="episodes[]" placeholder="Ep ${container.children.length + 1}"> <input type="file" name="files[]" accept=".srt">`;
-            container.appendChild(newRow);
-        }
+    <!-- ── Auto-fetch SRT ── -->
+    <div class="form-card">
+      <h2>⚡ Auto-fetch English SRT</h2>
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+        <input class="form-input" type="text" id="imdb-id-input" placeholder="IMDb ID (e.g. tt1375666)" style="max-width:260px">
+        <div id="ep-inputs" style="display:none;gap:.5rem;align-items:center">
+          <input class="form-input" type="number" id="fetch-season" placeholder="Season" min="1" style="width:90px">
+          <input class="form-input" type="number" id="fetch-episode" placeholder="Ep" min="1" style="width:70px">
+        </div>
+        <button type="button" class="btn-accent" onclick="autoFetchSRT()">⚡ Fetch SRT</button>
+      </div>
+      <div class="fetch-result" id="fetch-result"></div>
+      <div style="font-size:.75rem;color:var(--text-muted);margin-top:.5rem">Tries Subdl then OpenSubtitles automatically.</div>
+    </div>
 
-        async function autoFetchSRT() {
-            const imdbId = document.getElementById('hidden-imdb-id').value;
-            const mediaType = document.getElementById('media-type-select').value;
-            const btn = document.getElementById('fetch-srt-btn');
-            const statusBox = document.getElementById('fetch-status');
-            const container = document.getElementById('fetched-srts-container');
-            
-            if (!imdbId) return alert("Please use the TMDB Auto-Fill first so we have the IMDb ID!");
+    <!-- ── SRT Upload ── -->
+    <div class="form-card">
+      <h2>📄 SRT Subtitle Files</h2>
 
-            container.innerHTML = ''; 
-            btn.disabled = true;
+      <!-- Movie: single SRT -->
+      <div id="movie-srt-section">
+        <div class="drop-zone" onclick="document.getElementById('srt-file-single').click()" id="drop-single">
+          <div class="dz-icon">📂</div>
+          <p>Click or drag & drop English <strong>.srt</strong> file here</p>
+          <input type="file" id="srt-file-single" name="files[]" accept=".srt">
+        </div>
+        <input type="hidden" name="episodes[]" value="1">
+        <!-- auto-fetched SRT goes here -->
+        <div id="fetched-single-preview" style="display:none;margin-top:.75rem">
+          <div style="display:flex;align-items:center;justify-content:space-between;background:#0d2010;border:1px solid rgba(76,175,80,.3);border-radius:8px;padding:.65rem 1rem">
+            <span style="color:#81c784;font-size:.85rem">✅ Auto-fetched SRT ready</span>
+            <button type="button" onclick="clearFetchedSRT()" style="background:none;border:none;color:#555;cursor:pointer">✕</button>
+          </div>
+          <input type="hidden" name="fetched_srts[]" id="fetched-srt-single">
+          <input type="hidden" name="fetched_episodes[]" value="1">
+        </div>
+      </div>
 
-            if (mediaType === 'movie') {
-                btn.innerText = "⏳ Fetching Movie...";
-                statusBox.innerHTML = '<span style="color: #0984e3;">Searching databases (Subdl -> OpenSubtitles)...</span>';
-                try {
-                    const res = await fetch('/api/auto_fetch_srt', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({imdb_id: imdbId, media_type: 'movie'})
-                    });
-                    const data = await res.json();
-                    if (data.success) {
-                        container.innerHTML = `<textarea name="fetched_srts[]" style="display:none;">${data.srt_text}</textarea>
-                                               <input type="hidden" name="fetched_episodes[]" value="1">`;
-                        statusBox.innerHTML = `<span style="color: #27ae60; font-weight: bold;">✅ Captured from ${data.source}! Click "Upload & Start Processing" below.</span>`;
-                        btn.innerText = "✅ Fetch Complete!";
-                    } else {
-                        statusBox.innerHTML = `<span style="color: #e74c3c;">❌ Error: ${data.error}</span>`;
-                        btn.innerText = "✨ Auto-Fetch English Subtitles";
-                    }
-                } catch (e) {
-                    statusBox.innerHTML = '<span style="color: #e74c3c;">❌ Network error.</span>';
-                    btn.innerText = "✨ Auto-Fetch English Subtitles";
-                }
-            } else {
-                const season = document.getElementById('season-input').value;
-                const totalEps = document.getElementById('total-eps-input').value;
-                
-                if (!season || !totalEps) {
-                    btn.disabled = false;
-                    return alert("Please enter the Season and Total Episodes to Fetch!");
-                }
-                
-                btn.innerText = `⏳ Fetching ${totalEps} Episodes...`;
-                statusBox.innerHTML = '<b>Starting Batch Fetch...</b><br>';
-                
-                for (let i = 1; i <= totalEps; i++) {
-                    statusBox.innerHTML += `<span style="color: #0984e3;">Fetching Ep ${i}... </span>`;
-                    try {
-                        const res = await fetch('/api/auto_fetch_srt', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({imdb_id: imdbId, media_type: 'series', season: season, episode: i})
-                        });
-                        const data = await res.json();
-                        
-                        if (data.success) {
-                            statusBox.innerHTML += `<span style="color: #27ae60;">✅ Found (${data.source})</span><br>`;
-                            container.innerHTML += `<textarea name="fetched_srts[]" style="display:none;">${data.srt_text}</textarea>
-                                                   <input type="hidden" name="fetched_episodes[]" value="${i}">`;
-                        } else {
-                            statusBox.innerHTML += `<span style="color: #e74c3c;">❌ Failed</span><br>`;
-                        }
-                    } catch (e) {
-                        statusBox.innerHTML += `<span style="color: #e74c3c;">❌ Network Error</span><br>`;
-                    }
-                }
-                statusBox.innerHTML += `<br><span style="color: #27ae60; font-weight: bold;">🎉 Batch Process Complete! Click "Upload & Start Processing" below.</span>`;
-                btn.innerText = "✅ Batch Fetch Complete!";
-            }
-            btn.disabled = false;
-        }
-    </script>
-</body>
-</html>
+      <!-- Series: multiple episodes -->
+      <div id="series-srt-section" style="display:none">
+        <div id="ep-list"></div>
+        <button type="button" class="btn-ghost mt-3" onclick="addEpisode()">+ Add Episode SRT</button>
+      </div>
+    </div>
+
+    <!-- ── Options ── -->
+    <div class="form-card">
+      <h2>⚙️ Upload Options</h2>
+      <div class="toggle-row">
+        <label class="toggle">
+          <input type="checkbox" name="silent_upload" value="yes" id="silent-toggle">
+          <div class="toggle-slider"></div>
+        </label>
+        <div>
+          <div style="font-size:.88rem;font-weight:600">Silent Mode</div>
+          <div style="font-size:.75rem;color:var(--text-muted)">Skip Telegram notification for this upload</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Submit ── -->
+    <div class="submit-bar">
+      <button type="submit" class="btn-accent" style="padding:.65rem 2rem;font-size:1rem" onclick="showSpinner()">
+        ⬆️ Upload & Translate
+      </button>
+      <div class="spinner" id="spinner"></div>
+      <a href="/dashboard" class="btn-ghost">Cancel</a>
+    </div>
+
+  </form>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let fetchedSRTText = '';
+let episodeCount   = 0;
+
+// ── Type toggle ──
+function toggleType() {
+  const isSeries = document.getElementById('type-series').checked;
+  document.getElementById('season-group').style.display   = isSeries ? '' : 'none';
+  document.getElementById('ep-inputs').style.display      = isSeries ? 'flex' : 'none';
+  document.getElementById('movie-srt-section').style.display  = isSeries ? 'none' : '';
+  document.getElementById('series-srt-section').style.display = isSeries ? '' : 'none';
+  document.getElementById('lbl-movie').style.cssText  = isSeries ? '' : 'background:rgba(229,9,20,.2);border-color:var(--accent);color:var(--accent);font-weight:700';
+  document.getElementById('lbl-series').style.cssText = isSeries ? 'background:rgba(21,101,192,.2);border-color:#1565c0;color:#64b5f6;font-weight:700' : 'font-weight:700';
+}
+
+// ── TMDB Search ──
+async function searchTmdb() {
+  const q    = document.getElementById('tmdb-query').value.trim();
+  if (!q) return;
+  const type = document.getElementById('type-series').checked ? 'tv' : 'movie';
+  const res  = await fetch(`/api/tmdb_search?query=${encodeURIComponent(q)}&type=${type}`);
+  const data = await res.json();
+  const box  = document.getElementById('tmdb-results');
+  box.innerHTML = '';
+  box.style.display = 'block';
+  (data.results || []).slice(0, 8).forEach(item => {
+    const name = item.title || item.name || '';
+    const year = (item.release_date || item.first_air_date || '').slice(0,4);
+    const poster = item.poster_path ? `https://image.tmdb.org/t/p/w92${item.poster_path}` : 'https://via.placeholder.com/36x54/1a1a1a/555?text=?';
+    const el = document.createElement('div');
+    el.className = 'tmdb-item';
+    el.innerHTML = `<img src="${poster}" onerror="this.src='https://via.placeholder.com/36x54/1a1a1a/555?text=?'">
+      <div class="tmdb-info"><div class="tmdb-name">${name}</div><div class="tmdb-year">${year}</div></div>`;
+    el.onclick = () => fillFromTmdb(item.id, type, name);
+    box.appendChild(el);
+  });
+  if (!data.results || data.results.length === 0)
+    box.innerHTML = '<div style="padding:.75rem;color:var(--text-muted);font-size:.85rem">No results found.</div>';
+}
+
+async function fillFromTmdb(id, type, name) {
+  document.getElementById('tmdb-results').style.display = 'none';
+  const res  = await fetch(`/api/tmdb_details?id=${id}&type=${type}`);
+  const d    = await res.json();
+  document.getElementById('f-title').value  = d.title || d.name || name;
+  document.getElementById('f-year').value   = (d.release_date || d.first_air_date || '').slice(0,4);
+  document.getElementById('f-rating').value = d.vote_average ? d.vote_average.toFixed(1) : '';
+  document.getElementById('f-runtime').value = d.runtime ? d.runtime + ' min' : (d.episode_run_time?.[0] ? d.episode_run_time[0] + ' min' : '');
+  document.getElementById('f-plot').value   = d.overview || '';
+  if (d.poster_path) document.getElementById('f-poster').value = `https://image.tmdb.org/t/p/w500${d.poster_path}`;
+  const imdbId = d.imdb_id || d.external_ids?.imdb_id || '';
+  if (imdbId) document.getElementById('imdb-id-input').value = imdbId;
+  // Check genres
+  (d.genres || []).forEach(g => {
+    document.querySelectorAll('.cat-check').forEach(cb => {
+      if (cb.value === g.name) cb.checked = true;
+    });
+  });
+}
+
+// ── Auto-fetch SRT ──
+async function autoFetchSRT() {
+  const imdb    = document.getElementById('imdb-id-input').value.trim();
+  const isSeries = document.getElementById('type-series').checked;
+  const season  = document.getElementById('fetch-season')?.value;
+  const episode = document.getElementById('fetch-episode')?.value;
+  const resBox  = document.getElementById('fetch-result');
+
+  if (!imdb) { showFetchMsg('Please enter an IMDb ID first.', false); return; }
+
+  resBox.textContent = '⏳ Fetching subtitle…';
+  resBox.className = 'fetch-result';
+  resBox.style.display = 'block';
+
+  const body = { imdb_id: imdb, media_type: isSeries ? 'series' : 'movie' };
+  if (isSeries && season && episode) { body.season = parseInt(season); body.episode = parseInt(episode); }
+
+  const r = await fetch('/api/auto_fetch_srt', {
+    method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)
+  });
+  const d = await r.json();
+  if (d.success) {
+    fetchedSRTText = d.srt_text;
+    showFetchMsg(`✅ SRT fetched from ${d.source} (${(d.srt_text.length/1024).toFixed(1)} KB)`, true);
+    if (isSeries) addEpisodeWithSRT(episode || '1', d.srt_text);
+    else {
+      document.getElementById('fetched-srt-single').value = d.srt_text;
+      document.getElementById('fetched-single-preview').style.display = 'block';
+    }
+  } else {
+    showFetchMsg('❌ ' + (d.error || 'Not found on any source.'), false);
+  }
+}
+
+function showFetchMsg(msg, ok) {
+  const r = document.getElementById('fetch-result');
+  r.textContent = msg; r.className = 'fetch-result ' + (ok ? 'ok' : 'err'); r.style.display = 'block';
+}
+function clearFetchedSRT() {
+  document.getElementById('fetched-srt-single').value = '';
+  document.getElementById('fetched-single-preview').style.display = 'none';
+}
+
+// ── Episode management (series) ──
+function addEpisode(ep, srtText) {
+  episodeCount++;
+  const n   = ep || episodeCount;
+  const div = document.createElement('div');
+  div.className = 'ep-row';
+  div.id = 'ep-row-' + episodeCount;
+  div.innerHTML = `
+    <input type="number" class="form-input ep-num" placeholder="Ep #" value="${n}" name="episodes[]" min="1">
+    <input type="hidden" name="fetched_srts[]" id="fsrt-${episodeCount}" value="${srtText || ''}">
+    <input type="file" name="files[]" accept=".srt" style="display:none" id="ef-${episodeCount}">
+    <button type="button" class="btn-ghost" style="font-size:.8rem;padding:.4rem .8rem"
+            onclick="document.getElementById('ef-${episodeCount}').click()">📂 File</button>
+    ${srtText ? `<span style="color:#81c784;font-size:.78rem">✅ Auto-fetched</span>` : ''}
+    <button type="button" class="remove-ep" onclick="document.getElementById('ep-row-${episodeCount}').remove()">✕</button>`;
+  document.getElementById('ep-list').appendChild(div);
+}
+function addEpisodeWithSRT(ep, srtText) { addEpisode(ep, srtText); }
+
+// Drop zone drag events
+const dz = document.getElementById('drop-single');
+if (dz) {
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+  dz.addEventListener('drop', e => {
+    e.preventDefault(); dz.classList.remove('drag-over');
+    const f = e.dataTransfer.files[0];
+    if (f && f.name.endsWith('.srt')) {
+      document.getElementById('srt-file-single').files = e.dataTransfer.files;
+      dz.querySelector('p').textContent = '✅ ' + f.name;
+    }
+  });
+}
+document.getElementById('srt-file-single')?.addEventListener('change', function() {
+  if (this.files[0]) dz.querySelector('p').textContent = '✅ ' + this.files[0].name;
+});
+
+function showSpinner() {
+  document.getElementById('spinner').style.display = 'inline-block';
+}
+
+// TMDB query on Enter
+document.getElementById('tmdb-query').addEventListener('keypress', e => {
+  if (e.key === 'Enter') { e.preventDefault(); searchTmdb(); }
+});
+</script>
+{% endblock %}
