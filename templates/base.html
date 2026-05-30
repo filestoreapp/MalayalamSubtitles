@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  {# SEO meta tags – pages that set `seo` context var get rich meta #}
+  {% if seo %}
+    <title>{{ seo.title }}</title>
+    <meta name="description" content="{{ seo.description }}">
+    <meta name="keywords"    content="{{ seo.keywords }}">
+    <link rel="canonical"    href="{{ seo.canonical }}">
+    <meta property="og:title"       content="{{ seo.og_title }}">
+    <meta property="og:description" content="{{ seo.og_description }}">
+    <meta property="og:image"       content="{{ seo.og_image }}">
+    <meta property="og:url"         content="{{ seo.og_url }}">
+    <meta property="og:type"        content="{{ seo.og_type }}">
+    <meta name="twitter:card"  content="summary_large_image">
+    <meta name="twitter:title" content="{{ seo.og_title }}">
+    <meta name="twitter:image" content="{{ seo.og_image }}">
+    {% if seo.schema and seo.schema.get('@type') %}
+    <script type="application/ld+json">{{ seo.schema | tojson }}</script>
+    {% endif %}
+  {% else %}
+    <title>{% block title %}Malayalam Subtitles Hub{% endblock %}</title>
+    <meta name="description" content="Download Malayalam, Tamil and Hindi subtitles for movies and TV shows.">
+  {% endif %}
+
+  <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/2956/2956785.png" type="image/png">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+
+  <style>
+    :root {
+      --bg-primary:   #0d0d0d;
+      --bg-secondary: #141414;
+      --bg-card:      #1a1a1a;
+      --bg-card-hover:#222222;
+      --accent:       #e50914;
+      --accent-hover: #c5000f;
+      --text-primary: #f0f0f0;
+      --text-muted:   #999;
+      --border:       #2a2a2a;
+      --gold:         #f5c518;
+      --badge-ml:     #1a6b3c;
+      --badge-ta:     #6b1a1a;
+      --badge-hi:     #1a3a6b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg-primary); color: var(--text-primary); font-family: 'Segoe UI', sans-serif; min-height: 100vh; }
+
+    /* ── Navbar ── */
+    .site-nav {
+      background: #0a0a0aee;
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 1000;
+      padding: .75rem 1.25rem;
+    }
+    .nav-inner { display: flex; align-items: center; gap: 1rem; max-width: 1400px; margin: auto; }
+    .nav-logo { font-weight: 800; font-size: 1.2rem; color: var(--accent); text-decoration: none; white-space: nowrap; }
+    .nav-logo:hover { color: var(--accent-hover); }
+    .nav-search { flex: 1; min-width: 0; }
+    .nav-search form { display: flex; gap: .4rem; }
+    .nav-search input {
+      background: #1e1e1e; border: 1px solid var(--border); color: var(--text-primary);
+      border-radius: 8px; padding: .45rem .9rem; flex: 1; font-size: .9rem;
+    }
+    .nav-search input:focus { outline: none; border-color: var(--accent); }
+    .nav-search button {
+      background: var(--accent); border: none; color: #fff; border-radius: 8px;
+      padding: .45rem .9rem; cursor: pointer; font-size: .9rem;
+    }
+    .nav-links { display: flex; gap: .5rem; align-items: center; white-space: nowrap; }
+    .nav-links a {
+      color: var(--text-muted); text-decoration: none; font-size: .88rem; padding: .35rem .65rem;
+      border-radius: 6px; transition: all .2s;
+    }
+    .nav-links a:hover, .nav-links a.active { color: #fff; background: #252525; }
+
+    /* ── Category filter ── */
+    .cat-bar { background: var(--bg-secondary); border-bottom: 1px solid var(--border); padding: .5rem 1.25rem; overflow-x: auto; }
+    .cat-inner { display: flex; gap: .5rem; max-width: 1400px; margin: auto; }
+    .cat-chip {
+      color: var(--text-muted); text-decoration: none; font-size: .8rem;
+      padding: .3rem .75rem; border-radius: 20px; border: 1px solid var(--border);
+      white-space: nowrap; transition: all .2s; background: transparent;
+    }
+    .cat-chip:hover, .cat-chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+    /* ── Movie cards ── */
+    .movie-card {
+      background: var(--bg-card); border-radius: 10px; overflow: hidden;
+      transition: transform .2s, box-shadow .2s; cursor: pointer; display: block; text-decoration: none;
+      color: inherit; border: 1px solid var(--border);
+    }
+    .movie-card:hover { transform: translateY(-4px); box-shadow: 0 12px 32px rgba(229,9,20,.2); color: inherit; }
+    .movie-card img { width: 100%; aspect-ratio: 2/3; object-fit: cover; display: block; }
+    .movie-card .card-body { padding: .65rem .75rem; }
+    .movie-card .card-title { font-size: .88rem; font-weight: 600; margin-bottom: .2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .movie-card .card-meta { font-size: .75rem; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center; }
+    .movie-card .badge-type {
+      font-size: .65rem; padding: .2rem .45rem; border-radius: 4px; font-weight: 700;
+      background: var(--accent); color: #fff;
+    }
+    .badge-type.series { background: #1565c0; }
+    .rating-star { color: var(--gold); font-size: .8rem; }
+
+    /* ── Section headers ── */
+    .section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: .75rem; }
+    .section-head h2 { font-size: 1.1rem; font-weight: 700; }
+    .section-head a { font-size: .8rem; color: var(--text-muted); text-decoration: none; }
+    .section-head a:hover { color: #fff; }
+
+    /* ── Horizontal scroll row ── */
+    .scroll-row { display: flex; gap: 1rem; overflow-x: auto; padding-bottom: .5rem; }
+    .scroll-row::-webkit-scrollbar { height: 4px; }
+    .scroll-row::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    .scroll-row .movie-card { min-width: 140px; flex-shrink: 0; }
+    @media(min-width:768px) { .scroll-row .movie-card { min-width: 160px; } }
+
+    /* ── Grid ── */
+    .movie-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); }
+    @media(min-width:576px) { .movie-grid { grid-template-columns: repeat(auto-fill, minmax(160px,1fr)); } }
+
+    /* ── Buttons ── */
+    .btn-accent { background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: .5rem 1.2rem; cursor: pointer; font-size: .9rem; transition: background .2s; text-decoration: none; display: inline-block; }
+    .btn-accent:hover { background: var(--accent-hover); color: #fff; }
+    .btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border); border-radius: 8px; padding: .5rem 1.2rem; cursor: pointer; font-size: .9rem; transition: all .2s; text-decoration: none; display: inline-block; }
+    .btn-ghost:hover { border-color: #fff; color: #fff; }
+
+    /* ── Footer ── */
+    .site-footer { background: var(--bg-secondary); border-top: 1px solid var(--border); padding: 1.5rem 1.25rem; text-align: center; color: var(--text-muted); font-size: .82rem; margin-top: 3rem; }
+    .site-footer a { color: var(--text-muted); }
+    .site-footer a:hover { color: var(--accent); }
+
+    /* ── Misc ── */
+    .page-wrap { max-width: 1400px; margin: auto; padding: 1.5rem 1.25rem; }
+    .tag-badge { display: inline-block; background: #252525; color: var(--text-muted); font-size: .72rem; border-radius: 4px; padding: .2rem .5rem; margin: .15rem; border: 1px solid var(--border); }
+    .alert-dark { background: var(--bg-card); border: 1px solid var(--border); color: var(--text-muted); border-radius: 10px; }
+    .form-control-dark { background: #1e1e1e; border: 1px solid var(--border); color: var(--text-primary); border-radius: 8px; }
+    .form-control-dark:focus { background: #252525; border-color: var(--accent); color: var(--text-primary); box-shadow: none; }
+    .form-select-dark { background: #1e1e1e url("data:image/svg+xml,...") no-repeat right .75rem center; border: 1px solid var(--border); color: var(--text-primary); border-radius: 8px; }
+    select.form-control-dark option { background: #1e1e1e; }
+  </style>
+
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+<!-- ── Navbar ── -->
+<nav class="site-nav">
+  <div class="nav-inner">
+    <a href="/" class="nav-logo">🎬 MalSubs</a>
+    <div class="nav-search">
+      <form action="/" method="get">
+        <input type="text" name="q" placeholder="Search movies, series…" value="{{ request.args.get('q','') }}">
+        <button type="submit">🔍</button>
+      </form>
+    </div>
+    <div class="nav-links">
+      <a href="/search">Filter</a>
+      <a href="/requests">🙋 Request</a>
+      <a href="/favorites">❤️</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ── Category bar ── -->
+{% if categories is defined and categories %}
+<div class="cat-bar">
+  <div class="cat-inner">
+    <a href="/" class="cat-chip {% if not request.args.get('cat') %}active{% endif %}">All</a>
+    {% for cat in categories %}
+    <a href="/?cat={{ cat | urlencode }}" class="cat-chip {% if request.args.get('cat') == cat %}active{% endif %}">{{ cat }}</a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- ── Page content ── -->
+{% block content %}{% endblock %}
+
+<!-- ── Footer ── -->
+<footer class="site-footer">
+  © 2026 Malayalam Subtitles Hub &nbsp;|&nbsp;
+  <a href="/sitemap.xml">Sitemap</a> &nbsp;|&nbsp;
+  <a href="https://t.me/malayalam_sub1" target="_blank">📢 Telegram</a> &nbsp;|&nbsp;
+  <a href="/requests">🙋 Request Subs</a>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Favorite toggle helper (global) -->
+<script>
+function toggleFav(btn, movieId) {
+  fetch('/api/toggle_favorite', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({movie_id: movieId})
+  })
+  .then(r => r.json())
+  .then(d => {
+    btn.classList.toggle('active');
+    btn.title = d.status === 'added' ? 'Remove from Watchlist' : 'Add to Watchlist';
+    btn.textContent = d.status === 'added' ? '❤️' : '🤍';
+  });
+}
+</script>
+
+{% block extra_scripts %}{% endblock %}
+</body>
+</html>
