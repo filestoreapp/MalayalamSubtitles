@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+{% block title %}Edit – {{ media.title }} | Admin{% endblock %}
+
+{% block extra_head %}
+<style>
+  .edit-wrap { max-width: 800px; margin: 1.5rem auto; padding: 0 1.25rem; }
+  .admin-topbar {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 1rem 1.25rem; margin-bottom: 1.25rem;
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .75rem;
+  }
+  .admin-topbar h1 { font-size: 1.2rem; font-weight: 800; }
+  .admin-nav { display: flex; gap: .4rem; flex-wrap: wrap; }
+  .admin-nav a {
+    background: #1a1a1a; border: 1px solid var(--border); color: var(--text-muted);
+    border-radius: 8px; padding: .38rem .85rem; text-decoration: none; font-size: .8rem; transition: all .2s;
+  }
+  .admin-nav a:hover { color: #fff; border-color: #555; }
+
+  .form-card {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 1.5rem; margin-bottom: 1.25rem;
+  }
+  .form-card h2 { font-size: 1rem; font-weight: 700; margin-bottom: 1.1rem; padding-bottom: .6rem; border-bottom: 1px solid var(--border); }
+  .form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px,1fr)); gap: .9rem; }
+  .form-group { display: flex; flex-direction: column; gap: .35rem; }
+  .form-group.full { grid-column: 1 / -1; }
+  .form-label { font-size: .78rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  .form-input {
+    background: #1a1a1a; border: 1px solid var(--border); color: var(--text-primary);
+    border-radius: 8px; padding: .55rem .85rem; font-size: .9rem; width: 100%; transition: border-color .2s;
+  }
+  .form-input:focus { outline: none; border-color: var(--accent); background: #1e1e1e; }
+  textarea.form-input { resize: vertical; min-height: 90px; }
+
+  /* Poster preview */
+  .poster-preview { display: flex; gap: 1rem; align-items: flex-start; }
+  .poster-preview img { width: 100px; border-radius: 8px; object-fit: cover; flex-shrink: 0; border: 1px solid var(--border); }
+
+  /* Current SRT info */
+  .srt-info { background: #111; border: 1px solid var(--border); border-radius: 8px; padding: .7rem 1rem; font-size: .82rem; margin-bottom: .75rem; }
+  .srt-info .srt-label { color: var(--text-muted); margin-bottom: .2rem; }
+  .srt-info .srt-value { color: #81c784; word-break: break-all; }
+
+  /* Warning */
+  .warn-box { background: rgba(255,193,7,.08); border: 1px solid rgba(255,193,7,.25); border-radius: 10px; padding: .75rem 1rem; font-size: .82rem; color: #ffd54f; margin-bottom: .75rem; }
+
+  .submit-bar { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="edit-wrap">
+
+  <div class="admin-topbar">
+    <h1>✏️ Edit Media</h1>
+    <nav class="admin-nav">
+      <a href="/dashboard">📊 Dashboard</a>
+      <a href="/admin">➕ Upload</a>
+      <a href="/admin/requests">🙋 Requests</a>
+      <a href="/logout">🚪 Logout</a>
+    </nav>
+  </div>
+
+  <form action="/admin/edit/{{ media.id }}" method="post" enctype="multipart/form-data">
+
+    <!-- Poster preview + details -->
+    <div class="form-card">
+      <h2>📋 Media Details</h2>
+      <div class="poster-preview" style="margin-bottom:1rem">
+        <img src="{{ media.poster_url or 'https://via.placeholder.com/100x150/1a1a1a/555?text=?' }}"
+             id="poster-img" alt="{{ media.title }}"
+             onerror="this.src='https://via.placeholder.com/100x150/1a1a1a/555?text=?'">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:.3rem">
+            {{ '📺 TV Series' if media.media_type == 'series' else '🎬 Movie' }} · ID {{ media.id }}
+          </div>
+          <div style="font-size:.82rem;color:var(--text-muted)">Views: {{ media.views }} · Slug: {{ media.slug }}</div>
+        </div>
+      </div>
+
+      <div class="form-grid">
+        <div class="form-group full">
+          <label class="form-label">Title *</label>
+          <input class="form-input" type="text" name="title" value="{{ media.title }}" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Year</label>
+          <input class="form-input" type="text" name="year" value="{{ media.year or '' }}" maxlength="4">
+        </div>
+        <div class="form-group">
+          <label class="form-label">IMDb Rating</label>
+          <input class="form-input" type="text" name="rating" value="{{ media.rating or '' }}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Runtime</label>
+          <input class="form-input" type="text" name="runtime" value="{{ media.runtime or '' }}" placeholder="148 min">
+        </div>
+        {% if media.media_type == 'series' %}
+        <div class="form-group">
+          <label class="form-label">Season</label>
+          <input class="form-input" type="number" name="season" value="{{ media.season or 1 }}" min="1">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Episode</label>
+          <input class="form-input" type="number" name="episode" value="{{ media.episode or 1 }}" min="1">
+        </div>
+        {% endif %}
+        <div class="form-group full">
+          <label class="form-label">Poster URL</label>
+          <input class="form-input" type="url" name="poster_url" value="{{ media.poster_url or '' }}"
+                 oninput="document.getElementById('poster-img').src = this.value || 'https://via.placeholder.com/100x150/1a1a1a/555?text=?'">
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Genres (comma-separated)</label>
+          <input class="form-input" type="text" name="category" value="{{ media.category or '' }}" placeholder="Action, Drama, Thriller">
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Plot / Synopsis</label>
+          <textarea class="form-input" name="plot">{{ media.plot or '' }}</textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- SRT -->
+    <div class="form-card">
+      <h2>📄 English Subtitle (SRT)</h2>
+
+      {% if media.english_srt %}
+      <div class="srt-info">
+        <div class="srt-label">Current SRT:</div>
+        <div class="srt-value">
+          {% if media.english_srt.startswith('http') %}
+            <a href="{{ media.english_srt }}" target="_blank" style="color:#81c784">{{ media.english_srt[:80] }}…</a>
+          {% else %}
+            Stored in database ({{ (media.english_srt | length / 1024) | round(1) }} KB)
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="warn-box">
+        ⚠️ Uploading a new SRT will <strong>delete all existing translations</strong> and retrigger the translation pipeline.
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Replace SRT (optional)</label>
+        <input class="form-input" type="file" name="new_srt" accept=".srt" style="padding:.4rem .85rem">
+      </div>
+    </div>
+
+    <!-- Translations status -->
+    {% if media.translations %}
+    <div class="form-card">
+      <h2>🌐 Existing Translations</h2>
+      <div style="display:flex;flex-wrap:wrap;gap:.6rem">
+        {% for t in media.translations %}
+        <div style="background:#1a1a1a;border:1px solid var(--border);border-radius:8px;padding:.6rem 1rem;font-size:.82rem">
+          <strong>{{ {'ml':'Malayalam','ta':'Tamil','hi':'Hindi'}.get(t.language, t.language) }}</strong>
+          <span style="color:var(--text-muted)"> · {{ t.downloads }} downloads</span>
+          <a href="/download/{{ media.id }}/{{ t.language }}" style="color:var(--accent);margin-left:.5rem;text-decoration:none">⬇</a>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="submit-bar">
+      <button type="submit" class="btn-accent" style="padding:.65rem 2rem;font-size:1rem">💾 Save Changes</button>
+      <a href="/dashboard" class="btn-ghost">Cancel</a>
+      <a href="/delete/{{ media.id }}" class="btn-ghost"
+         style="border-color:#3a1010;color:#ff6b6b;margin-left:auto"
+         onclick="return confirm('Permanently delete {{ media.title }}?')">🗑 Delete</a>
+    </div>
+
+  </form>
+</div>
+{% endblock %}
