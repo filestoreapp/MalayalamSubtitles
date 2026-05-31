@@ -376,12 +376,18 @@ async function autoFetchSRT(){
     }).then(r=>r.json());
 
     if(d.success){
-      const kb = (d.srt_text.length/1024).toFixed(1);
-      showFetchMsg(`✅ Fetched from ${d.source} · ${kb} KB`, 'ok');
-      if(isSeries) addEpisodeWithSRT(episode, d.srt_text);
-      else {
+      const kb      = (d.srt_text.length/1024).toFixed(1);
+      const lines   = (d.srt_text.match(/\n/g)||[]).length;
+      showFetchMsg(`✅ Fetched from ${d.source} · ${kb} KB · ${lines} lines`, 'ok');
+      if(isSeries){
+        addEpisodeWithSRT(episode, d.srt_text);
+      } else {
+        // Use .value property (safe for any SRT content — no HTML encoding issues)
         document.getElementById('fetched-srt-single').value = d.srt_text;
         document.getElementById('fetched-single-preview').style.display = 'block';
+        // Update preview label with file size
+        const lbl = document.querySelector('#fetched-single-preview .fetched-preview-inner span');
+        if(lbl) lbl.textContent = `✅ Auto-fetched SRT ready · ${kb} KB · ${lines} lines`;
       }
     } else {
       showFetchMsg('❌ ' + (d.error||'Not found.'), 'err');
@@ -444,9 +450,11 @@ async function fetchFullSeason(){
       }).then(r=>r.json());
 
       if(d.success){
-        const kb = (d.srt_text.length/1024).toFixed(1);
-        st.textContent  = `✅ ${d.source} · ${kb} KB`;
+        const kb    = (d.srt_text.length/1024).toFixed(1);
+        const lines = (d.srt_text.match(/\n/g)||[]).length;
+        st.textContent  = `✅ ${d.source} · ${kb} KB · ${lines} lines`;
         row.className   = 'ep-prog-item done';
+        // addEpisodeWithSRT uses DOM APIs internally — SRT content is safe
         addEpisodeWithSRT(String(num), d.srt_text);
         ok++;
       } else {
@@ -483,23 +491,78 @@ function clearFetchedSRT(){
 }
 
 // ── Episode management (series) ──────────────────────────────────────────────
+// IMPORTANT: We build the hidden input using DOM APIs (.value property), NOT
+// innerHTML, because SRT files contain <i>, <b>, quotes and & characters that
+// the HTML parser would interpret as tags/attribute-end, silently truncating
+// the subtitle content.
 function addEpisode(ep, srtText){
   episodeCount++;
   const n   = ep || episodeCount;
   const div = document.createElement('div');
-  div.className = 'ep-row'; div.id = 'ep-row-'+episodeCount;
-  div.innerHTML = `
-    <input type="number" class="form-input ep-num" placeholder="Ep #" value="${n}"
-           name="episodes[]" min="1" style="width:72px;flex:none">
-    <input type="hidden" name="fetched_srts[]" id="fsrt-${episodeCount}" value="${srtText||''}">
-    <input type="file" name="files[]" accept=".srt,.zip" style="display:none" id="ef-${episodeCount}">
-    ${srtText
-      ? `<span style="color:#81c784;font-size:.78rem;flex:1">✅ Auto-fetched (${(srtText.length/1024).toFixed(1)} KB)</span>`
-      : `<button type="button" class="btn-ghost" style="font-size:.8rem;padding:.4rem .8rem;flex:1"
-                 onclick="document.getElementById('ef-${episodeCount}').click()">📂 Choose File</button>`
-    }
-    <button type="button" class="remove-ep"
-            onclick="document.getElementById('ep-row-${episodeCount}').remove()">✕</button>`;
+  div.className = 'ep-row';
+  div.id        = 'ep-row-' + episodeCount;
+  div.style.display = 'flex';
+  div.style.gap     = '.5rem';
+  div.style.alignItems = 'center';
+  div.style.marginBottom = '.5rem';
+
+  // ① Episode number input
+  const numIn = document.createElement('input');
+  numIn.type      = 'number';
+  numIn.className = 'form-input ep-num';
+  numIn.placeholder = 'Ep #';
+  numIn.value     = n;
+  numIn.name      = 'episodes[]';
+  numIn.min       = '1';
+  numIn.style.cssText = 'width:72px;flex:none';
+  div.appendChild(numIn);
+
+  // ② Hidden SRT input — value set via .value NOT via innerHTML/attribute
+  //    This is the critical fix: avoids HTML-encoding truncation.
+  const srtIn = document.createElement('input');
+  srtIn.type  = 'hidden';
+  srtIn.name  = 'fetched_srts[]';
+  srtIn.id    = 'fsrt-' + episodeCount;
+  if(srtText) srtIn.value = srtText;   // ← safe DOM property assignment
+  div.appendChild(srtIn);
+
+  // ③ Hidden file input
+  const fileIn = document.createElement('input');
+  fileIn.type   = 'file';
+  fileIn.name   = 'files[]';
+  fileIn.accept = '.srt,.zip';
+  fileIn.style.display = 'none';
+  fileIn.id     = 'ef-' + episodeCount;
+  div.appendChild(fileIn);
+
+  // ④ Status label or "Choose File" button
+  if(srtText){
+    const lbl = document.createElement('span');
+    lbl.style.cssText = 'color:#81c784;font-size:.78rem;flex:1';
+    lbl.textContent   = '✅ Auto-fetched (' + (srtText.length/1024).toFixed(1) + ' KB)';
+    div.appendChild(lbl);
+  } else {
+    const btn = document.createElement('button');
+    btn.type      = 'button';
+    btn.className = 'btn-ghost';
+    btn.style.cssText = 'font-size:.8rem;padding:.4rem .8rem;flex:1';
+    btn.textContent   = '📂 Choose File';
+    btn.onclick = () => fileIn.click();
+    div.appendChild(btn);
+    // When a file is chosen, show its name
+    fileIn.onchange = () => {
+      if(fileIn.files[0]) btn.textContent = '✅ ' + fileIn.files[0].name;
+    };
+  }
+
+  // ⑤ Remove button
+  const rmBtn = document.createElement('button');
+  rmBtn.type      = 'button';
+  rmBtn.className = 'remove-ep';
+  rmBtn.textContent = '✕';
+  rmBtn.onclick   = () => div.remove();
+  div.appendChild(rmBtn);
+
   document.getElementById('ep-list').appendChild(div);
 }
 function addEpisodeWithSRT(ep, srtText){ addEpisode(ep, srtText); }
