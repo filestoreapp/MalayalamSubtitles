@@ -3,119 +3,95 @@
 
 {% block extra_head %}
 <style>
-  .upload-wrap { max-width: 1000px; margin: 1.5rem auto; padding: 0 1.25rem; }
-  .admin-topbar {
-    background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
-    padding: 1rem 1.25rem; margin-bottom: 1.25rem;
-    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .75rem;
-  }
-  .admin-topbar h1 { font-size: 1.2rem; font-weight: 800; }
-  .admin-nav { display: flex; gap: .4rem; flex-wrap: wrap; }
-  .admin-nav a {
-    background: #1a1a1a; border: 1px solid var(--border); color: var(--text-muted);
-    border-radius: 8px; padding: .38rem .85rem; text-decoration: none; font-size: .8rem; transition: all .2s;
-  }
-  .admin-nav a:hover { color: #fff; border-color: #555; }
-  .admin-nav a.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.upload-wrap{max-width:1000px;margin:1.5rem auto;padding:0 1rem}
+.admin-topbar{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.25rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem}
+.admin-topbar h1{font-size:1.2rem;font-weight:800}
+.admin-nav{display:flex;gap:.4rem;flex-wrap:wrap}
+.admin-nav a{background:#1a1a1a;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:.38rem .85rem;text-decoration:none;font-size:.8rem;transition:all .2s}
+.admin-nav a:hover{color:#fff;border-color:#555}
+.admin-nav a.active{background:var(--accent);border-color:var(--accent);color:#fff}
 
-  .form-card {
-    background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
-    padding: 1.5rem; margin-bottom: 1.25rem;
-  }
-  .form-card h2 { font-size: 1rem; font-weight: 700; margin-bottom: 1.1rem; padding-bottom: .6rem; border-bottom: 1px solid var(--border); }
+.form-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.5rem;margin-bottom:1.25rem}
+.form-card h2{font-size:1rem;font-weight:700;margin-bottom:1rem;padding-bottom:.6rem;border-bottom:1px solid var(--border)}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.9rem}
+.form-group{display:flex;flex-direction:column;gap:.35rem}
+.form-group.full{grid-column:1/-1}
+.form-label{font-size:.72rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.form-input{background:#1a1a1a;border:1px solid var(--border);color:var(--text);border-radius:8px;padding:.55rem .85rem;font-size:.88rem;width:100%;transition:border-color .2s;font-family:inherit}
+.form-input:focus{outline:none;border-color:var(--accent);background:#1e1e1e}
+textarea.form-input{resize:vertical;min-height:80px}
 
-  .form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: .9rem; }
-  .form-group { display: flex; flex-direction: column; gap: .35rem; }
-  .form-group.full { grid-column: 1 / -1; }
-  .form-label { font-size: .78rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
-  .form-input {
-    background: #1a1a1a; border: 1px solid var(--border); color: var(--text-primary);
-    border-radius: 8px; padding: .55rem .85rem; font-size: .9rem; width: 100%; transition: border-color .2s;
-  }
-  .form-input:focus { outline: none; border-color: var(--accent); background: #1e1e1e; }
-  textarea.form-input { resize: vertical; min-height: 90px; }
-  select.form-input { cursor: pointer; }
+/* TMDB */
+.tmdb-row{display:flex;gap:.5rem}
+.tmdb-row .form-input{flex:1}
+.tmdb-btn{background:var(--gold);color:#000;border:none;border-radius:8px;padding:.55rem 1rem;font-size:.85rem;font-weight:700;cursor:pointer;transition:opacity .2s;white-space:nowrap}
+.tmdb-btn:hover{opacity:.85}
+.tmdb-results{background:#111;border:1px solid var(--border);border-radius:8px;max-height:280px;overflow-y:auto;margin-top:.5rem;display:none}
+.tmdb-item{display:flex;gap:.75rem;align-items:center;padding:.65rem .9rem;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s}
+.tmdb-item:last-child{border-bottom:none}
+.tmdb-item:hover{background:#1a1a1a}
+.tmdb-item img{width:36px;height:54px;object-fit:cover;border-radius:4px;flex-shrink:0}
+.tmdb-name{font-size:.88rem;font-weight:600}
+.tmdb-year{font-size:.75rem;color:var(--muted)}
 
-  /* TMDB search */
-  .tmdb-row { display: flex; gap: .5rem; }
-  .tmdb-row .form-input { flex: 1; }
-  .tmdb-btn {
-    background: #f5c518; color: #000; border: none; border-radius: 8px;
-    padding: .55rem 1rem; font-size: .85rem; font-weight: 700; cursor: pointer; white-space: nowrap; transition: opacity .2s;
-  }
-  .tmdb-btn:hover { opacity: .85; }
-  .tmdb-results {
-    background: #111; border: 1px solid var(--border); border-radius: 8px;
-    max-height: 280px; overflow-y: auto; margin-top: .5rem; display: none;
-  }
-  .tmdb-item {
-    display: flex; gap: .75rem; align-items: center; padding: .65rem .9rem;
-    border-bottom: 1px solid var(--border); cursor: pointer; transition: background .15s;
-  }
-  .tmdb-item:last-child { border-bottom: none; }
-  .tmdb-item:hover { background: #1a1a1a; }
-  .tmdb-item img { width: 36px; height: 54px; object-fit: cover; border-radius: 4px; flex-shrink: 0; }
-  .tmdb-item .tmdb-info .tmdb-name { font-size: .88rem; font-weight: 600; }
-  .tmdb-item .tmdb-info .tmdb-year { font-size: .75rem; color: var(--text-muted); }
+/* Categories */
+.cat-grid{display:flex;flex-wrap:wrap;gap:.5rem}
+.cat-check{display:none}
+.cat-label{background:#1a1a1a;border:1px solid var(--border);color:var(--muted);border-radius:20px;padding:.3rem .75rem;font-size:.8rem;cursor:pointer;transition:all .2s;user-select:none}
+.cat-check:checked + .cat-label{background:rgba(229,9,20,.2);border-color:var(--accent);color:var(--accent)}
 
-  /* Categories */
-  .cat-grid { display: flex; flex-wrap: wrap; gap: .5rem; }
-  .cat-check { display: none; }
-  .cat-label {
-    background: #1a1a1a; border: 1px solid var(--border); color: var(--text-muted);
-    border-radius: 20px; padding: .3rem .75rem; font-size: .8rem; cursor: pointer; transition: all .2s;
-    user-select: none;
-  }
-  .cat-check:checked + .cat-label { background: rgba(229,9,20,.2); border-color: var(--accent); color: var(--accent); }
+/* Auto-fetch result */
+.fetch-result{background:#111;border:1px solid var(--border);border-radius:8px;padding:.75rem 1rem;margin-top:.65rem;font-size:.82rem;display:none}
+.fetch-result.ok{border-color:rgba(76,175,80,.4);color:#81c784}
+.fetch-result.err{border-color:rgba(229,9,20,.4);color:#ef9a9a}
+.fetch-result.info{border-color:rgba(33,150,243,.4);color:#64b5f6}
 
-  /* SRT upload area */
-  .drop-zone {
-    border: 2px dashed var(--border); border-radius: 10px; padding: 1.5rem;
-    text-align: center; color: var(--text-muted); cursor: pointer; transition: all .2s;
-  }
-  .drop-zone:hover, .drop-zone.drag-over { border-color: var(--accent); color: var(--text-primary); }
-  .drop-zone .dz-icon { font-size: 2rem; margin-bottom: .5rem; }
-  .drop-zone input[type="file"] { display: none; }
+/* Fetch-all progress */
+.ep-progress-wrap{display:none;margin-top:.75rem}
+.ep-progress-wrap h4{font-size:.78rem;color:var(--muted);margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.05em}
+.ep-prog-list{display:flex;flex-direction:column;gap:.35rem;max-height:240px;overflow-y:auto}
+.ep-prog-item{display:flex;align-items:center;gap:.6rem;background:#111;border:1px solid var(--border);border-radius:7px;padding:.45rem .75rem;font-size:.8rem}
+.ep-prog-item .ep-badge{background:#1a1a1a;border:1px solid var(--border);border-radius:5px;padding:.15rem .45rem;font-size:.68rem;font-weight:700;color:var(--muted);flex-shrink:0;min-width:36px;text-align:center}
+.ep-prog-item .ep-status{flex:1}
+.ep-prog-item.done .ep-badge{background:rgba(76,175,80,.15);border-color:#2e7d32;color:#81c784}
+.ep-prog-item.fail .ep-badge{background:rgba(229,9,20,.1);border-color:#c62828;color:#ef9a9a}
+.ep-prog-item.pending .ep-badge{color:#888}
 
-  /* Episode rows */
-  .ep-row { display: flex; gap: .5rem; align-items: center; margin-bottom: .5rem; }
-  .ep-row input { background: #1a1a1a; border: 1px solid var(--border); color: #fff; border-radius: 6px; padding: .4rem .7rem; flex: 1; font-size: .85rem; }
-  .ep-row input:focus { outline: none; border-color: var(--accent); }
-  .ep-row .ep-num { width: 60px; flex-shrink: 0; text-align: center; }
-  .remove-ep { background: none; border: 1px solid #3a1010; color: #ff6b6b; border-radius: 5px; padding: .3rem .6rem; cursor: pointer; font-size: .8rem; }
-  .remove-ep:hover { background: rgba(229,9,20,.2); }
+/* SRT / ZIP upload */
+.drop-zone{border:2px dashed var(--border);border-radius:10px;padding:1.5rem;text-align:center;color:var(--muted);cursor:pointer;transition:all .2s}
+.drop-zone:hover,.drop-zone.drag-over{border-color:var(--accent);color:var(--text)}
+.drop-zone input[type="file"]{display:none}
+.drop-zone .dz-icon{font-size:2rem;margin-bottom:.5rem}
 
-  /* Auto-fetch result box */
-  .fetch-result {
-    background: #111; border: 1px solid var(--border); border-radius: 8px;
-    padding: .75rem 1rem; margin-top: .5rem; display: none; font-size: .82rem;
-  }
-  .fetch-result.ok  { border-color: rgba(76,175,80,.4); color: #81c784; }
-  .fetch-result.err { border-color: rgba(229,9,20,.4); color: #ef9a9a; }
+/* Episode rows */
+.ep-row{display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem}
+.ep-row input{background:#1a1a1a;border:1px solid var(--border);color:#fff;border-radius:6px;padding:.4rem .7rem;flex:1;font-size:.85rem}
+.ep-row .ep-num{width:60px;flex-shrink:0;text-align:center}
+.remove-ep{background:none;border:1px solid #3a1010;color:#ff6b6b;border-radius:5px;padding:.3rem .6rem;cursor:pointer;font-size:.8rem}
+.remove-ep:hover{background:rgba(229,9,20,.2)}
 
-  /* Toggle */
-  .toggle-row { display: flex; align-items: center; gap: .75rem; }
-  .toggle { position: relative; width: 42px; height: 24px; }
-  .toggle input { opacity: 0; width: 0; height: 0; }
-  .toggle-slider {
-    position: absolute; inset: 0; background: #333; border-radius: 24px; cursor: pointer; transition: .2s;
-  }
-  .toggle-slider::before {
-    content: ''; position: absolute; left: 3px; top: 3px;
-    width: 18px; height: 18px; background: #888; border-radius: 50%; transition: .2s;
-  }
-  .toggle input:checked + .toggle-slider { background: rgba(229,9,20,.3); }
-  .toggle input:checked + .toggle-slider::before { background: var(--accent); transform: translateX(18px); }
+/* Fetched preview */
+.fetched-preview{display:none;margin-top:.75rem}
+.fetched-preview-inner{display:flex;align-items:center;justify-content:space-between;background:#0d2010;border:1px solid rgba(76,175,80,.3);border-radius:8px;padding:.65rem 1rem}
+.fetched-preview-inner span{color:#81c784;font-size:.85rem}
 
-  .submit-bar { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; margin-top: .5rem; }
-  .spinner { display: none; width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
+/* Toggle */
+.toggle-row{display:flex;align-items:center;gap:.75rem}
+.toggle{position:relative;width:42px;height:24px}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;inset:0;background:#333;border-radius:24px;cursor:pointer;transition:.2s}
+.toggle-slider::before{content:'';position:absolute;left:3px;top:3px;width:18px;height:18px;background:#888;border-radius:50%;transition:.2s}
+.toggle input:checked + .toggle-slider{background:rgba(229,9,20,.3)}
+.toggle input:checked + .toggle-slider::before{background:var(--accent);transform:translateX(18px)}
+
+.submit-bar{display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;margin-top:.5rem}
+.spinner{display:none;width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="upload-wrap">
-
   <div class="admin-topbar">
     <h1>🛠 Admin Panel</h1>
     <nav class="admin-nav">
@@ -129,17 +105,17 @@
 
   <form action="/admin" method="post" enctype="multipart/form-data" id="upload-form">
 
-    <!-- ── Type selector ── -->
+    <!-- ── Type ── -->
     <div class="form-card">
       <h2>📁 Media Type</h2>
       <div style="display:flex;gap:.75rem">
         <label style="cursor:pointer;flex:1">
           <input type="radio" name="media_type" value="movie" id="type-movie" checked onchange="toggleType()" style="display:none">
-          <div class="form-input text-center" id="lbl-movie" style="background:rgba(229,9,20,.2);border-color:var(--accent);color:var(--accent);font-weight:700">🎬 Movie</div>
+          <div class="form-input text-center" id="lbl-movie" style="background:rgba(229,9,20,.2);border-color:var(--accent);color:var(--accent);font-weight:700;cursor:pointer;text-align:center">🎬 Movie</div>
         </label>
         <label style="cursor:pointer;flex:1">
           <input type="radio" name="media_type" value="series" id="type-series" onchange="toggleType()" style="display:none">
-          <div class="form-input text-center" id="lbl-series" style="font-weight:700">📺 TV Series</div>
+          <div class="form-input text-center" id="lbl-series" style="font-weight:700;cursor:pointer;text-align:center">📺 TV Series</div>
         </label>
       </div>
     </div>
@@ -148,13 +124,13 @@
     <div class="form-card">
       <h2>🔍 Auto-fill from TMDB</h2>
       <div class="tmdb-row">
-        <input class="form-input" type="text" id="tmdb-query" placeholder="Search movie or series title…">
+        <input class="form-input" type="text" id="tmdb-query" placeholder="Search title…">
         <button type="button" class="tmdb-btn" onclick="searchTmdb()">Search TMDB</button>
       </div>
       <div class="tmdb-results" id="tmdb-results"></div>
     </div>
 
-    <!-- ── Media details ── -->
+    <!-- ── Details ── -->
     <div class="form-card">
       <h2>📋 Media Details</h2>
       <div class="form-grid">
@@ -183,16 +159,16 @@
           <input class="form-input" type="url" name="poster_url" id="f-poster" placeholder="https://…">
         </div>
         <div class="form-group full">
-          <label class="form-label">Plot / Synopsis</label>
+          <label class="form-label">Plot</label>
           <textarea class="form-input" name="plot" id="f-plot" placeholder="Short description…"></textarea>
         </div>
       </div>
     </div>
 
-    <!-- ── Categories ── -->
+    <!-- ── Genres ── -->
     <div class="form-card">
       <h2>🎭 Genres</h2>
-      <div class="cat-grid" id="cat-grid">
+      <div class="cat-grid">
         {% for cat in ['Action','Adventure','Animation','Comedy','Crime','Documentary','Drama','Family','Fantasy','History','Horror','Music','Mystery','Romance','Science Fiction','Thriller','War','Western'] %}
         <input type="checkbox" class="cat-check" name="category" value="{{ cat }}" id="cat-{{ loop.index }}">
         <label class="cat-label" for="cat-{{ loop.index }}">{{ cat }}</label>
@@ -202,10 +178,11 @@
 
     <!-- ── Auto-fetch SRT ── -->
     <div class="form-card">
-      <h2>⚡ Auto-fetch English SRT</h2>
-      <p style="font-size:.78rem;color:#888;margin-bottom:.85rem">
-        Auto-fill from TMDB above first so the IMDb ID is set. For series, enter the <strong>exact</strong> season &amp; episode — wrong numbers are rejected automatically.
+      <h2>⚡ Auto-fetch Subtitles</h2>
+      <p style="font-size:.78rem;color:var(--muted);margin-bottom:.9rem">
+        Auto-fill from TMDB first so the IMDb ID is populated. For series you can fetch a single episode or the <strong>entire season</strong> at once.
       </p>
+
       <div style="display:flex;gap:.6rem;flex-wrap:wrap;align-items:flex-end">
         <div style="flex:1;min-width:150px">
           <label class="form-label">IMDb ID</label>
@@ -213,38 +190,50 @@
         </div>
         <div id="ep-inputs" style="display:none;gap:.5rem;align-items:flex-end;flex-wrap:wrap">
           <div>
-            <label class="form-label">Season #</label>
+            <label class="form-label">Season</label>
             <input class="form-input" type="number" id="fetch-season" placeholder="1" min="1" style="width:76px">
           </div>
           <div>
-            <label class="form-label">Episode #</label>
+            <label class="form-label">Episode</label>
             <input class="form-input" type="number" id="fetch-episode" placeholder="1" min="1" style="width:76px">
           </div>
         </div>
-        <div>
-          <button type="button" class="btn-accent" onclick="autoFetchSRT()" id="fetch-btn">⚡ Fetch SRT</button>
+        <div style="display:flex;gap:.45rem;flex-wrap:wrap">
+          <button type="button" class="btn-accent" onclick="autoFetchSRT()" id="fetch-btn">⚡ Fetch Episode</button>
+          <button type="button" id="fetch-all-btn" onclick="fetchFullSeason()"
+                  style="display:none;background:#1565c0;border:none;color:#fff;border-radius:8px;padding:.52rem 1rem;font-size:.85rem;cursor:pointer;font-weight:600">
+            📺 Fetch Full Season
+          </button>
         </div>
       </div>
-      <div class="fetch-result" id="fetch-result" style="margin-top:.75rem"></div>
+
+      <div class="fetch-result" id="fetch-result"></div>
+
+      <!-- Full-season progress -->
+      <div class="ep-progress-wrap" id="ep-progress-wrap">
+        <h4>📺 Season fetch progress</h4>
+        <div class="ep-prog-list" id="ep-prog-list"></div>
+        <div style="margin-top:.6rem;font-size:.78rem;color:var(--muted)" id="ep-prog-summary"></div>
+      </div>
     </div>
 
     <!-- ── SRT Upload ── -->
     <div class="form-card">
-      <h2>📄 SRT Subtitle Files</h2>
+      <h2>📄 Subtitle Files</h2>
 
-      <!-- Movie: single SRT -->
+      <!-- Movie: single SRT or ZIP -->
       <div id="movie-srt-section">
+        <p style="font-size:.78rem;color:var(--muted);margin-bottom:.75rem">Upload a single <code>.srt</code> file or a <code>.zip</code> containing SRTs.</p>
         <div class="drop-zone" onclick="document.getElementById('srt-file-single').click()" id="drop-single">
           <div class="dz-icon">📂</div>
-          <p>Click or drag & drop English <strong>.srt</strong> file here</p>
-          <input type="file" id="srt-file-single" name="files[]" accept=".srt">
+          <p id="drop-label">Click or drag &amp; drop English <strong>.srt</strong> or <strong>.zip</strong> here</p>
+          <input type="file" id="srt-file-single" name="files[]" accept=".srt,.zip">
         </div>
         <input type="hidden" name="episodes[]" value="1">
-        <!-- auto-fetched SRT goes here -->
-        <div id="fetched-single-preview" style="display:none;margin-top:.75rem">
-          <div style="display:flex;align-items:center;justify-content:space-between;background:#0d2010;border:1px solid rgba(76,175,80,.3);border-radius:8px;padding:.65rem 1rem">
-            <span style="color:#81c784;font-size:.85rem">✅ Auto-fetched SRT ready</span>
-            <button type="button" onclick="clearFetchedSRT()" style="background:none;border:none;color:#555;cursor:pointer">✕</button>
+        <div class="fetched-preview" id="fetched-single-preview">
+          <div class="fetched-preview-inner">
+            <span>✅ Auto-fetched SRT ready</span>
+            <button type="button" onclick="clearFetchedSRT()" style="background:none;border:none;color:#555;cursor:pointer;font-size:1.1rem">✕</button>
           </div>
           <input type="hidden" name="fetched_srts[]" id="fetched-srt-single">
           <input type="hidden" name="fetched_episodes[]" value="1">
@@ -253,14 +242,27 @@
 
       <!-- Series: multiple episodes -->
       <div id="series-srt-section" style="display:none">
+        <p style="font-size:.78rem;color:var(--muted);margin-bottom:.75rem">
+          Upload individual <code>.srt</code> files <strong>or a single ZIP</strong> containing all episodes. Episode numbers are detected automatically from filenames (e.g. <code>S01E03.srt</code>).
+        </p>
+
+        <!-- ZIP upload for full season -->
+        <div class="drop-zone" onclick="document.getElementById('srt-zip-series').click()" id="drop-zip" style="margin-bottom:.75rem;border-color:#1565c0">
+          <div class="dz-icon">🗜️</div>
+          <p id="zip-label">Click or drop a <strong>.zip</strong> of episode SRTs here (auto-assigns episode numbers)</p>
+          <input type="file" id="srt-zip-series" name="files[]" accept=".srt,.zip">
+        </div>
+
+        <div style="text-align:center;color:var(--muted);font-size:.78rem;margin:.5rem 0">— or add episodes manually —</div>
+
         <div id="ep-list"></div>
-        <button type="button" class="btn-ghost mt-3" onclick="addEpisode()">+ Add Episode SRT</button>
+        <button type="button" class="btn-ghost" style="margin-top:.5rem;font-size:.82rem" onclick="addEpisode()">+ Add Episode SRT</button>
       </div>
     </div>
 
     <!-- ── Options ── -->
     <div class="form-card">
-      <h2>⚙️ Upload Options</h2>
+      <h2>⚙️ Options</h2>
       <div class="toggle-row">
         <label class="toggle">
           <input type="checkbox" name="silent_upload" value="yes" id="silent-toggle">
@@ -268,15 +270,14 @@
         </label>
         <div>
           <div style="font-size:.88rem;font-weight:600">Silent Mode</div>
-          <div style="font-size:.75rem;color:var(--text-muted)">Skip Telegram notification for this upload</div>
+          <div style="font-size:.75rem;color:var(--muted)">Skip Telegram notification</div>
         </div>
       </div>
     </div>
 
-    <!-- ── Submit ── -->
     <div class="submit-bar">
-      <button type="submit" class="btn-accent" style="padding:.65rem 2rem;font-size:1rem" onclick="showSpinner()">
-        ⬆️ Upload & Translate
+      <button type="submit" class="btn-red" style="padding:.65rem 2rem;font-size:1rem" onclick="showSpinner()">
+        ⬆️ Upload &amp; Translate
       </button>
       <div class="spinner" id="spinner"></div>
       <a href="/dashboard" class="btn-ghost">Cancel</a>
@@ -288,169 +289,250 @@
 
 {% block extra_scripts %}
 <script>
-let fetchedSRTText = '';
-let episodeCount   = 0;
+let episodeCount = 0;
 
-// ── Type toggle ──
-function toggleType() {
+// ── Type toggle ──────────────────────────────────────────────────────────────
+function toggleType(){
   const isSeries = document.getElementById('type-series').checked;
-  document.getElementById('season-group').style.display   = isSeries ? '' : 'none';
-  document.getElementById('ep-inputs').style.display      = isSeries ? 'flex' : 'none';
-  document.getElementById('movie-srt-section').style.display  = isSeries ? 'none' : '';
-  document.getElementById('series-srt-section').style.display = isSeries ? '' : 'none';
-  document.getElementById('lbl-movie').style.cssText  = isSeries ? '' : 'background:rgba(229,9,20,.2);border-color:var(--accent);color:var(--accent);font-weight:700';
-  document.getElementById('lbl-series').style.cssText = isSeries ? 'background:rgba(21,101,192,.2);border-color:#1565c0;color:#64b5f6;font-weight:700' : 'font-weight:700';
+  document.getElementById('season-group').style.display        = isSeries ? '' : 'none';
+  document.getElementById('ep-inputs').style.display           = isSeries ? 'flex' : 'none';
+  document.getElementById('movie-srt-section').style.display   = isSeries ? 'none' : '';
+  document.getElementById('series-srt-section').style.display  = isSeries ? '' : 'none';
+  document.getElementById('fetch-all-btn').style.display       = isSeries ? '' : 'none';
+  document.getElementById('lbl-movie').style.cssText  = isSeries
+    ? 'font-weight:700;cursor:pointer;text-align:center'
+    : 'background:rgba(229,9,20,.2);border-color:var(--accent);color:var(--accent);font-weight:700;cursor:pointer;text-align:center';
+  document.getElementById('lbl-series').style.cssText = isSeries
+    ? 'background:rgba(21,101,192,.2);border-color:#1565c0;color:#64b5f6;font-weight:700;cursor:pointer;text-align:center'
+    : 'font-weight:700;cursor:pointer;text-align:center';
 }
 
-// ── TMDB Search ──
-async function searchTmdb() {
+// ── TMDB search ──────────────────────────────────────────────────────────────
+async function searchTmdb(){
   const q    = document.getElementById('tmdb-query').value.trim();
-  if (!q) return;
+  if(!q) return;
   const type = document.getElementById('type-series').checked ? 'tv' : 'movie';
   const res  = await fetch(`/api/tmdb_search?query=${encodeURIComponent(q)}&type=${type}`);
   const data = await res.json();
   const box  = document.getElementById('tmdb-results');
-  box.innerHTML = '';
-  box.style.display = 'block';
-  (data.results || []).slice(0, 8).forEach(item => {
-    const name = item.title || item.name || '';
-    const year = (item.release_date || item.first_air_date || '').slice(0,4);
-    const poster = item.poster_path ? `https://image.tmdb.org/t/p/w92${item.poster_path}` : 'https://via.placeholder.com/36x54/1a1a1a/555?text=?';
+  box.innerHTML = ''; box.style.display = 'block';
+  (data.results||[]).slice(0,8).forEach(item => {
+    const name   = item.title||item.name||'';
+    const year   = (item.release_date||item.first_air_date||'').slice(0,4);
+    const poster = item.poster_path
+      ? `https://image.tmdb.org/t/p/w92${item.poster_path}`
+      : 'https://placehold.co/36x54/1a1a1a/555?text=?';
     const el = document.createElement('div');
     el.className = 'tmdb-item';
-    el.innerHTML = `<img src="${poster}" onerror="this.src='https://via.placeholder.com/36x54/1a1a1a/555?text=?'">
-      <div class="tmdb-info"><div class="tmdb-name">${name}</div><div class="tmdb-year">${year}</div></div>`;
-    el.onclick = () => fillFromTmdb(item.id, type, name);
+    el.innerHTML = `<img src="${poster}" onerror="this.src='https://placehold.co/36x54/1a1a1a/555?text=?'">
+      <div><div class="tmdb-name">${name}</div><div class="tmdb-year">${year}</div></div>`;
+    el.onclick = ()=> fillFromTmdb(item.id, type);
     box.appendChild(el);
   });
-  if (!data.results || data.results.length === 0)
-    box.innerHTML = '<div style="padding:.75rem;color:var(--text-muted);font-size:.85rem">No results found.</div>';
+  if(!data.results?.length)
+    box.innerHTML = '<div style="padding:.75rem;color:var(--muted);font-size:.85rem">No results.</div>';
 }
 
-async function fillFromTmdb(id, type, name) {
+async function fillFromTmdb(id, type){
   document.getElementById('tmdb-results').style.display = 'none';
-  const res  = await fetch(`/api/tmdb_details?id=${id}&type=${type}`);
-  const d    = await res.json();
-  document.getElementById('f-title').value  = d.title || d.name || name;
-  document.getElementById('f-year').value   = (d.release_date || d.first_air_date || '').slice(0,4);
-  document.getElementById('f-rating').value = d.vote_average ? d.vote_average.toFixed(1) : '';
-  document.getElementById('f-runtime').value = d.runtime ? d.runtime + ' min' : (d.episode_run_time?.[0] ? d.episode_run_time[0] + ' min' : '');
-  document.getElementById('f-plot').value   = d.overview || '';
-  if (d.poster_path) document.getElementById('f-poster').value = `https://image.tmdb.org/t/p/w500${d.poster_path}`;
-  const imdbId = d.imdb_id || d.external_ids?.imdb_id || '';
-  if (imdbId) document.getElementById('imdb-id-input').value = imdbId;
-  // Check genres
-  (d.genres || []).forEach(g => {
-    document.querySelectorAll('.cat-check').forEach(cb => {
-      if (cb.value === g.name) cb.checked = true;
-    });
+  const d = await fetch(`/api/tmdb_details?id=${id}&type=${type}`).then(r=>r.json());
+  document.getElementById('f-title').value   = d.title||d.name||'';
+  document.getElementById('f-year').value    = (d.release_date||d.first_air_date||'').slice(0,4);
+  document.getElementById('f-rating').value  = d.vote_average ? d.vote_average.toFixed(1) : '';
+  document.getElementById('f-runtime').value = d.runtime ? d.runtime+' min'
+    : (d.episode_run_time?.[0] ? d.episode_run_time[0]+' min' : '');
+  document.getElementById('f-plot').value    = d.overview||'';
+  if(d.poster_path)
+    document.getElementById('f-poster').value = `https://image.tmdb.org/t/p/w500${d.poster_path}`;
+  const imdb = d.imdb_id || d.external_ids?.imdb_id || '';
+  if(imdb) document.getElementById('imdb-id-input').value = imdb;
+  (d.genres||[]).forEach(g=>{
+    document.querySelectorAll('.cat-check').forEach(cb=>{ if(cb.value===g.name) cb.checked=true; });
   });
 }
 
-// ── Auto-fetch SRT ──
-async function autoFetchSRT() {
+// ── Single episode auto-fetch ─────────────────────────────────────────────────
+async function autoFetchSRT(){
   const isSeries = document.getElementById('type-series').checked;
   const imdb     = document.getElementById('imdb-id-input').value.trim();
   const season   = document.getElementById('fetch-season')?.value?.trim();
   const episode  = document.getElementById('fetch-episode')?.value?.trim();
   const btn      = document.getElementById('fetch-btn');
 
-  // Validate series inputs before hitting the server
-  if (!imdb || imdb === '') {
-    showFetchMsg('❌ No IMDb ID found. Use the TMDB search above to auto-fill it.', false);
-    return;
-  }
-  if (isSeries && (!season || !episode || parseInt(season) < 1 || parseInt(episode) < 1)) {
-    showFetchMsg('❌ Enter both Season and Episode numbers for series.', false);
-    return;
+  if(!imdb){ showFetchMsg('❌ No IMDb ID — use TMDB search above.', 'err'); return; }
+  if(isSeries && (!season||!episode||+season<1||+episode<1)){
+    showFetchMsg('❌ Enter both Season and Episode numbers.', 'err'); return;
   }
 
-  btn.textContent = '⏳ Fetching…';
-  btn.disabled    = true;
-  showFetchMsg('⏳ Searching Subdl and OpenSubtitles…', null);
+  btn.textContent = '⏳ Fetching…'; btn.disabled = true;
+  showFetchMsg('⏳ Searching Subdl and OpenSubtitles…', 'info');
 
   const body = { imdb_id: imdb, media_type: isSeries ? 'series' : 'movie' };
-  if (isSeries) { body.season = parseInt(season); body.episode = parseInt(episode); }
+  if(isSeries){ body.season = +season; body.episode = +episode; }
 
   try {
-    const r = await fetch('/api/auto_fetch_srt', {
-      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)
-    });
-    const d = await r.json();
+    const d = await fetch('/api/auto_fetch_srt',{
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
+    }).then(r=>r.json());
 
-    if (d.success) {
-      const kb = (d.srt_text.length / 1024).toFixed(1);
-      showFetchMsg(`✅ Fetched from ${d.source} · ${kb} KB · Ready to upload!`, true);
-      if (isSeries) {
-        addEpisodeWithSRT(episode, d.srt_text);
-      } else {
+    if(d.success){
+      const kb = (d.srt_text.length/1024).toFixed(1);
+      showFetchMsg(`✅ Fetched from ${d.source} · ${kb} KB`, 'ok');
+      if(isSeries) addEpisodeWithSRT(episode, d.srt_text);
+      else {
         document.getElementById('fetched-srt-single').value = d.srt_text;
         document.getElementById('fetched-single-preview').style.display = 'block';
       }
     } else {
-      showFetchMsg('❌ ' + (d.error || 'Not found on any source.'), false);
+      showFetchMsg('❌ ' + (d.error||'Not found.'), 'err');
     }
-  } catch (err) {
-    showFetchMsg('❌ Network error: ' + err.message, false);
-  } finally {
-    btn.textContent = '⚡ Fetch SRT';
-    btn.disabled    = false;
-  }
+  } catch(e){ showFetchMsg('❌ Network error: '+e.message, 'err'); }
+  finally { btn.textContent='⚡ Fetch Episode'; btn.disabled=false; }
 }
 
-function showFetchMsg(msg, ok) {
-  const r = document.getElementById('fetch-result');
-  r.textContent = msg; r.className = 'fetch-result ' + (ok ? 'ok' : 'err'); r.style.display = 'block';
+// ── Fetch FULL season ────────────────────────────────────────────────────────
+async function fetchFullSeason(){
+  const imdb   = document.getElementById('imdb-id-input').value.trim();
+  const season = document.getElementById('fetch-season')?.value?.trim();
+  const btn    = document.getElementById('fetch-all-btn');
+
+  if(!imdb){ showFetchMsg('❌ No IMDb ID — use TMDB search above.', 'err'); return; }
+  if(!season||+season<1){ showFetchMsg('❌ Enter Season number first.', 'err'); return; }
+
+  btn.textContent='⏳ Loading…'; btn.disabled=true;
+  showFetchMsg(`⏳ Getting episode list for Season ${season} from TMDB…`, 'info');
+
+  // Step 1: get episode list from TMDB
+  let episodes;
+  try {
+    const data = await fetch(`/api/tmdb_season_episodes?imdb_id=${encodeURIComponent(imdb)}&season=${season}`)
+      .then(r=>r.json());
+    if(data.error){ showFetchMsg('❌ TMDB: '+data.error,'err'); return; }
+    episodes = data.episodes;
+  } catch(e){ showFetchMsg('❌ TMDB error: '+e.message,'err'); return; }
+  finally { btn.textContent='📺 Fetch Full Season'; btn.disabled=false; }
+
+  showFetchMsg(`📺 Found ${episodes.length} episodes — fetching subtitles…`, 'info');
+
+  // Show progress list
+  const wrap = document.getElementById('ep-progress-wrap');
+  const list = document.getElementById('ep-prog-list');
+  const summ = document.getElementById('ep-prog-summary');
+  wrap.style.display = 'block';
+  list.innerHTML = '';
+  episodes.forEach(ep => {
+    const row = document.createElement('div');
+    row.className = 'ep-prog-item pending';
+    row.id = `eprow-${ep.episode_number}`;
+    row.innerHTML = `<span class="ep-badge">E${String(ep.episode_number).padStart(2,'0')}</span>
+      <span class="ep-status" id="epst-${ep.episode_number}">Waiting…</span>`;
+    list.appendChild(row);
+  });
+
+  // Step 2: fetch each episode sequentially
+  let ok=0, fail=0;
+  for(const ep of episodes){
+    const num    = ep.episode_number;
+    const row    = document.getElementById(`eprow-${num}`);
+    const st     = document.getElementById(`epst-${num}`);
+    st.textContent = '⏳ Fetching…';
+
+    try {
+      const d = await fetch('/api/auto_fetch_srt',{
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ imdb_id: imdb, media_type:'series', season:+season, episode:num })
+      }).then(r=>r.json());
+
+      if(d.success){
+        const kb = (d.srt_text.length/1024).toFixed(1);
+        st.textContent  = `✅ ${d.source} · ${kb} KB`;
+        row.className   = 'ep-prog-item done';
+        addEpisodeWithSRT(String(num), d.srt_text);
+        ok++;
+      } else {
+        st.textContent = '❌ ' + (d.error||'Not found');
+        row.className  = 'ep-prog-item fail';
+        fail++;
+      }
+    } catch(e) {
+      st.textContent = '❌ Error: '+e.message;
+      row.className  = 'ep-prog-item fail';
+      fail++;
+    }
+    // Small delay to avoid hammering the APIs
+    await new Promise(r => setTimeout(r, 800));
+  }
+
+  summ.textContent = `Done: ${ok} fetched, ${fail} failed out of ${episodes.length} episodes.`;
+  showFetchMsg(
+    ok > 0 ? `✅ ${ok}/${episodes.length} subtitles fetched successfully!` : `❌ 0/${episodes.length} fetched.`,
+    ok > 0 ? 'ok' : 'err'
+  );
 }
-function clearFetchedSRT() {
+
+function showFetchMsg(msg, cls){
+  const r = document.getElementById('fetch-result');
+  r.textContent = msg;
+  r.className   = 'fetch-result' + (cls ? ' '+cls : '');
+  r.style.display = 'block';
+}
+
+function clearFetchedSRT(){
   document.getElementById('fetched-srt-single').value = '';
   document.getElementById('fetched-single-preview').style.display = 'none';
 }
 
-// ── Episode management (series) ──
-function addEpisode(ep, srtText) {
+// ── Episode management (series) ──────────────────────────────────────────────
+function addEpisode(ep, srtText){
   episodeCount++;
   const n   = ep || episodeCount;
   const div = document.createElement('div');
-  div.className = 'ep-row';
-  div.id = 'ep-row-' + episodeCount;
+  div.className = 'ep-row'; div.id = 'ep-row-'+episodeCount;
   div.innerHTML = `
-    <input type="number" class="form-input ep-num" placeholder="Ep #" value="${n}" name="episodes[]" min="1">
-    <input type="hidden" name="fetched_srts[]" id="fsrt-${episodeCount}" value="${srtText || ''}">
-    <input type="file" name="files[]" accept=".srt" style="display:none" id="ef-${episodeCount}">
-    <button type="button" class="btn-ghost" style="font-size:.8rem;padding:.4rem .8rem"
-            onclick="document.getElementById('ef-${episodeCount}').click()">📂 File</button>
-    ${srtText ? `<span style="color:#81c784;font-size:.78rem">✅ Auto-fetched</span>` : ''}
-    <button type="button" class="remove-ep" onclick="document.getElementById('ep-row-${episodeCount}').remove()">✕</button>`;
+    <input type="number" class="form-input ep-num" placeholder="Ep #" value="${n}"
+           name="episodes[]" min="1" style="width:72px;flex:none">
+    <input type="hidden" name="fetched_srts[]" id="fsrt-${episodeCount}" value="${srtText||''}">
+    <input type="file" name="files[]" accept=".srt,.zip" style="display:none" id="ef-${episodeCount}">
+    ${srtText
+      ? `<span style="color:#81c784;font-size:.78rem;flex:1">✅ Auto-fetched (${(srtText.length/1024).toFixed(1)} KB)</span>`
+      : `<button type="button" class="btn-ghost" style="font-size:.8rem;padding:.4rem .8rem;flex:1"
+                 onclick="document.getElementById('ef-${episodeCount}').click()">📂 Choose File</button>`
+    }
+    <button type="button" class="remove-ep"
+            onclick="document.getElementById('ep-row-${episodeCount}').remove()">✕</button>`;
   document.getElementById('ep-list').appendChild(div);
 }
-function addEpisodeWithSRT(ep, srtText) { addEpisode(ep, srtText); }
+function addEpisodeWithSRT(ep, srtText){ addEpisode(ep, srtText); }
 
-// Drop zone drag events
-const dz = document.getElementById('drop-single');
-if (dz) {
-  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
-  dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
-  dz.addEventListener('drop', e => {
+// ── Drop zone events ─────────────────────────────────────────────────────────
+function setupDrop(zoneId, inputId, labelId){
+  const dz = document.getElementById(zoneId);
+  if(!dz) return;
+  dz.addEventListener('dragover', e=>{ e.preventDefault(); dz.classList.add('drag-over'); });
+  dz.addEventListener('dragleave', ()=> dz.classList.remove('drag-over'));
+  dz.addEventListener('drop', e=>{
     e.preventDefault(); dz.classList.remove('drag-over');
     const f = e.dataTransfer.files[0];
-    if (f && f.name.endsWith('.srt')) {
-      document.getElementById('srt-file-single').files = e.dataTransfer.files;
-      dz.querySelector('p').textContent = '✅ ' + f.name;
+    if(f){
+      document.getElementById(inputId).files = e.dataTransfer.files;
+      document.getElementById(labelId).innerHTML
+        = `✅ <strong>${f.name}</strong> (${(f.size/1024).toFixed(1)} KB)`;
     }
   });
+  document.getElementById(inputId)?.addEventListener('change', function(){
+    if(this.files[0])
+      document.getElementById(labelId).innerHTML
+        = `✅ <strong>${this.files[0].name}</strong> (${(this.files[0].size/1024).toFixed(1)} KB)`;
+  });
 }
-document.getElementById('srt-file-single')?.addEventListener('change', function() {
-  if (this.files[0]) dz.querySelector('p').textContent = '✅ ' + this.files[0].name;
+setupDrop('drop-single','srt-file-single','drop-label');
+setupDrop('drop-zip','srt-zip-series','zip-label');
+
+// ── TMDB query on Enter ──────────────────────────────────────────────────────
+document.getElementById('tmdb-query').addEventListener('keypress', e=>{
+  if(e.key==='Enter'){ e.preventDefault(); searchTmdb(); }
 });
 
-function showSpinner() {
-  document.getElementById('spinner').style.display = 'inline-block';
-}
-
-// TMDB query on Enter
-document.getElementById('tmdb-query').addEventListener('keypress', e => {
-  if (e.key === 'Enter') { e.preventDefault(); searchTmdb(); }
-});
+function showSpinner(){ document.getElementById('spinner').style.display='inline-block'; }
 </script>
 {% endblock %}
