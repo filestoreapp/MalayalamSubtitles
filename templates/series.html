@@ -1,128 +1,380 @@
 {% extends "base.html" %}
-{% block title %}{{ title }} Season {{ season }} – Malayalam Subtitles Hub{% endblock %}
+{% block title %}{{ title }} Season {{ season }} Episodes – MalSubs{% endblock %}
 
 {% block extra_head %}
 <style>
-/* Hero (compact) */
-.shero-sm{position:relative;overflow:hidden;background:#020818;border-bottom:1px solid var(--border);padding:1.1rem 1rem}
-.shero-sm-bg{position:absolute;inset:0;
+/* ══ HERO ══ */
+.shero{position:relative;overflow:hidden;background:#080818}
+.shero-bg{
+  position:absolute;inset:0;
   {% if show_data.poster_url %}background-image:url('{{ show_data.poster_url | replace("'","%27") }}');{% endif %}
-  background-size:cover;background-position:center;
-  filter:blur(40px) brightness(.12);transform:scale(1.1)}
-.shero-sm-inner{position:relative;max-width:1100px;margin:0 auto;display:flex;gap:1rem;align-items:center}
-.shero-sm img{width:72px;height:108px;object-fit:cover;border-radius:8px;flex-shrink:0;box-shadow:0 8px 24px rgba(0,0,0,.8)}
-.shero-sm h1{font-size:clamp(1rem,3.5vw,1.4rem);font-weight:800;line-height:1.25}
-.mpill{display:inline-flex;align-items:center;background:rgba(255,255,255,.07);border:1px solid var(--border);border-radius:20px;padding:.24rem .6rem;font-size:.74rem;color:var(--muted);margin:.2rem .2rem 0 0}
-.imdb-pill{background:var(--gold);color:#000;font-weight:800;border-radius:6px;padding:.24rem .6rem;font-size:.74rem}
-
-/* Season nav */
-.sn-wrap{max-width:1100px;margin:.85rem auto 0;padding:0 1rem;display:flex;gap:.4rem;overflow-x:auto;scrollbar-width:none}
-.sn-wrap::-webkit-scrollbar{display:none}
-.sn-btn{background:var(--card);border:1px solid var(--border);color:var(--muted);border-radius:7px;padding:.35rem .75rem;font-size:.78rem;text-decoration:none;white-space:nowrap;transition:all .15s;flex-shrink:0}
-.sn-btn:hover{color:#fff;border-color:#555}
-.sn-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
-
-/* Episode list */
-.ep-list-wrap{max-width:1100px;margin:1rem auto 1.5rem;padding:0 1rem}
-.ep-table{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--bg2)}
-
-.ep-row{
-  display:grid;
-  grid-template-columns:52px 1fr auto auto;
-  gap:.5rem;padding:.75rem .9rem;border-bottom:1px solid var(--border);
-  align-items:center;text-decoration:none;color:inherit;transition:background .13s;
+  background-size:cover;background-position:center 25%;
+  filter:blur(40px) brightness(.18);transform:scale(1.08);
 }
-.ep-row:last-child{border-bottom:none}
-.ep-row:hover{background:var(--card);color:inherit}
+.shero-grad{position:absolute;inset:0;background:linear-gradient(to top,#0d0d0d 0%,rgba(13,13,13,.5) 60%,transparent 100%)}
+.shero-inner{position:relative;z-index:2;max-width:1100px;margin:0 auto;padding:1.25rem 1rem;display:flex;gap:1rem;align-items:center}
+.shero-poster{width:75px;height:112px;object-fit:cover;border-radius:9px;box-shadow:0 8px 28px rgba(0,0,0,.9);flex-shrink:0;border:1.5px solid rgba(255,255,255,.1)}
+@media(min-width:480px){.shero-poster{width:90px;height:135px}}
+.shero-info{flex:1;min-width:0}
+.shero-back{font-size:.72rem;color:var(--muted);display:inline-flex;align-items:center;gap:.3rem;margin-bottom:.35rem;transition:color .15s}
+.shero-back:hover{color:#fff}
+.shero-title{font-size:clamp(1rem,4vw,1.5rem);font-weight:900;line-height:1.2;margin-bottom:.4rem}
+.shero-pills{display:flex;flex-wrap:wrap;gap:.3rem}
+.spill{display:inline-flex;align-items:center;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:20px;padding:.22rem .6rem;font-size:.72rem;color:#ccc}
+.spill.gold{background:rgba(245,197,24,.12);border-color:rgba(245,197,24,.35);color:var(--gold);font-weight:700}
 
-.ep-num{font-size:.82rem;font-weight:700;color:var(--accent);text-align:center}
-.ep-info .ep-title{font-size:.88rem;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-.ep-info .ep-sub{font-size:.72rem;color:var(--muted);margin-top:.15rem}
-
-/* Language dots */
-.lang-dots{display:flex;gap:.22rem;flex-shrink:0}
-.ld{width:26px;height:26px;border-radius:50%;font-size:.58rem;font-weight:700;display:flex;align-items:center;justify-content:center;border:1.5px solid transparent;flex-shrink:0}
-.ld-ready-en{border-color:#888;color:#aaa}
-.ld-ready-ml{border-color:#4caf50;color:#4caf50}
-.ld-ready-ta{border-color:#ef5350;color:#ef5350}
-.ld-ready-hi{border-color:#42a5f5;color:#42a5f5}
-.ld-pend{border-color:#333;color:#444}
-
-/* Quick download links */
-.ep-dls{display:flex;flex-direction:column;gap:.18rem;align-items:flex-end;flex-shrink:0}
-.ep-dls a{color:var(--muted);font-size:.7rem;text-decoration:none;white-space:nowrap;padding:.15rem .3rem;border-radius:4px;border:1px solid var(--border);transition:all .13s}
-.ep-dls a:hover{color:#fff;border-color:#666}
-
-/* Mobile: hide download links, show only dots */
-@media(max-width:480px){
-  .ep-row{grid-template-columns:42px 1fr auto}
-  .ep-dls{display:none}
+/* ══ SEASON NAV ══ */
+.snav{max-width:1100px;margin:.9rem auto 0;padding:0 1rem;display:flex;gap:.4rem;overflow-x:auto;scrollbar-width:none}
+.snav::-webkit-scrollbar{display:none}
+.snav a{
+  background:var(--card);border:1.5px solid var(--border);color:var(--muted);
+  border-radius:8px;padding:.38rem .8rem;font-size:.78rem;white-space:nowrap;
+  flex-shrink:0;transition:all .18s;font-weight:600;
 }
+.snav a:hover{color:#fff;border-color:#555}
+.snav a.active{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 4px 12px rgba(229,9,20,.35)}
+
+/* ══ EPISODE LIST ══ */
+.ep-wrap{max-width:1100px;margin:1.1rem auto 2rem;padding:0 1rem}
+.ep-card{
+  background:var(--card);border:1px solid var(--border);border-radius:12px;
+  margin-bottom:.6rem;overflow:hidden;transition:border-color .18s,box-shadow .18s;
+}
+.ep-card:hover{border-color:#3a3a3a;box-shadow:0 4px 20px rgba(0,0,0,.4)}
+
+.ep-main{
+  display:flex;align-items:center;gap:.85rem;padding:.85rem 1rem;
+  text-decoration:none;color:inherit;
+}
+.ep-main:hover{color:inherit}
+
+/* Episode number circle */
+.ep-circle{
+  width:46px;height:46px;border-radius:50%;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-size:.95rem;font-weight:900;
+  background:linear-gradient(135deg,#1a1a2e,#16213e);
+  border:2px solid #2a2a4a;color:#7b8fff;
+  transition:all .18s;
+}
+.ep-card:hover .ep-circle{background:linear-gradient(135deg,var(--accent),#ff6b35);border-color:transparent;color:#fff;box-shadow:0 4px 14px rgba(229,9,20,.4)}
+
+.ep-info{flex:1;min-width:0}
+.ep-title{font-size:.92rem;font-weight:700;margin-bottom:.25rem;
+  overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.ep-sub{font-size:.72rem;color:var(--muted)}
+
+/* Language badges */
+.ep-langs{display:flex;gap:.35rem;flex-shrink:0;align-items:center}
+.lb{
+  display:inline-flex;align-items:center;gap:.25rem;
+  border-radius:6px;padding:.25rem .5rem;font-size:.68rem;font-weight:700;
+  border:1.5px solid transparent;white-space:nowrap;
+}
+.lb-en{background:#1a1a1a;border-color:#444;color:#888}
+.lb-en.ready{background:#1a1a1a;border-color:#777;color:#bbb}
+.lb-ml{background:#0d2010;border-color:#1a4d30;color:#4caf50}
+.lb-ml.ready{background:#0d2510;border-color:#2e7d32;color:#66bb6a}
+.lb-ta{background:#2d0a0a;border-color:#4d1a1a;color:#ef5350}
+.lb-ta.ready{background:#2d0a0a;border-color:#c62828;color:#ef9a9a}
+.lb-hi{background:#0a0d2d;border-color:#1a2070;color:#42a5f5}
+.lb-hi.ready{background:#0a0d2d;border-color:#1565c0;color:#64b5f6}
+.lb-pend{opacity:.35;filter:grayscale(1)}
+
+/* Download expand panel */
+.ep-dl-panel{
+  display:none;padding:.7rem 1rem .85rem;
+  background:#141414;border-top:1px solid var(--border);
+}
+.ep-dl-panel.open{display:block}
+.dl-panel-title{font-size:.72rem;color:var(--muted);margin-bottom:.6rem;text-transform:uppercase;letter-spacing:.06em}
+.dl-btns{display:grid;grid-template-columns:repeat(2,1fr);gap:.45rem}
+@media(min-width:480px){.dl-btns{grid-template-columns:repeat(4,1fr)}}
+.dl-lang-btn{
+  display:flex;flex-direction:column;align-items:center;gap:.3rem;
+  border-radius:9px;padding:.65rem .5rem;font-size:.75rem;font-weight:700;
+  cursor:pointer;transition:all .18s;border:1.5px solid transparent;text-decoration:none;
+}
+.dl-en{background:#1e1e1e;border-color:#444;color:#aaa}
+.dl-en:hover{border-color:#888;color:#fff;background:#252525}
+.dl-ml{background:#0a2010;border-color:#2e7d32;color:#66bb6a}
+.dl-ml:hover{background:#0d2d15;box-shadow:0 4px 14px rgba(76,175,80,.25);color:#81c784}
+.dl-ta{background:#2d0a0a;border-color:#c62828;color:#ef9a9a}
+.dl-ta:hover{background:#3d0a0a;box-shadow:0 4px 14px rgba(239,83,80,.25);color:#ffcdd2}
+.dl-hi{background:#0a0d2d;border-color:#1565c0;color:#64b5f6}
+.dl-hi:hover{background:#0a1040;box-shadow:0 4px 14px rgba(66,165,245,.25);color:#90caf9}
+.dl-lang-btn .dl-flag{font-size:1.4rem}
+.dl-lang-btn .dl-name{font-size:.68rem}
+.dl-lang-btn.unavail{opacity:.3;pointer-events:none;cursor:default}
+
+/* Toggle button */
+.ep-toggle{
+  width:100%;background:none;border:none;border-top:1px solid var(--border);
+  color:var(--muted);padding:.55rem;font-size:.78rem;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:.35rem;
+  transition:all .18s;
+}
+.ep-toggle:hover{background:#1a1a1a;color:#fff}
+.ep-toggle .arr{transition:transform .2s;display:inline-block}
+.ep-toggle.open .arr{transform:rotate(180deg)}
+
+/* ══ COUNTDOWN MODAL ══ */
+.cd-modal{
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);
+  z-index:3000;align-items:center;justify-content:center;padding:1rem;
+}
+.cd-modal.show{display:flex}
+.cd-box{
+  background:#141414;border:1px solid #2a2a2a;border-radius:16px;
+  padding:1.75rem 1.5rem;width:min(340px,92vw);text-align:center;
+  box-shadow:0 24px 80px rgba(0,0,0,.8);
+}
+.cd-title{font-size:1rem;font-weight:700;margin-bottom:.35rem}
+.cd-subtitle{font-size:.8rem;color:var(--muted);margin-bottom:1.5rem}
+
+/* Ring timer */
+.cd-ring-wrap{position:relative;width:100px;height:100px;margin:0 auto 1.5rem}
+.cd-svg{width:100px;height:100px;transform:rotate(-90deg)}
+.cd-track{fill:none;stroke:#222;stroke-width:6}
+.cd-fill{fill:none;stroke:var(--accent);stroke-width:6;stroke-linecap:round;
+  stroke-dasharray:264;stroke-dashoffset:0;transition:stroke-dashoffset 1s linear}
+.cd-number{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:2rem;font-weight:900;color:var(--accent);
+}
+.cd-label{font-size:.72rem;color:var(--muted);margin-top:-1.2rem;margin-bottom:1.5rem}
+
+.cd-progress-bar{height:4px;background:#1e1e1e;border-radius:2px;overflow:hidden;margin-bottom:1.25rem}
+.cd-progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),#ff6b35);border-radius:2px;width:100%;transition:width 1s linear}
+
+.cd-file{font-size:.82rem;color:#ccc;margin-bottom:1.25rem;
+  background:#1a1a1a;border-radius:7px;padding:.5rem .75rem;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.cd-cancel{background:none;border:1px solid #333;color:var(--muted);border-radius:8px;padding:.5rem 1.2rem;font-size:.82rem;cursor:pointer;transition:all .18s;width:100%}
+.cd-cancel:hover{border-color:#666;color:#fff}
 </style>
 {% endblock %}
 
 {% block content %}
 
-<!-- Compact hero -->
-<div class="shero-sm">
-  <div class="shero-sm-bg"></div>
-  <div class="shero-sm-inner">
-    <a href="/series/{{ title | urlencode }}">
-      <img src="{{ show_data.poster_url or 'https://placehold.co/300x450/1a1a1a/555?text=?' }}"
+<!-- ══ HERO ══ -->
+<div class="shero">
+  <div class="shero-bg"></div>
+  <div class="shero-grad"></div>
+  <div class="shero-inner">
+    <a href="/series/{{ title|urlencode }}">
+      <img class="shero-poster"
+           src="{{ show_data.poster_url or 'https://placehold.co/300x450/1a1a1a/555?text=?' }}"
            alt="{{ title }}"
            onerror="this.src='https://placehold.co/300x450/1a1a1a/555?text=?'">
     </a>
-    <div>
-      <a href="/series/{{ title | urlencode }}" style="color:var(--muted);font-size:.72rem;display:inline-block;margin-bottom:.3rem">← All Seasons</a>
-      <h1>{{ title }}</h1>
-      <div style="margin-top:.35rem">
-        {% if show_data.rating and show_data.rating not in ('N/A','0') %}<span class="imdb-pill">⭐ {{ show_data.rating }}</span>{% endif %}
-        <span class="mpill">📺 Season {{ season }}</span>
-        <span class="mpill">{{ episodes | length }} Episodes</span>
-        {% if show_data.year %}<span class="mpill">{{ show_data.year }}</span>{% endif %}
+    <div class="shero-info">
+      <a href="/series/{{ title|urlencode }}" class="shero-back">← All Seasons</a>
+      <div class="shero-title">{{ title }}</div>
+      <div class="shero-pills">
+        {% if show_data.rating and show_data.rating not in ('N/A','0') %}
+        <span class="spill gold">⭐ {{ show_data.rating }}</span>
+        {% endif %}
+        <span class="spill">📺 Season {{ season }}</span>
+        <span class="spill">{{ episodes|length }} Episodes</span>
+        {% if show_data.year %}<span class="spill">{{ show_data.year }}</span>{% endif %}
       </div>
     </div>
   </div>
 </div>
 
-<!-- Season navigation -->
-{% if all_seasons and all_seasons | length > 1 %}
-<div class="sn-wrap">
+<!-- ══ SEASON NAV ══ -->
+{% if all_seasons and all_seasons|length > 1 %}
+<div class="snav">
   {% for s in all_seasons %}
-  <a href="/series/{{ title | urlencode }}/{{ s }}" class="sn-btn {{ 'active' if s == season }}">Season {{ s }}</a>
+  <a href="/series/{{ title|urlencode }}/{{ s }}" class="{{ 'active' if s == season }}">Season {{ s }}</a>
   {% endfor %}
 </div>
 {% endif %}
 
-<!-- Episode list -->
-<div class="ep-list-wrap">
-  <div class="ep-table">
-    {% for ep in episodes %}
-    {% set tlangs = ep.translations | map(attribute='language') | list %}
-    <a href="/movie/{{ ep.slug or ep.id }}" class="ep-row">
+<!-- ══ EPISODES ══ -->
+<div class="ep-wrap">
+  {% for ep in episodes %}
+  {% set tlangs = ep.translations | map(attribute='language') | list %}
+  {% set ep_idx = loop.index %}
 
-      <div class="ep-num">E{{ '%02d' | format(ep.episode or 1) }}</div>
+  <div class="ep-card" id="epc-{{ ep_idx }}">
 
+    <!-- Main row (click to expand) -->
+    <div class="ep-main" onclick="toggleEp({{ ep_idx }})">
+      <div class="ep-circle">{{ ep.episode or '?' }}</div>
       <div class="ep-info">
         <div class="ep-title">Episode {{ ep.episode or '?' }}</div>
-        <div class="ep-sub">S{{ '%02d'|format(ep.season or 1) }}E{{ '%02d'|format(ep.episode or 1) }}</div>
+        <div class="ep-sub">
+          S{{ '%02d'|format(ep.season or 1) }}E{{ '%02d'|format(ep.episode or 1) }}
+          {% if ep.english_srt %} · EN ready{% endif %}
+          {% if ep.translations %} · {{ ep.translations|length }} lang{{ 's' if ep.translations|length>1 }}{% endif %}
+        </div>
       </div>
-
-      <div class="lang-dots">
-        <span class="ld {{ 'ld-ready-en' if ep.english_srt else 'ld-pend' }}" title="English">EN</span>
-        <span class="ld {{ 'ld-ready-ml' if 'ml' in tlangs else 'ld-pend' }}" title="Malayalam">ML</span>
-        <span class="ld {{ 'ld-ready-ta' if 'ta' in tlangs else 'ld-pend' }}" title="Tamil">TA</span>
-        <span class="ld {{ 'ld-ready-hi' if 'hi' in tlangs else 'ld-pend' }}" title="Hindi">HI</span>
+      <div class="ep-langs">
+        <span class="lb lb-en {{ 'ready' if ep.english_srt else 'lb-pend' }}">
+          {% if ep.english_srt %}✓{% else %}–{% endif %} EN
+        </span>
+        <span class="lb lb-ml {{ 'ready' if 'ml' in tlangs else 'lb-pend' }}">
+          {% if 'ml' in tlangs %}✓{% else %}–{% endif %} ML
+        </span>
+        <span class="lb lb-ta {{ 'ready' if 'ta' in tlangs else 'lb-pend' }}">
+          {% if 'ta' in tlangs %}✓{% else %}–{% endif %} TA
+        </span>
+        <span class="lb lb-hi {{ 'ready' if 'hi' in tlangs else 'lb-pend' }}">
+          {% if 'hi' in tlangs %}✓{% else %}–{% endif %} HI
+        </span>
       </div>
+    </div>
 
-      <div class="ep-dls" onclick="event.stopPropagation()">
-        {% if ep.english_srt %}<a href="/download/{{ ep.id }}/en">⬇ EN</a>{% endif %}
-        {% for t in ep.translations %}<a href="/download/{{ ep.id }}/{{ t.language }}">⬇ {{ t.language | upper }}</a>{% endfor %}
+    <!-- Download panel -->
+    <div class="ep-dl-panel" id="edl-{{ ep_idx }}">
+      <div class="dl-panel-title">📥 Download Subtitle</div>
+      <div class="dl-btns">
+
+        <a class="dl-lang-btn dl-en {{ '' if ep.english_srt else 'unavail' }}"
+           onclick="startDownload(event,'/download/{{ ep.id }}/en','{{ ep.title or 'Episode '+((ep.episode or 1)|string) }} – English')"
+           href="#">
+          <span class="dl-flag">🇬🇧</span>
+          <span>English</span>
+          <span class="dl-name">{{ '✓ Available' if ep.english_srt else 'Not ready' }}</span>
+        </a>
+
+        <a class="dl-lang-btn dl-ml {{ '' if 'ml' in tlangs else 'unavail' }}"
+           onclick="startDownload(event,'/download/{{ ep.id }}/ml','{{ ep.title or 'Episode '+((ep.episode or 1)|string) }} – Malayalam')"
+           href="#">
+          <span class="dl-flag">🇮🇳</span>
+          <span>Malayalam</span>
+          <span class="dl-name">{{ '✓ Available' if 'ml' in tlangs else '⏳ Pending' }}</span>
+        </a>
+
+        <a class="dl-lang-btn dl-ta {{ '' if 'ta' in tlangs else 'unavail' }}"
+           onclick="startDownload(event,'/download/{{ ep.id }}/ta','{{ ep.title or 'Episode '+((ep.episode or 1)|string) }} – Tamil')"
+           href="#">
+          <span class="dl-flag">🇮🇳</span>
+          <span>Tamil</span>
+          <span class="dl-name">{{ '✓ Available' if 'ta' in tlangs else '⏳ Pending' }}</span>
+        </a>
+
+        <a class="dl-lang-btn dl-hi {{ '' if 'hi' in tlangs else 'unavail' }}"
+           onclick="startDownload(event,'/download/{{ ep.id }}/hi','{{ ep.title or 'Episode '+((ep.episode or 1)|string) }} – Hindi')"
+           href="#">
+          <span class="dl-flag">🇮🇳</span>
+          <span>Hindi</span>
+          <span class="dl-name">{{ '✓ Available' if 'hi' in tlangs else '⏳ Pending' }}</span>
+        </a>
+
       </div>
+    </div>
 
-    </a>
-    {% endfor %}
+    <!-- Toggle button -->
+    <button class="ep-toggle" id="etb-{{ ep_idx }}" onclick="toggleEp({{ ep_idx }})">
+      <span>Get Subtitles</span>
+      <span class="arr">▼</span>
+    </button>
+
+  </div>
+  {% endfor %}
+</div>
+
+<!-- ══ COUNTDOWN MODAL ══ -->
+<div class="cd-modal" id="cd-modal">
+  <div class="cd-box">
+    <div class="cd-title">⬇️ Preparing Download</div>
+    <div class="cd-subtitle" id="cd-sub">Your subtitle is being prepared…</div>
+
+    <div class="cd-ring-wrap">
+      <svg class="cd-svg" viewBox="0 0 88 88">
+        <circle class="cd-track" cx="44" cy="44" r="42"/>
+        <circle class="cd-fill" cx="44" cy="44" r="42" id="cd-ring"/>
+      </svg>
+      <div class="cd-number" id="cd-num">10</div>
+    </div>
+    <div class="cd-label">seconds remaining</div>
+
+    <div class="cd-progress-bar">
+      <div class="cd-progress-fill" id="cd-bar"></div>
+    </div>
+
+    <div class="cd-file" id="cd-file">Loading…</div>
+    <button class="cd-cancel" onclick="cancelDownload()">✕ Cancel</button>
   </div>
 </div>
 
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// ══ Episode toggle ══
+function toggleEp(idx){
+  const panel = document.getElementById('edl-'+idx);
+  const btn   = document.getElementById('etb-'+idx);
+  const open  = panel.classList.toggle('open');
+  btn.classList.toggle('open', open);
+  btn.querySelector('span:first-child').textContent = open ? 'Hide' : 'Get Subtitles';
+}
+
+// ══ Countdown Download ══
+let cdTimer = null;
+let cdUrl   = '';
+let cdSecs  = 10;
+const TOTAL = 10;
+const CIRC  = 2 * Math.PI * 42; // 263.9
+
+function startDownload(e, url, fileName){
+  e.preventDefault();
+  cdUrl  = url;
+  cdSecs = TOTAL;
+  document.getElementById('cd-file').textContent = '📄 ' + fileName;
+  document.getElementById('cd-sub').textContent   = 'Your subtitle is being prepared…';
+  document.getElementById('cd-num').textContent   = cdSecs;
+  document.getElementById('cd-ring').style.strokeDashoffset = '0';
+  document.getElementById('cd-bar').style.width   = '100%';
+  document.getElementById('cd-modal').classList.add('show');
+  document.body.style.overflow = 'hidden';
+  cdTimer = setInterval(tickDown, 1000);
+}
+
+function tickDown(){
+  cdSecs--;
+  document.getElementById('cd-num').textContent = cdSecs;
+  const pct     = cdSecs / TOTAL;
+  const offset  = CIRC * (1 - pct);
+  document.getElementById('cd-ring').style.strokeDashoffset = offset;
+  document.getElementById('cd-bar').style.width = (pct * 100) + '%';
+
+  if(cdSecs <= 3){
+    document.getElementById('cd-sub').textContent = 'Starting download…';
+    document.getElementById('cd-ring').style.stroke = '#f5c518';
+  }
+  if(cdSecs <= 0){
+    clearInterval(cdTimer);
+    doDownload();
+  }
+}
+
+function doDownload(){
+  const a = document.createElement('a');
+  a.href  = cdUrl;
+  a.click();
+  setTimeout(closeCD, 1200);
+}
+
+function cancelDownload(){
+  clearInterval(cdTimer);
+  closeCD();
+}
+
+function closeCD(){
+  document.getElementById('cd-modal').classList.remove('show');
+  document.body.style.overflow = '';
+  document.getElementById('cd-ring').style.stroke = 'var(--accent)';
+  cdUrl = '';
+}
+
+document.getElementById('cd-modal').addEventListener('click', function(e){
+  if(e.target === this) cancelDownload();
+});
+</script>
 {% endblock %}
