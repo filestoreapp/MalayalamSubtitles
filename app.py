@@ -1177,23 +1177,43 @@ def tmdb_details():
 # ------------------ TMDB EPISODE VERIFICATION ------------------
 
 def tmdb_episode_exists(imdb_id: str, season: int, episode: int) -> bool:
+    """Legacy wrapper kept for scheduler compatibility."""
+    ok, _ = tmdb_episode_exists_strict(imdb_id, season, episode)
+    return ok
+
+def tmdb_episode_exists_strict(imdb_id: str, season: int, episode: int):
+    """
+    Returns (exists: bool, total_episodes_in_season: int | None).
+    Fetches the full season so we know exactly how many episodes exist.
+    """
     api_key = os.environ.get('TMDB_API_KEY')
     if not api_key:
-        return True
+        return True, None
     try:
-        find_data  = requests.get(
-            f"https://api.themoviedb.org/3/find/{imdb_id}?api_key={api_key}&external_source=imdb_id",
+        find_data = requests.get(
+            f"https://api.themoviedb.org/3/find/{imdb_id}"
+            f"?api_key={api_key}&external_source=imdb_id",
             timeout=10).json()
         tv_results = find_data.get('tv_results', [])
         if not tv_results:
-            return True
-        series_id = tv_results[0]['id']
-        ep_resp   = requests.get(
-            f"https://api.themoviedb.org/3/tv/{series_id}/season/{season}/episode/{episode}?api_key={api_key}",
+            return True, None          # cannot verify -> allow
+
+        series_id   = tv_results[0]['id']
+        season_resp = requests.get(
+            f"https://api.themoviedb.org/3/tv/{series_id}/season/{season}"
+            f"?api_key={api_key}",
             timeout=10)
-        return ep_resp.status_code == 200
+
+        if season_resp.status_code != 200:
+            return False, 0            # season does not exist
+
+        episodes = season_resp.json().get('episodes', [])
+        total    = len(episodes)
+        ep_nums  = [e.get('episode_number') for e in episodes]
+        exists   = episode in ep_nums
+        return exists, total
     except Exception:
-        return True
+        return True, None              # network error -> allow
 
 # ------------------ SLUG HELPERS ------------------
 
@@ -1222,7 +1242,7 @@ def _unique_slug(title, year, exclude_id=None):
 @login_required
 def auto_fetch_srt():
     data       = request.json
-    imdb_id    = data.get('imdb_id')
+    imdb_id    = (data.get('imdb_id') or '').strip()
     media_type = data.get('media_type', 'movie')
     season     = data.get('season')
     episode    = data.get('episode')
@@ -1230,118 +1250,197 @@ def auto_fetch_srt():
     SUBDL_API_KEY = os.environ.get('SUBDL_API_KEY')
     OS_API_KEY    = os.environ.get('OS_API_KEY')
 
-    if not imdb_id or imdb_id == 'undefined':
-        return jsonify({"error": "Missing IMDb ID"}), 400
-    if not str(imdb_id).startswith('tt'):
-        imdb_id = f"tt{imdb_id}"
-    clean_imdb = str(imdb_id).replace('tt', '')
+    # ── Validate inputs ──────────────────────────────────────────────────────
+    if not imdb_id or imdb_id in ('undefined', 'null', ''):
+        return jsonify({"error": "Missing IMDb ID. Auto-fill from TMDB first."}), 400
 
-    if media_type == 'series' and season and episode:
-        if not tmdb_episode_exists(imdb_id, int(season), int(episode)):
-            return jsonify({"error": f"Episode S{season}E{episode} does not exist (TMDB)"}), 400
+    if not imdb_id.startswith('tt'):
+        imdb_id = 'tt' + imdb_id
+    clean_imdb = imdb_id.replace('tt', '')
 
-    custom_headers = {"User-Agent": "Mozilla/5.0 Chrome/114.0.0.0 Safari/537.36"}
-    error_log      = []
+    # Convert season/episode to int safely
+    try:
+        season  = int(season)  if season  not in (None, '', 'null') else None
+    except (ValueError, TypeError):
+        season = None
+    try:
+        episode = int(episode) if episode not in (None, '', 'null') else None
+    except (ValueError, TypeError):
+        episode = None
 
-    # ----- SUBDL -----
+    if media_type == 'series':
+        if not season or not episode:
+            return jsonify({"error": "Season and Episode number are required for series."}), 400
+        exists, total_eps = tmdb_episode_exists_strict(imdb_id, season, episode)
+        if not exists:
+            extra = f" Season {season} only has {total_eps} episode(s)." if total_eps else ""
+            return jsonify({"error": f"S{season:02d}E{episode:02d} does not exist.{extra}"}), 400
+
+    ua      = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120 Safari/537.36"
+    headers = {"User-Agent": ua}
+    errors  = []
+
+    # ── Helper: does a filename contain matching SxxEyy? ─────────────────────
+    def release_matches(name, s, e):
+        import re as _re
+        for pat in [
+            r'[Ss](\d{1,2})[Ee](\d{1,2})',
+            r'[Ss]eason\s*(\d+).*?[Ee]pisode\s*(\d+)',
+            r'(\d{1,2})x(\d{2})',
+        ]:
+            m = _re.search(pat, name or '')
+            if m:
+                try:
+                    if int(m.group(1)) == s and int(m.group(2)) == e:
+                        return True
+                except (ValueError, TypeError):
+                    pass
+        return False
+
+    # ── Helper: extract correct SRT from ZIP ─────────────────────────────────
+    def extract_srt(raw_bytes, s=None, e=None):
+        try:
+            with zipfile.ZipFile(io.BytesIO(raw_bytes)) as z:
+                srts = [f for f in z.namelist() if f.lower().endswith('.srt')]
+                if not srts:
+                    return None
+                if s and e:
+                    for fn in srts:
+                        if release_matches(fn, s, e):
+                            return z.read(fn).decode('utf-8', errors='ignore')
+                return z.read(srts[0]).decode('utf-8', errors='ignore')
+        except Exception as ex:
+            errors.append(f"ZIP error: {ex}")
+            return None
+
+    # ────────────────────────────────────────────────────────────────────────
+    # SUBDL
+    # ────────────────────────────────────────────────────────────────────────
     if SUBDL_API_KEY:
         try:
-            url = (f"https://api.subdl.com/api/v1/subtitles?api_key={SUBDL_API_KEY}"
-                   f"&imdb_id={imdb_id}&type={'tv' if media_type == 'series' else 'movie'}&languages=EN"
-                   + (f"&season_number={season}&episode_number={episode}" if media_type == 'series' else ''))
-            res_raw = requests.get(url, headers=custom_headers)
-            if res_raw.status_code == 200:
-                res  = res_raw.json()
-                subs = res.get('subtitles', []) if res.get('status') else []
-                if media_type == 'series' and season and episode and subs:
-                    filtered = []
+            qtype = 'tv' if media_type == 'series' else 'movie'
+            url   = (f"https://api.subdl.com/api/v1/subtitles"
+                     f"?api_key={SUBDL_API_KEY}&imdb_id={imdb_id}"
+                     f"&type={qtype}&languages=EN")
+            if media_type == 'series':
+                url += f"&season_number={season}&episode_number={episode}"
+
+            resp = requests.get(url, headers=headers, timeout=15)
+            if resp.status_code != 200:
+                errors.append(f"Subdl HTTP {resp.status_code}")
+            else:
+                subs = resp.json().get('subtitles', []) if resp.json().get('status') else []
+
+                # Strict episode filter for series
+                if media_type == 'series' and subs:
+                    matched = []
                     for sub in subs:
                         ss, se = sub.get('season'), sub.get('episode')
-                        if ss is not None and se is not None:
-                            if ss == season and se == episode:
-                                filtered.append(sub)
-                        else:
-                            m = re.search(r'S(\d+)\s*E(\d+)', sub.get('release_name', ''), re.I)
-                            if m and int(m.group(1)) == season and int(m.group(2)) == episode:
-                                filtered.append(sub)
-                    subs = filtered or []
-
-                def score_sub(sub):
-                    if sub.get('hearing_impaired'): return -1
-                    return (2 if sub.get('format', '').lower() == 'srt' else 0,
-                            int(sub.get('downloads', 0)),
-                            float(sub.get('rating', 0)))
-
-                scored = sorted(((score_sub(s), s) for s in subs if score_sub(s) != -1),
-                                key=lambda x: x[0], reverse=True)
-                if scored:
-                    dl_url  = "https://dl.subdl.com" + scored[0][1]['url']
-                    dl_res  = requests.get(dl_url, headers=custom_headers)
-                    srt_text = ""
-                    if b'PK\x03\x04' in dl_res.content[:4]:
-                        with zipfile.ZipFile(io.BytesIO(dl_res.content)) as z:
-                            for fn in z.namelist():
-                                if fn.endswith('.srt'):
-                                    srt_text = z.read(fn).decode('utf-8', errors='ignore'); break
+                        try:
+                            if ss is not None and se is not None:
+                                if int(ss) == season and int(se) == episode:
+                                    matched.append(sub)
+                                    continue
+                        except (ValueError, TypeError):
+                            pass
+                        if release_matches(sub.get('release_name', ''), season, episode):
+                            matched.append(sub)
+                    if not matched:
+                        errors.append(
+                            f"Subdl: {len(subs)} result(s) but none match "
+                            f"S{season:02d}E{episode:02d}")
+                        subs = []
                     else:
-                        srt_text = dl_res.text
-                    if srt_text:
-                        return jsonify({"success": True, "srt_text": srt_text, "source": "Subdl"})
-                else:
-                    error_log.append("Subdl: No suitable subtitles")
-            else:
-                error_log.append(f"Subdl HTTP {res_raw.status_code}")
-        except Exception as e:
-            error_log.append(f"Subdl Crash: {e}")
+                        subs = matched
 
-    # ----- OPENSUBTITLES -----
+                def score_sub(s):
+                    if s.get('hearing_impaired'):
+                        return (-1, 0, 0)
+                    return (2 if s.get('format','').lower()=='srt' else 0,
+                            int(s.get('downloads', 0) or 0),
+                            float(s.get('rating', 0) or 0))
+
+                ranked = sorted([(score_sub(s), s) for s in subs if score_sub(s)[0] >= 0],
+                                key=lambda x: x[0], reverse=True)
+
+                for _, best in ranked:
+                    dl = requests.get("https://dl.subdl.com" + best['url'],
+                                      headers=headers, timeout=20)
+                    if dl.status_code != 200:
+                        continue
+                    raw = dl.content
+                    txt = (extract_srt(raw, season, episode)
+                           if raw[:2] == b'PK'
+                           else raw.decode('utf-8', errors='ignore'))
+                    if txt and txt.strip():
+                        return jsonify({"success": True, "srt_text": txt, "source": "Subdl"})
+
+                if ranked:
+                    errors.append("Subdl: could not extract valid SRT from download")
+        except Exception as ex:
+            errors.append(f"Subdl crash: {ex}")
+
+    # ────────────────────────────────────────────────────────────────────────
+    # OPENSUBTITLES
+    # ────────────────────────────────────────────────────────────────────────
     if OS_API_KEY:
         try:
-            os_headers = {"Api-Key": OS_API_KEY, "Content-Type": "application/json",
-                          "User-Agent": "malayalamsubtitles_app v1.0"}
+            os_h = {"Api-Key": OS_API_KEY,
+                    "Content-Type": "application/json",
+                    "User-Agent": "malayalamsubtitles_app v1.0"}
             if media_type == 'series':
                 url = (f"https://api.opensubtitles.com/api/v1/subtitles"
-                       f"?parent_imdb_id={clean_imdb}&season_number={season}&episode_number={episode}&languages=en")
+                       f"?parent_imdb_id={clean_imdb}"
+                       f"&season_number={season}&episode_number={episode}&languages=en")
             else:
-                url = f"https://api.opensubtitles.com/api/v1/subtitles?imdb_id={clean_imdb}&languages=en"
+                url = (f"https://api.opensubtitles.com/api/v1/subtitles"
+                       f"?imdb_id={clean_imdb}&languages=en")
 
-            search_res = requests.get(url, headers=os_headers)
-            if search_res.status_code == 200:
-                items = search_res.json().get('data', [])
+            sr = requests.get(url, headers=os_h, timeout=15)
+            if sr.status_code != 200:
+                errors.append(f"OS HTTP {sr.status_code}")
+            else:
+                items = sr.json().get('data', [])
                 if media_type == 'series':
-                    items = [i for i in items if
-                             i.get('attributes', {}).get('season') == season and
-                             i.get('attributes', {}).get('episode') == episode]
-                if items:
-                    file_id   = items[0]['attributes']['files'][0]['file_id']
-                    dl_resp   = requests.post("https://api.opensubtitles.com/api/v1/download",
-                                              headers=os_headers, json={"file_id": file_id})
-                    if dl_resp.status_code == 200:
-                        link = dl_resp.json().get('link')
-                        if link:
-                            os_dl    = requests.get(link, headers=custom_headers)
-                            srt_text = ""
-                            if b'PK\x03\x04' in os_dl.content[:4]:
-                                with zipfile.ZipFile(io.BytesIO(os_dl.content)) as z:
-                                    for fn in z.namelist():
-                                        if fn.endswith('.srt'):
-                                            srt_text = z.read(fn).decode('utf-8', errors='ignore'); break
-                            else:
-                                srt_text = os_dl.text
-                            if srt_text:
-                                return jsonify({"success": True, "srt_text": srt_text, "source": "OpenSubtitles"})
-                        else:
-                            error_log.append("OS: Download link blocked")
-                    else:
-                        error_log.append(f"OS Download HTTP {dl_resp.status_code}")
-                else:
-                    error_log.append("OS: No matching subtitles")
-            else:
-                error_log.append(f"OS Search HTTP {search_res.status_code}")
-        except Exception as e:
-            error_log.append(f"OS Crash: {e}")
+                    def os_match(item):
+                        attr = item.get('attributes', {})
+                        try:
+                            if (int(attr.get('season_number', -1)) == season and
+                                    int(attr.get('episode_number', -1)) == episode):
+                                return True
+                        except (ValueError, TypeError):
+                            pass
+                        for f in attr.get('files', []):
+                            if release_matches(f.get('file_name',''), season, episode):
+                                return True
+                        return release_matches(attr.get('release',''), season, episode)
+                    items = [i for i in items if os_match(i)]
 
-    return jsonify({"error": " | ".join(error_log)}), 404
+                if not items:
+                    errors.append(
+                        f"OS: no results for S{season:02d}E{episode:02d}"
+                        if media_type == 'series' else "OS: no results")
+                else:
+                    fid  = items[0]['attributes']['files'][0]['file_id']
+                    dl_r = requests.post("https://api.opensubtitles.com/api/v1/download",
+                                         headers=os_h, json={"file_id": fid}, timeout=15)
+                    if dl_r.status_code == 200:
+                        link = dl_r.json().get('link','')
+                        if link:
+                            raw = requests.get(link, headers=headers, timeout=20).content
+                            txt = (extract_srt(raw, season, episode)
+                                   if raw[:2] == b'PK'
+                                   else raw.decode('utf-8', errors='ignore'))
+                            if txt and txt.strip():
+                                return jsonify({"success": True, "srt_text": txt,
+                                                "source": "OpenSubtitles"})
+                        errors.append("OS: empty download link")
+                    else:
+                        errors.append(f"OS download HTTP {dl_r.status_code}")
+        except Exception as ex:
+            errors.append(f"OS crash: {ex}")
+
+    return jsonify({"error": " | ".join(errors) or "Not found on any source"}), 404
 
 # ------------------ MASTER UPLOAD ROUTE ------------------
 
