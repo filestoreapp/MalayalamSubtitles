@@ -203,16 +203,29 @@
     <!-- ── Auto-fetch SRT ── -->
     <div class="form-card">
       <h2>⚡ Auto-fetch English SRT</h2>
-      <div style="display:flex;gap:.5rem;flex-wrap:wrap">
-        <input class="form-input" type="text" id="imdb-id-input" placeholder="IMDb ID (e.g. tt1375666)" style="max-width:260px">
-        <div id="ep-inputs" style="display:none;gap:.5rem;align-items:center">
-          <input class="form-input" type="number" id="fetch-season" placeholder="Season" min="1" style="width:90px">
-          <input class="form-input" type="number" id="fetch-episode" placeholder="Ep" min="1" style="width:70px">
+      <p style="font-size:.78rem;color:#888;margin-bottom:.85rem">
+        Auto-fill from TMDB above first so the IMDb ID is set. For series, enter the <strong>exact</strong> season &amp; episode — wrong numbers are rejected automatically.
+      </p>
+      <div style="display:flex;gap:.6rem;flex-wrap:wrap;align-items:flex-end">
+        <div style="flex:1;min-width:150px">
+          <label class="form-label">IMDb ID</label>
+          <input class="form-input" type="text" id="imdb-id-input" placeholder="tt1375666 (auto-filled by TMDB)">
         </div>
-        <button type="button" class="btn-accent" onclick="autoFetchSRT()">⚡ Fetch SRT</button>
+        <div id="ep-inputs" style="display:none;gap:.5rem;align-items:flex-end;flex-wrap:wrap">
+          <div>
+            <label class="form-label">Season #</label>
+            <input class="form-input" type="number" id="fetch-season" placeholder="1" min="1" style="width:76px">
+          </div>
+          <div>
+            <label class="form-label">Episode #</label>
+            <input class="form-input" type="number" id="fetch-episode" placeholder="1" min="1" style="width:76px">
+          </div>
+        </div>
+        <div>
+          <button type="button" class="btn-accent" onclick="autoFetchSRT()" id="fetch-btn">⚡ Fetch SRT</button>
+        </div>
       </div>
-      <div class="fetch-result" id="fetch-result"></div>
-      <div style="font-size:.75rem;color:var(--text-muted);margin-top:.5rem">Tries Subdl then OpenSubtitles automatically.</div>
+      <div class="fetch-result" id="fetch-result" style="margin-top:.75rem"></div>
     </div>
 
     <!-- ── SRT Upload ── -->
@@ -336,35 +349,52 @@ async function fillFromTmdb(id, type, name) {
 
 // ── Auto-fetch SRT ──
 async function autoFetchSRT() {
-  const imdb    = document.getElementById('imdb-id-input').value.trim();
   const isSeries = document.getElementById('type-series').checked;
-  const season  = document.getElementById('fetch-season')?.value;
-  const episode = document.getElementById('fetch-episode')?.value;
-  const resBox  = document.getElementById('fetch-result');
+  const imdb     = document.getElementById('imdb-id-input').value.trim();
+  const season   = document.getElementById('fetch-season')?.value?.trim();
+  const episode  = document.getElementById('fetch-episode')?.value?.trim();
+  const btn      = document.getElementById('fetch-btn');
 
-  if (!imdb) { showFetchMsg('Please enter an IMDb ID first.', false); return; }
+  // Validate series inputs before hitting the server
+  if (!imdb || imdb === '') {
+    showFetchMsg('❌ No IMDb ID found. Use the TMDB search above to auto-fill it.', false);
+    return;
+  }
+  if (isSeries && (!season || !episode || parseInt(season) < 1 || parseInt(episode) < 1)) {
+    showFetchMsg('❌ Enter both Season and Episode numbers for series.', false);
+    return;
+  }
 
-  resBox.textContent = '⏳ Fetching subtitle…';
-  resBox.className = 'fetch-result';
-  resBox.style.display = 'block';
+  btn.textContent = '⏳ Fetching…';
+  btn.disabled    = true;
+  showFetchMsg('⏳ Searching Subdl and OpenSubtitles…', null);
 
   const body = { imdb_id: imdb, media_type: isSeries ? 'series' : 'movie' };
-  if (isSeries && season && episode) { body.season = parseInt(season); body.episode = parseInt(episode); }
+  if (isSeries) { body.season = parseInt(season); body.episode = parseInt(episode); }
 
-  const r = await fetch('/api/auto_fetch_srt', {
-    method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)
-  });
-  const d = await r.json();
-  if (d.success) {
-    fetchedSRTText = d.srt_text;
-    showFetchMsg(`✅ SRT fetched from ${d.source} (${(d.srt_text.length/1024).toFixed(1)} KB)`, true);
-    if (isSeries) addEpisodeWithSRT(episode || '1', d.srt_text);
-    else {
-      document.getElementById('fetched-srt-single').value = d.srt_text;
-      document.getElementById('fetched-single-preview').style.display = 'block';
+  try {
+    const r = await fetch('/api/auto_fetch_srt', {
+      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)
+    });
+    const d = await r.json();
+
+    if (d.success) {
+      const kb = (d.srt_text.length / 1024).toFixed(1);
+      showFetchMsg(`✅ Fetched from ${d.source} · ${kb} KB · Ready to upload!`, true);
+      if (isSeries) {
+        addEpisodeWithSRT(episode, d.srt_text);
+      } else {
+        document.getElementById('fetched-srt-single').value = d.srt_text;
+        document.getElementById('fetched-single-preview').style.display = 'block';
+      }
+    } else {
+      showFetchMsg('❌ ' + (d.error || 'Not found on any source.'), false);
     }
-  } else {
-    showFetchMsg('❌ ' + (d.error || 'Not found on any source.'), false);
+  } catch (err) {
+    showFetchMsg('❌ Network error: ' + err.message, false);
+  } finally {
+    btn.textContent = '⚡ Fetch SRT';
+    btn.disabled    = false;
   }
 }
 
