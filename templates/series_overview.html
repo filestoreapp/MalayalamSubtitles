@@ -4,99 +4,109 @@
 {% block extra_head %}
 <style>
 /* ══ HERO ══ */
-.hero-backdrop{
-  position:relative;min-height:300px;overflow:hidden;
-  display:flex;align-items:flex-end;
-}
+.hero-backdrop{position:relative;min-height:280px;overflow:hidden;display:flex;align-items:flex-end}
 .hero-bg-img{
   position:absolute;inset:0;
   {% if show_data.poster_url %}background-image:url('{{ show_data.poster_url | replace("'","%27") }}');{% endif %}
   background-size:cover;background-position:center 20%;
-  filter:blur(0px) brightness(.35);transform:scale(1.05);
+  filter:blur(0) brightness(.3);transform:scale(1.05);
 }
-.hero-gradient{
-  position:absolute;inset:0;
-  background:linear-gradient(to top, #0d0d0d 0%, rgba(13,13,13,.6) 50%, rgba(13,13,13,.1) 100%);
-}
+.hero-gradient{position:absolute;inset:0;background:linear-gradient(to top,#0d0d0d 0%,rgba(13,13,13,.65) 55%,rgba(13,13,13,.05) 100%)}
 .hero-content{
-  position:relative;z-index:2;
-  display:flex;gap:1.25rem;align-items:flex-end;
-  width:100%;max-width:1100px;margin:0 auto;
-  padding:1.5rem 1rem 1.75rem;
+  position:relative;z-index:2;display:flex;gap:1.1rem;align-items:flex-end;
+  width:100%;max-width:1100px;margin:0 auto;padding:1.5rem 1rem 1.75rem;
 }
-@media(max-width:480px){.hero-content{flex-direction:column;align-items:flex-start}}
-
-.hero-poster{
-  width:120px;flex-shrink:0;border-radius:10px;
-  box-shadow:0 12px 40px rgba(0,0,0,.9);
-  border:2px solid rgba(255,255,255,.12);
-}
-@media(min-width:600px){.hero-poster{width:150px}}
-
-.hero-text{flex:1;min-width:0}
-.hero-tag{font-size:.68rem;font-weight:700;letter-spacing:.1em;color:var(--accent);text-transform:uppercase;margin-bottom:.4rem}
-.hero-title{font-size:clamp(1.4rem,5vw,2.2rem);font-weight:900;line-height:1.15;margin-bottom:.6rem;text-shadow:0 2px 12px rgba(0,0,0,.8)}
-.hero-meta{display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.75rem}
-.hpill{display:inline-flex;align-items:center;gap:.3rem;background:rgba(255,255,255,.1);backdrop-filter:blur(4px);border:1px solid rgba(255,255,255,.15);border-radius:20px;padding:.25rem .65rem;font-size:.75rem;color:#ddd}
+@media(max-width:460px){.hero-content{flex-direction:column;align-items:flex-start}}
+.hero-poster{width:110px;flex-shrink:0;border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.9);border:2px solid rgba(255,255,255,.1)}
+@media(min-width:500px){.hero-poster{width:135px}}
+.hero-tag{font-size:.65rem;font-weight:700;letter-spacing:.1em;color:var(--accent);text-transform:uppercase;margin-bottom:.35rem}
+.hero-title{font-size:clamp(1.3rem,5vw,2rem);font-weight:900;line-height:1.15;margin-bottom:.55rem;text-shadow:0 2px 12px rgba(0,0,0,.8)}
+.hero-meta{display:flex;flex-wrap:wrap;gap:.35rem;margin-bottom:.65rem}
+.hpill{display:inline-flex;align-items:center;gap:.3rem;background:rgba(255,255,255,.1);backdrop-filter:blur(4px);border:1px solid rgba(255,255,255,.15);border-radius:20px;padding:.24rem .62rem;font-size:.74rem;color:#ddd}
 .hpill.gold{background:rgba(245,197,24,.15);border-color:rgba(245,197,24,.4);color:var(--gold)}
-.hero-plot{color:#ccc;font-size:.84rem;line-height:1.6;max-width:600px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
-.hero-cats{margin-top:.6rem}
-.hero-cats a{display:inline-block;background:rgba(229,9,20,.15);border:1px solid rgba(229,9,20,.3);color:#ff6b6b;font-size:.68rem;border-radius:4px;padding:.18rem .5rem;margin:.18rem;transition:all .15s}
+.hero-plot{color:#ccc;font-size:.83rem;line-height:1.6;max-width:580px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.hero-cats{margin-top:.55rem}
+.hero-cats a{display:inline-block;background:rgba(229,9,20,.15);border:1px solid rgba(229,9,20,.3);color:#ff8080;font-size:.68rem;border-radius:4px;padding:.18rem .5rem;margin:.15rem;transition:all .15s}
 .hero-cats a:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
 
-/* ══ SEASON CARDS ══ */
-.seasons-section{max-width:1100px;margin:0 auto;padding:1.25rem 1rem}
-.season-tabs{display:flex;gap:.5rem;overflow-x:auto;padding-bottom:.5rem;scrollbar-width:none;margin-bottom:1.25rem}
-.season-tabs::-webkit-scrollbar{display:none}
-.season-tab{
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  background:var(--card);border:2px solid var(--border);border-radius:10px;
-  padding:.65rem .9rem;cursor:pointer;transition:all .2s;flex-shrink:0;min-width:72px;
-  text-decoration:none;color:var(--muted);
+/* ══ SEASON TABS ══ */
+.seasons-nav{
+  max-width:1100px;margin:0 auto;padding:.9rem 1rem 0;
+  display:flex;gap:.5rem;overflow-x:auto;scrollbar-width:none;
 }
-.season-tab:hover{border-color:#555;color:#fff;transform:translateY(-2px)}
-.season-tab.active{border-color:var(--accent);background:rgba(229,9,20,.12);color:#fff}
-.season-tab .sn{font-size:1.1rem;font-weight:900;line-height:1}
-.season-tab .sl{font-size:.62rem;color:inherit;opacity:.7;margin-top:.2rem;white-space:nowrap}
+.seasons-nav::-webkit-scrollbar{display:none}
+.s-tab{
+  display:flex;flex-direction:column;align-items:center;
+  background:var(--card);border:2px solid var(--border);border-radius:10px;
+  padding:.55rem .85rem;cursor:pointer;transition:all .2s;flex-shrink:0;min-width:76px;
+  text-decoration:none;
+}
+.s-tab:hover{border-color:#555;transform:translateY(-2px)}
+.s-tab.active{border-color:var(--accent);background:rgba(229,9,20,.12)}
+.s-tab .sn{font-size:1.05rem;font-weight:900;color:#fff;line-height:1}
+.s-tab .sc{font-size:.6rem;color:var(--muted);margin-top:.2rem;white-space:nowrap}
+
+/* ══ SEASONS BODY ══ */
+.seasons-body{max-width:1100px;margin:1rem auto 2rem;padding:0 1rem}
+
+/* Season block */
+.season-block{margin-bottom:2rem;scroll-margin-top:70px}
+.season-block-head{
+  display:flex;align-items:center;gap:.75rem;margin-bottom:.85rem;
+  padding-bottom:.75rem;border-bottom:2px solid var(--border);
+}
+.season-num-badge{
+  background:linear-gradient(135deg,var(--accent),#ff5c35);
+  border-radius:8px;padding:.42rem .95rem;font-size:.95rem;font-weight:900;
+  color:#fff;flex-shrink:0;box-shadow:0 4px 14px rgba(229,9,20,.35);
+}
+.season-ep-count{font-size:.78rem;color:var(--muted)}
+.season-view-all{
+  margin-left:auto;background:var(--card);border:1px solid var(--border);
+  color:var(--muted);font-size:.75rem;border-radius:6px;padding:.32rem .75rem;
+  text-decoration:none;flex-shrink:0;transition:all .15s;white-space:nowrap;
+}
+.season-view-all:hover{color:#fff;border-color:#666}
 
 /* ══ EPISODE GRID ══ */
-.ep-section{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden}
-.ep-sec-head{
-  display:flex;align-items:center;justify-content:space-between;
-  background:#1e1e1e;padding:.85rem 1.1rem;border-bottom:1px solid var(--border);
-}
-.ep-sec-head h2{font-size:.92rem;font-weight:700}
-.ep-sec-head span{font-size:.75rem;color:var(--muted)}
 .ep-grid{
-  display:grid;gap:1px;background:var(--border);
+  display:grid;gap:.55rem;
   grid-template-columns:repeat(3,1fr);
 }
-@media(min-width:480px){.ep-grid{grid-template-columns:repeat(4,1fr)}}
-@media(min-width:640px){.ep-grid{grid-template-columns:repeat(5,1fr)}}
+@media(min-width:420px){.ep-grid{grid-template-columns:repeat(4,1fr)}}
+@media(min-width:600px){.ep-grid{grid-template-columns:repeat(5,1fr)}}
 @media(min-width:900px){.ep-grid{grid-template-columns:repeat(6,1fr)}}
 
 .ep-card{
-  background:var(--card);padding:.7rem .6rem;
-  text-decoration:none;color:inherit;transition:background .15s;
-  display:flex;flex-direction:column;align-items:center;gap:.35rem;
+  background:var(--card);border:1px solid var(--border);border-radius:10px;
+  padding:.7rem .6rem;text-decoration:none;color:inherit;
+  transition:all .18s;display:flex;flex-direction:column;align-items:center;gap:.3rem;
 }
-.ep-card:hover{background:#222;color:inherit}
+.ep-card:hover{border-color:var(--accent);background:#1e1e1e;transform:translateY(-2px);box-shadow:0 6px 18px rgba(229,9,20,.2)}
+
 .ep-badge{
-  width:42px;height:42px;border-radius:50%;
+  width:44px;height:44px;border-radius:50%;
   display:flex;align-items:center;justify-content:center;
-  font-size:.82rem;font-weight:800;flex-shrink:0;
-  background:linear-gradient(135deg,#e50914,#ff4444);
-  box-shadow:0 4px 12px rgba(229,9,20,.35);
-  color:#fff;transition:transform .15s;
+  font-size:.88rem;font-weight:800;
+  background:linear-gradient(135deg,#c62828,var(--accent));
+  box-shadow:0 4px 12px rgba(229,9,20,.3);color:#fff;
+  transition:transform .15s,box-shadow .15s;
 }
-.ep-card:hover .ep-badge{transform:scale(1.1)}
-.ep-num-label{font-size:.72rem;font-weight:600;color:#ddd}
-.ep-dots{display:flex;gap:.18rem;justify-content:center;flex-wrap:wrap}
+.ep-card:hover .ep-badge{transform:scale(1.1);box-shadow:0 6px 18px rgba(229,9,20,.45)}
+
+.ep-num-label{font-size:.72rem;font-weight:600;color:#ccc;text-align:center}
+.ep-dots{display:flex;gap:.2rem;justify-content:center}
 .dot{width:7px;height:7px;border-radius:50%;background:var(--border)}
-.dot.en{background:#888}
+.dot.en{background:#777}
 .dot.ml{background:#4caf50}
 .dot.ta{background:#ef5350}
 .dot.hi{background:#42a5f5}
+
+/* ══ EMPTY / DATA-FIX NOTICE ══ */
+.data-notice{
+  background:rgba(245,197,24,.08);border:1px solid rgba(245,197,24,.25);
+  border-radius:10px;padding:.85rem 1rem;margin-bottom:1.1rem;font-size:.82rem;color:#ffd54f;
+}
 </style>
 {% endblock %}
 
@@ -116,11 +126,13 @@
       <h1 class="hero-title">{{ title }}</h1>
       <div class="hero-meta">
         {% if show_data.rating and show_data.rating not in ('N/A','0') %}
-        <span class="hpill gold">⭐ {{ show_data.rating }} IMDb</span>
+        <span class="hpill gold">⭐ {{ show_data.rating }}</span>
         {% endif %}
         {% if show_data.year %}<span class="hpill">📅 {{ show_data.year }}</span>{% endif %}
         <span class="hpill">📂 {{ sorted_seasons|length }} Season{{ 's' if sorted_seasons|length > 1 }}</span>
-        {% if show_data.runtime %}<span class="hpill">⏱ {{ show_data.runtime }}</span>{% endif %}
+        {% set total_eps = namespace(n=0) %}
+        {% for _, eps in sorted_seasons %}{% set total_eps.n = total_eps.n + eps|length %}{% endfor %}
+        <span class="hpill">🎬 {{ total_eps.n }} Episodes</span>
       </div>
       {% if show_data.plot %}
       <p class="hero-plot">{{ show_data.plot }}</p>
@@ -138,45 +150,62 @@
   </div>
 </div>
 
-<!-- ══ SEASONS ══ -->
-<div class="seasons-section">
+<!-- ══ SEASON NAVIGATION TABS ══ -->
+{% if sorted_seasons|length > 1 %}
+<div class="seasons-nav">
+  {% for season_num, eps in sorted_seasons %}
+  <a href="#season-{{ season_num }}" class="s-tab">
+    <span class="sn">S{{ season_num }}</span>
+    <span class="sc">{{ eps|length }} eps</span>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- ══ SEASON BLOCKS ══ -->
+<div class="seasons-body">
+
+  {% if sorted_seasons|length == 1 %}
+  {# Only 1 season found — might be data issue if user uploaded multiple seasons as same season number #}
+  {% set only_season_num = sorted_seasons[0][0] %}
+  {% set only_eps        = sorted_seasons[0][1] %}
+  {% if only_eps|length > 12 %}
+  <div class="data-notice">
+    ⚠️ All <strong>{{ only_eps|length }} episodes</strong> are grouped under Season {{ only_season_num }}.
+    If this series has multiple seasons, edit each episode in the
+    <a href="/dashboard" style="color:var(--gold);font-weight:600">Admin Dashboard</a>
+    and set the correct season number.
+  </div>
+  {% endif %}
+  {% endif %}
 
   {% for season_num, eps in sorted_seasons %}
-  <!-- Season tab row -->
-  <div style="margin-bottom:1.5rem">
+  <div class="season-block" id="season-{{ season_num }}">
 
     <!-- Season header -->
-    <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.85rem">
-      <div style="background:linear-gradient(135deg,var(--accent),#ff6b35);border-radius:8px;padding:.45rem .9rem;font-size:.9rem;font-weight:800;flex-shrink:0">
-        Season {{ season_num }}
-      </div>
-      <div style="height:1px;flex:1;background:var(--border)"></div>
-      <span style="font-size:.75rem;color:var(--muted);flex-shrink:0">{{ eps|length }} episodes</span>
-      <a href="/series/{{ title|urlencode }}/{{ season_num }}"
-         style="background:var(--card);border:1px solid var(--border);color:var(--muted);font-size:.75rem;border-radius:6px;padding:.3rem .7rem;flex-shrink:0;transition:all .15s"
-         onmouseover="this.style.color='#fff';this.style.borderColor='#555'"
-         onmouseout="this.style.color='';this.style.borderColor=''">
-        View All →
+    <div class="season-block-head">
+      <span class="season-num-badge">Season {{ season_num }}</span>
+      <span class="season-ep-count">{{ eps|length }} episode{{ 's' if eps|length != 1 }}</span>
+      <a href="/series/{{ title|urlencode }}/{{ season_num }}" class="season-view-all">
+        View all →
       </a>
     </div>
 
     <!-- Episode grid -->
-    <div class="ep-section">
-      <div class="ep-grid">
-        {% for ep in eps %}
-        {% set tlangs = ep.translations | map(attribute='language') | list %}
-        <a href="/movie/{{ ep.slug or ep.id }}" class="ep-card">
-          <div class="ep-badge">{{ ep.episode or '?' }}</div>
-          <div class="ep-num-label">Episode {{ ep.episode or '?' }}</div>
-          <div class="ep-dots">
-            <div class="dot {{ 'en' if ep.english_srt }}" title="English"></div>
-            <div class="dot {{ 'ml' if 'ml' in tlangs }}" title="Malayalam"></div>
-            <div class="dot {{ 'ta' if 'ta' in tlangs }}" title="Tamil"></div>
-            <div class="dot {{ 'hi' if 'hi' in tlangs }}" title="Hindi"></div>
-          </div>
-        </a>
-        {% endfor %}
-      </div>
+    <div class="ep-grid">
+      {% for ep in eps %}
+      {% set tlangs = ep.translations | map(attribute='language') | list %}
+      <a href="/movie/{{ ep.slug or ep.id }}" class="ep-card">
+        <div class="ep-badge">{{ ep.episode or '?' }}</div>
+        <div class="ep-num-label">Ep {{ ep.episode or '?' }}</div>
+        <div class="ep-dots">
+          <div class="dot {{ 'en' if ep.english_srt }}" title="English"></div>
+          <div class="dot {{ 'ml' if 'ml' in tlangs }}" title="Malayalam"></div>
+          <div class="dot {{ 'ta' if 'ta' in tlangs }}" title="Tamil"></div>
+          <div class="dot {{ 'hi' if 'hi' in tlangs }}" title="Hindi"></div>
+        </div>
+      </a>
+      {% endfor %}
     </div>
 
   </div>
