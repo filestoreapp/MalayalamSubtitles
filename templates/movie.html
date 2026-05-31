@@ -49,10 +49,39 @@
 .hi-tag{background:#1a2f4d;color:#aaccff}
 .en-tag{background:#333;color:#ccc}
 
-.dl-btn{display:flex;align-items:center;justify-content:center;gap:.4rem;background:var(--accent);color:#fff;border-radius:7px;padding:.48rem .6rem;font-size:.82rem;font-weight:600;transition:background .18s;text-decoration:none}
-.dl-btn:hover{background:var(--acc2);color:#fff}
-.dl-btn.pend{background:#252525;color:var(--muted);pointer-events:none}
-.dl-btn.rate-btn{background:transparent;border:1px solid var(--border);color:var(--muted);margin-top:.35rem;font-size:.75rem;padding:.35rem}
+.dl-btn{
+  position:relative;overflow:hidden;
+  display:flex;align-items:center;justify-content:center;gap:.4rem;
+  border-radius:7px;padding:.5rem .7rem;font-size:.84rem;font-weight:600;
+  cursor:pointer;border:none;width:100%;
+  transition:box-shadow .18s;min-height:40px;
+}
+.dl-btn .btn-txt{position:relative;z-index:2;pointer-events:none}
+.dl-btn .btn-fill{
+  position:absolute;left:0;top:0;bottom:0;z-index:1;
+  width:0%;border-radius:7px;
+}
+/* EN – red */
+.dl-btn.dl-en{background:var(--accent);color:#fff}
+.dl-btn.dl-en:hover{box-shadow:0 4px 14px rgba(229,9,20,.4)}
+.dl-btn.dl-en .btn-fill{background:rgba(255,255,255,.2)}
+/* ML – green */
+.dl-btn.dl-ml{background:#1b5e20;color:#a5d6a7}
+.dl-btn.dl-ml:hover{box-shadow:0 4px 14px rgba(76,175,80,.35)}
+.dl-btn.dl-ml .btn-fill{background:rgba(165,214,167,.25)}
+/* TA – deep red */
+.dl-btn.dl-ta{background:#b71c1c;color:#ffcdd2}
+.dl-btn.dl-ta:hover{box-shadow:0 4px 14px rgba(239,83,80,.35)}
+.dl-btn.dl-ta .btn-fill{background:rgba(255,205,210,.25)}
+/* HI – blue */
+.dl-btn.dl-hi{background:#0d47a1;color:#bbdefb}
+.dl-btn.dl-hi:hover{box-shadow:0 4px 14px rgba(66,165,245,.35)}
+.dl-btn.dl-hi .btn-fill{background:rgba(187,222,251,.25)}
+/* Pending */
+.dl-btn.pend{background:#252525;color:var(--muted);pointer-events:none;cursor:default}
+.dl-btn.pend .btn-fill{display:none}
+/* Rate */
+.dl-btn.rate-btn{background:transparent;border:1px solid var(--border);color:var(--muted);font-size:.75rem;padding:.35rem;box-shadow:none}
 .dl-btn.rate-btn:hover{border-color:var(--accent);color:var(--accent);background:rgba(229,9,20,.08)}
 .rating-row{font-size:.72rem;color:var(--muted);margin-bottom:.35rem}
 .stars{color:var(--gold)}
@@ -149,7 +178,7 @@
       <div class="dl-item">
         <div class="dl-lang-row"><span class="flag">🇬🇧</span><span class="lang-name">English</span><span class="lang-tag en-tag">EN</span></div>
         {% if lang_ratings.get('en') %}<div class="rating-row"><span class="stars">{{ '★'*(lang_ratings['en']['avg']|int) }}{{ '☆'*(5-lang_ratings['en']['avg']|int) }}</span> {{ lang_ratings['en']['avg'] }}/5</div>{% endif %}
-        <a onclick="startDownload(event,'/download/{{ movie.id }}/en','{{ movie.title }} – English')" href="#" class="dl-btn">⬇ Download</a>
+        <button class="dl-btn dl-en" onclick="dlCountdown(this,'/download/{{ movie.id }}/en')"><div class="btn-fill"></div><span class="btn-txt">⬇ English</span></button>
         <button onclick="openRateModal('en','English')" class="dl-btn rate-btn">⭐ Rate</button>
       </div>
       {% endif %}
@@ -158,7 +187,7 @@
       <div class="dl-item">
         <div class="dl-lang-row"><span class="flag">🇮🇳</span><span class="lang-name">Malayalam</span><span class="lang-tag ml-tag">ML</span></div>
         {% if lang_ratings.get('ml') %}<div class="rating-row"><span class="stars">{{ '★'*(lang_ratings['ml']['avg']|int) }}{{ '☆'*(5-lang_ratings['ml']['avg']|int) }}</span> {{ lang_ratings['ml']['avg'] }}/5</div>{% endif %}
-        {% if 'ml' in ready_languages %}<a onclick="startDownload(event,'/download/{{ movie.id }}/ml','{{ movie.title }} – Malayalam')" href="#" class="dl-btn">⬇ Download</a><button onclick="openRateModal('ml','Malayalam')" class="dl-btn rate-btn">⭐ Rate</button>
+        {% if 'ml' in ready_languages %}<button class="dl-btn dl-ml" onclick="dlCountdown(this,'/download/{{ movie.id }}/ml')"><div class="btn-fill"></div><span class="btn-txt">⬇ Malayalam</span></button><button onclick="openRateModal('ml','Malayalam')" class="dl-btn rate-btn">⭐ Rate</button>
         {% else %}<div class="dl-btn pend" id="ml-st">⏳ Translating…</div><div class="prog-bar"><div class="prog-fill" id="ml-bar"></div></div>{% endif %}
       </div>
 
@@ -166,7 +195,7 @@
       <div class="dl-item">
         <div class="dl-lang-row"><span class="flag">🇮🇳</span><span class="lang-name">Tamil</span><span class="lang-tag ta-tag">TA</span></div>
         {% if lang_ratings.get('ta') %}<div class="rating-row"><span class="stars">{{ '★'*(lang_ratings['ta']['avg']|int) }}{{ '☆'*(5-lang_ratings['ta']['avg']|int) }}</span> {{ lang_ratings['ta']['avg'] }}/5</div>{% endif %}
-        {% if 'ta' in ready_languages %}<a onclick="startDownload(event,'/download/{{ movie.id }}/ta','{{ movie.title }} – Tamil')" href="#" class="dl-btn">⬇ Download</a><button onclick="openRateModal('ta','Tamil')" class="dl-btn rate-btn">⭐ Rate</button>
+        {% if 'ta' in ready_languages %}<button class="dl-btn dl-ta" onclick="dlCountdown(this,'/download/{{ movie.id }}/ta')"><div class="btn-fill"></div><span class="btn-txt">⬇ Tamil</span></button><button onclick="openRateModal('ta','Tamil')" class="dl-btn rate-btn">⭐ Rate</button>
         {% else %}<div class="dl-btn pend" id="ta-st">⏳ Translating…</div><div class="prog-bar"><div class="prog-fill" id="ta-bar"></div></div>{% endif %}
       </div>
 
@@ -174,7 +203,7 @@
       <div class="dl-item">
         <div class="dl-lang-row"><span class="flag">🇮🇳</span><span class="lang-name">Hindi</span><span class="lang-tag hi-tag">HI</span></div>
         {% if lang_ratings.get('hi') %}<div class="rating-row"><span class="stars">{{ '★'*(lang_ratings['hi']['avg']|int) }}{{ '☆'*(5-lang_ratings['hi']['avg']|int) }}</span> {{ lang_ratings['hi']['avg'] }}/5</div>{% endif %}
-        {% if 'hi' in ready_languages %}<a onclick="startDownload(event,'/download/{{ movie.id }}/hi','{{ movie.title }} – Hindi')" href="#" class="dl-btn">⬇ Download</a><button onclick="openRateModal('hi','Hindi')" class="dl-btn rate-btn">⭐ Rate</button>
+        {% if 'hi' in ready_languages %}<button class="dl-btn dl-hi" onclick="dlCountdown(this,'/download/{{ movie.id }}/hi')"><div class="btn-fill"></div><span class="btn-txt">⬇ Hindi</span></button><button onclick="openRateModal('hi','Hindi')" class="dl-btn rate-btn">⭐ Rate</button>
         {% else %}<div class="dl-btn pend" id="hi-st">⏳ Translating…</div><div class="prog-bar"><div class="prog-fill" id="hi-bar"></div></div>{% endif %}
       </div>
 
@@ -215,34 +244,6 @@
 </div>
 {% endif %}
 
-<!-- ── Countdown Modal ── -->
-<div class="cd-modal" id="cd-modal" onclick="if(event.target===this)cancelDownload()">
-  <div style="background:#141414;border:1px solid #2a2a2a;border-radius:16px;padding:1.75rem 1.5rem;width:min(340px,92vw);text-align:center;box-shadow:0 24px 80px rgba(0,0,0,.8)">
-    <div style="font-size:1rem;font-weight:700;margin-bottom:.3rem">⬇️ Preparing Download</div>
-    <div style="font-size:.8rem;color:var(--muted);margin-bottom:1.4rem" id="cd-sub">Your subtitle is being prepared…</div>
-
-    <div style="position:relative;width:100px;height:100px;margin:0 auto 1.25rem">
-      <svg width="100" height="100" viewBox="0 0 88 88" style="transform:rotate(-90deg)">
-        <circle fill="none" stroke="#222" stroke-width="6" cx="44" cy="44" r="42"/>
-        <circle id="cd-ring" fill="none" stroke="var(--accent)" stroke-width="6" stroke-linecap="round"
-                cx="44" cy="44" r="42" stroke-dasharray="264" stroke-dashoffset="0"
-                style="transition:stroke-dashoffset 1s linear,stroke .3s"/>
-      </svg>
-      <div id="cd-num" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:2rem;font-weight:900;color:var(--accent)">10</div>
-    </div>
-    <div style="font-size:.7rem;color:var(--muted);margin-bottom:1.25rem">seconds remaining</div>
-
-    <div style="height:4px;background:#1e1e1e;border-radius:2px;overflow:hidden;margin-bottom:1rem">
-      <div id="cd-bar" style="height:100%;background:linear-gradient(90deg,var(--accent),#ff6b35);width:100%;transition:width 1s linear;border-radius:2px"></div>
-    </div>
-
-    <div id="cd-file" style="font-size:.8rem;color:#ccc;background:#1a1a1a;border-radius:7px;padding:.5rem .75rem;margin-bottom:1.1rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Loading…</div>
-    <button onclick="cancelDownload()" style="width:100%;background:none;border:1px solid #333;color:var(--muted);border-radius:8px;padding:.52rem;font-size:.82rem;cursor:pointer;transition:all .18s"
-            onmouseover="this.style.borderColor='#666';this.style.color='#fff'"
-            onmouseout="this.style.borderColor='#333';this.style.color=''">✕ Cancel</button>
-  </div>
-</div>
-
 <!-- ── Rating Modal ── -->
 <div id="rate-modal" class="modal-bg" onclick="if(event.target===this)closeRateModal()">
   <div class="modal-box">
@@ -268,53 +269,73 @@
 {% block extra_scripts %}
 <script>
 const MID={{ movie.id }};
+const SECS=10;
 
-// ══ Countdown Download ══
-let cdTimer=null,cdUrl='',cdSecs=10;
-const TOTAL=10, CIRC=264;
-function startDownload(e,url,name){
-  e.preventDefault();
-  cdUrl=url; cdSecs=TOTAL;
-  document.getElementById('cd-file').textContent='📄 '+name;
-  document.getElementById('cd-sub').textContent='Your subtitle is being prepared…';
-  document.getElementById('cd-num').textContent=TOTAL;
-  document.getElementById('cd-ring').style.strokeDashoffset='0';
-  document.getElementById('cd-ring').style.stroke='var(--accent)';
-  document.getElementById('cd-bar').style.width='100%';
-  document.getElementById('cd-modal').classList.add('show');
-  document.body.style.overflow='hidden';
-  cdTimer=setInterval(tickDown,1000);
-}
-function tickDown(){
-  cdSecs--;
-  document.getElementById('cd-num').textContent=cdSecs;
-  const pct=cdSecs/TOTAL;
-  document.getElementById('cd-ring').style.strokeDashoffset=CIRC*(1-pct);
-  document.getElementById('cd-bar').style.width=(pct*100)+'%';
-  if(cdSecs<=3){
-    document.getElementById('cd-sub').textContent='Starting download…';
-    document.getElementById('cd-ring').style.stroke='#f5c518';
-    document.getElementById('cd-num').style.color='#f5c518';
-  }
-  if(cdSecs<=0){clearInterval(cdTimer);doDownload()}
-}
-function doDownload(){const a=document.createElement('a');a.href=cdUrl;a.click();setTimeout(closeCD,1200)}
-function cancelDownload(){clearInterval(cdTimer);closeCD()}
-function closeCD(){
-  document.getElementById('cd-modal').classList.remove('show');
-  document.body.style.overflow='';
-  document.getElementById('cd-ring').style.stroke='var(--accent)';
-  document.getElementById('cd-num').style.color='var(--accent)';
-  cdUrl='';
+/* ══ Countdown inside button ══
+   - fill bar animates inside the button
+   - window.location.href triggers the actual download
+   - clicking again cancels                              */
+function dlCountdown(btn, url){
+  if(btn.dataset.running==='1') return;
+  btn.dataset.running='1';
+
+  const fill   = btn.querySelector('.btn-fill');
+  const txt    = btn.querySelector('.btn-txt');
+  const origTxt = txt.textContent;
+  let secs = SECS;
+
+  /* Animate fill from 100% → 0% over SECS seconds */
+  fill.style.transition = 'none';
+  fill.style.width = '100%';
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    fill.style.transition = `width ${SECS}s linear`;
+    fill.style.width = '0%';
+  }));
+
+  txt.textContent = '⏳ ' + secs + 's  (tap to cancel)';
+
+  btn.onclick = ()=>{ cancelDl(btn, origTxt); };
+
+  const timer = setInterval(()=>{
+    secs--;
+    txt.textContent = '⏳ ' + secs + 's  (tap to cancel)';
+    if(secs <= 0){
+      clearInterval(timer);
+      txt.textContent = '✅ Downloading…';
+      /* ← window.location.href is the correct way to trigger file downloads */
+      window.location.href = url;
+      setTimeout(()=>{ resetBtn(btn, origTxt); }, 3000);
+    }
+  }, 1000);
+
+  btn.dataset.timer = String(timer);
 }
 
-// ══ Share ══
+function cancelDl(btn, origTxt){
+  clearInterval(parseInt(btn.dataset.timer||'0'));
+  resetBtn(btn, origTxt);
+}
+
+function resetBtn(btn, origTxt){
+  const fill = btn.querySelector('.btn-fill');
+  const txt  = btn.querySelector('.btn-txt');
+  fill.style.transition='none';
+  fill.style.width='0%';
+  txt.textContent = origTxt;
+  delete btn.dataset.running;
+  delete btn.dataset.timer;
+  /* restore original handler */
+  const url = btn.getAttribute('data-url');
+  btn.onclick = null;
+}
+
+/* ══ Share ══ */
 function shareMovie(){
-  if(navigator.share){navigator.share({title:'{{ movie.title }}',url:location.href})}
-  else{navigator.clipboard.writeText(location.href).then(()=>alert('Link copied!'))}
+  if(navigator.share) navigator.share({title:'{{ movie.title }}',url:location.href});
+  else navigator.clipboard.writeText(location.href).then(()=>alert('Link copied!'));
 }
 
-// ══ Rating modal ══
+/* ══ Rating modal ══ */
 function openRateModal(lang,name){
   document.getElementById('rate-lang').value=lang;
   document.getElementById('modal-title').textContent='Rate '+name+' Subtitle';
