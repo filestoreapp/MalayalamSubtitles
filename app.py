@@ -1174,6 +1174,48 @@ def tmdb_details():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# --- TMDB: get all episodes for a season (used by Fetch Full Season) ---
+@app.route('/api/tmdb_season_episodes')
+@login_required
+def tmdb_season_episodes():
+    """Return list of episodes for a given series season from TMDB."""
+    imdb_id    = (request.args.get('imdb_id') or '').strip()
+    season_num = request.args.get('season', type=int)
+    api_key    = os.environ.get('TMDB_API_KEY')
+
+    if not imdb_id or not season_num or not api_key:
+        return jsonify({"error": "Missing imdb_id, season or TMDB_API_KEY"}), 400
+
+    if not imdb_id.startswith('tt'):
+        imdb_id = 'tt' + imdb_id
+
+    try:
+        # Resolve IMDb → TMDB series ID
+        find = requests.get(
+            f"https://api.themoviedb.org/3/find/{imdb_id}"
+            f"?api_key={api_key}&external_source=imdb_id",
+            timeout=10).json()
+        tv = find.get('tv_results', [])
+        if not tv:
+            return jsonify({"error": "Series not found on TMDB"}), 404
+
+        series_id = tv[0]['id']
+        s_data    = requests.get(
+            f"https://api.themoviedb.org/3/tv/{series_id}/season/{season_num}"
+            f"?api_key={api_key}",
+            timeout=10).json()
+
+        if 'episodes' not in s_data:
+            return jsonify({"error": f"Season {season_num} not found on TMDB"}), 404
+
+        episodes = [
+            {"episode_number": e["episode_number"], "name": e.get("name", "")}
+            for e in s_data["episodes"]
+        ]
+        return jsonify({"season": season_num, "episodes": episodes, "total": len(episodes)})
+    except Exception as ex:
+        return jsonify({"error": str(ex)}), 500
+
 # ------------------ TMDB EPISODE VERIFICATION ------------------
 
 def tmdb_episode_exists(imdb_id: str, season: int, episode: int) -> bool:
@@ -1471,15 +1513,60 @@ def admin():
         valid_files      = [f for f in files if f and f.filename]
         valid_manual_eps = [ep for ep in manual_episodes if ep.strip()]
 
+        # ── Helper: parse episode number from SRT filename ──────────────────
+        def ep_from_filename(name):
+            """Extract episode number from filename like S01E03.srt or E03.srt."""
+            m = re.search(r'[Ss]\d{1,2}[Ee](\d{1,2})', name)
+            if m:
+                return str(int(m.group(1)))
+            m = re.search(r'[Ee](\d{1,2})', name)
+            if m:
+                return str(int(m.group(1)))
+            m = re.search(r'(\d{1,2})(?=\.srt)', name, re.IGNORECASE)
+            if m:
+                return str(int(m.group(1)))
+            return None
+
         items_to_process = []
+
+        # 1. Auto-fetched SRTs (from JS fetch-all-season flow)
         for i, text in enumerate(fetched_srts):
             if text.strip():
                 ep = fetched_episodes[i] if i < len(fetched_episodes) else str(i + 1)
                 items_to_process.append((text, ep))
+
+        # 2. Uploaded files — handle both .srt and .zip
+        ep_counter = len(items_to_process) + 1
         for i, srt_file in enumerate(valid_files):
-            content = srt_file.read().decode('utf-8', errors='ignore')
-            ep = valid_manual_eps[i] if i < len(valid_manual_eps) else str(i + 1)
-            items_to_process.append((content, ep))
+            fname = srt_file.filename or ''
+            raw   = srt_file.read()
+
+            if fname.lower().endswith('.zip') or raw[:2] == b'PK':
+                # ── ZIP: extract all SRTs inside ────────────────────────────
+                try:
+                    with zipfile.ZipFile(io.BytesIO(raw)) as z:
+                        srt_names = sorted([n for n in z.namelist()
+                                            if n.lower().endswith('.srt')])
+                        for srt_name in srt_names:
+                            srt_content = z.read(srt_name).decode('utf-8', errors='ignore')
+                            if not srt_content.strip():
+                                continue
+                            # Try to get episode number from filename
+                            detected_ep = ep_from_filename(srt_name)
+                            if not detected_ep:
+                                # Fallback: use manual episode list or counter
+                                detected_ep = (valid_manual_eps[ep_counter - 1]
+                                               if ep_counter - 1 < len(valid_manual_eps)
+                                               else str(ep_counter))
+                                ep_counter += 1
+                            items_to_process.append((srt_content, detected_ep))
+                except Exception as ze:
+                    print(f"ZIP extract error: {ze}")
+            else:
+                # ── Plain SRT file ───────────────────────────────────────────
+                srt_content = raw.decode('utf-8', errors='ignore')
+                ep = valid_manual_eps[i] if i < len(valid_manual_eps) else str(i + 1)
+                items_to_process.append((srt_content, ep))
 
         try:
             safe_season = int(season_raw) if season_raw and str(season_raw).strip() else None
