@@ -319,6 +319,106 @@ def log_admin_action(action, details):
 #  USER ROUTES
 # ===========================================================================
 
+# ══════════════════════════════════════════════════════════════════════
+# GENRE LANDING PAGES
+# ══════════════════════════════════════════════════════════════════════
+
+GENRE_META = {
+    'Action':          {'icon': '💥', 'color': '#c62828', 'desc': 'High-octane Action movies and series'},
+    'Adventure':       {'icon': '🗺️', 'color': '#e65100', 'desc': 'Epic Adventure movies and series'},
+    'Animation':       {'icon': '🎨', 'color': '#1565c0', 'desc': 'Animated movies and series for all ages'},
+    'Comedy':          {'icon': '😂', 'color': '#f9a825', 'desc': 'Hilarious Comedy movies and series'},
+    'Crime':           {'icon': '🔍', 'color': '#4a148c', 'desc': 'Gripping Crime and detective stories'},
+    'Documentary':     {'icon': '🎬', 'color': '#2e7d32', 'desc': 'Fascinating Documentary films and series'},
+    'Drama':           {'icon': '🎭', 'color': '#6a1b9a', 'desc': 'Powerful Drama movies and series'},
+    'Family':          {'icon': '👨‍👩‍👧', 'color': '#0277bd', 'desc': 'Family-friendly movies and series'},
+    'Fantasy':         {'icon': '🧙', 'color': '#283593', 'desc': 'Magical Fantasy movies and series'},
+    'History':         {'icon': '📜', 'color': '#5d4037', 'desc': 'Historical movies and epic sagas'},
+    'Horror':          {'icon': '👻', 'color': '#b71c1c', 'desc': 'Scary Horror movies and series'},
+    'Music':           {'icon': '🎵', 'color': '#00695c', 'desc': 'Music movies and concert films'},
+    'Mystery':         {'icon': '🔮', 'color': '#37474f', 'desc': 'Mysterious and suspenseful titles'},
+    'Romance':         {'icon': '❤️',  'color': '#c2185b', 'desc': 'Romantic movies and love stories'},
+    'Science Fiction': {'icon': '🚀', 'color': '#0d47a1', 'desc': 'Mind-bending Sci-Fi movies and series'},
+    'Thriller':        {'icon': '😱', 'color': '#212121', 'desc': 'Edge-of-your-seat Thriller titles'},
+    'War':             {'icon': '⚔️',  'color': '#827717', 'desc': 'Powerful War movies and series'},
+    'Western':         {'icon': '🤠', 'color': '#4e342e', 'desc': 'Classic Western movies and series'},
+}
+
+def deduplicate_results(query_results):
+    """
+    From a list of Movie rows that may include multiple episodes of the
+    same series, keep only the most-recently-uploaded episode per series.
+    Movies are always kept as-is.
+    """
+    seen_series = {}
+    movies_list = []
+    for m in query_results:
+        if m.media_type == 'series':
+            # Keep highest id (most recent upload) per title
+            if m.title not in seen_series or m.id > seen_series[m.title].id:
+                seen_series[m.title] = m
+        else:
+            movies_list.append(m)
+    combined = movies_list + list(seen_series.values())
+    combined.sort(key=lambda m: m.id, reverse=True)
+    return combined
+
+@app.route('/subtitles/<genre>')
+def genre_page(genre):
+    # Normalise genre name (URL might be lowercase)
+    display_genre = next(
+        (g for g in GENRE_META if g.lower() == genre.lower()),
+        genre.title()
+    )
+    meta = GENRE_META.get(display_genre, {
+        'icon': '🎬', 'color': '#e50914', 'desc': f'{display_genre} movies and series'
+    })
+
+    page     = request.args.get('page', 1, type=int)
+    sort     = request.args.get('sort', 'newest')
+    mtype    = request.args.get('type', '')   # 'movie' | 'series' | ''
+    per_page = 24
+
+    sort_map = {
+        'newest':      Movie.id.desc(),
+        'rating':      cast(func.nullif(Movie.rating, 'N/A'), Float).desc().nulls_last(),
+        'popular':     Movie.views.desc(),
+        'title':       Movie.title.asc(),
+    }
+
+    base_q = Movie.query.filter(Movie.category.ilike(f'%{display_genre}%'))
+    if mtype in ('movie', 'series'):
+        base_q = base_q.filter(Movie.media_type == mtype)
+
+    all_results  = base_q.order_by(sort_map.get(sort, Movie.id.desc())).all()
+    deduped      = deduplicate_results(all_results)
+    total        = len(deduped)
+    start        = (page - 1) * per_page
+    items        = deduped[start:start + per_page]
+    total_pages  = (total + per_page - 1) // per_page
+
+    # Related genres (genres that co-occur with movies in this genre)
+    related = [g for g in GENRE_META if g != display_genre][:8]
+
+    seo_title = f"{display_genre} Subtitles – Download Malayalam, Tamil & Hindi | MalSubs"
+    seo_desc  = (f"Download free Malayalam, Tamil and Hindi subtitles for "
+                 f"{total} {display_genre} movies and series. {meta['desc']}.")
+
+    return render_template('genre.html',
+                           genre=display_genre,
+                           meta=meta,
+                           items=items,
+                           total=total,
+                           page=page,
+                           total_pages=total_pages,
+                           per_page=per_page,
+                           sort=sort,
+                           mtype=mtype,
+                           related_genres=related,
+                           categories=get_categories_list(),
+                           seo_title=seo_title,
+                           seo_desc=seo_desc)
+
 @app.route('/')
 def index():
     stat = SiteStat.query.first()
@@ -342,14 +442,8 @@ def index():
                                mode="search")
 
     if category_query:
-        pagination = Movie.query.filter(
-            Movie.category.ilike(f'%{category_query}%')
-        ).order_by(Movie.id.desc()).paginate(page=page, per_page=12, error_out=False)
-        return render_template('index.html',
-                               pagination=pagination,
-                               search_query=category_query,
-                               categories=categories_list,
-                               mode="search")
+        # Redirect category clicks to the SEO genre landing page
+        return redirect(url_for('genre_page', genre=category_query))
 
     trending_movies  = Movie.query.filter_by(media_type='movie').order_by(Movie.views.desc()).limit(12).all()
     trending_series  = Movie.query.from_statement(
