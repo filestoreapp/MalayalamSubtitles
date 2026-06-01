@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+{% block title %}{{ seo_title }}{% endblock %}
+
+{% block extra_head %}
+<meta name="description" content="{{ seo_desc }}">
+<meta property="og:title"       content="{{ seo_title }}">
+<meta property="og:description" content="{{ seo_desc }}">
+<meta property="og:type"        content="website">
+<link rel="canonical" href="{{ request.url }}">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "CollectionPage",
+  "name": "{{ genre }} Subtitles",
+  "description": "{{ seo_desc }}",
+  "url": "{{ request.url }}",
+  "numberOfItems": {{ total }}
+}
+</script>
+<style>
+/* ══ HERO ══ */
+.genre-hero{
+  background:linear-gradient(135deg, {{ meta.color }}22 0%, #0d0d0d 60%);
+  border-bottom:1px solid var(--border);
+  padding:2rem 1rem 1.75rem;
+  position:relative;overflow:hidden;
+}
+.genre-hero::before{
+  content:'{{ meta.icon }}';
+  position:absolute;right:-10px;top:-20px;
+  font-size:9rem;opacity:.06;line-height:1;
+  pointer-events:none;user-select:none;
+}
+.genre-hero-inner{max-width:1200px;margin:0 auto}
+.genre-breadcrumb{font-size:.75rem;color:var(--muted);margin-bottom:.75rem}
+.genre-breadcrumb a{color:var(--muted)}
+.genre-breadcrumb a:hover{color:#fff}
+.genre-title-row{display:flex;align-items:center;gap:.85rem;margin-bottom:.6rem;flex-wrap:wrap}
+.genre-icon-badge{
+  width:56px;height:56px;border-radius:14px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.75rem;flex-shrink:0;
+  background:{{ meta.color }}33;border:2px solid {{ meta.color }}66;
+}
+.genre-name{font-size:clamp(1.6rem,5vw,2.4rem);font-weight:900;line-height:1}
+.genre-desc{color:#ccc;font-size:.9rem;margin-bottom:1rem;max-width:520px}
+.genre-stats{display:flex;gap:.6rem;flex-wrap:wrap}
+.gstat{display:inline-flex;align-items:center;gap:.35rem;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:20px;padding:.28rem .7rem;font-size:.78rem;color:#ddd}
+
+/* ══ CONTROLS ══ */
+.genre-controls{
+  max-width:1200px;margin:.9rem auto;padding:0 1rem;
+  display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;
+}
+.ctrl-label{font-size:.75rem;color:var(--muted);white-space:nowrap}
+.ctrl-sel{background:#1a1a1a;border:1px solid var(--border);color:var(--text);border-radius:7px;padding:.38rem .65rem;font-size:.8rem;font-family:inherit}
+.type-tabs{display:flex;gap:.35rem}
+.type-tab{background:var(--card);border:1px solid var(--border);color:var(--muted);border-radius:7px;padding:.38rem .75rem;font-size:.78rem;text-decoration:none;transition:all .15s;white-space:nowrap}
+.type-tab:hover{color:#fff;border-color:#555}
+.type-tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.result-count{margin-left:auto;font-size:.78rem;color:var(--muted);white-space:nowrap}
+
+/* ══ GRID ══ */
+.genre-grid-wrap{max-width:1200px;margin:0 auto;padding:0 1rem 1.5rem}
+.genre-grid{
+  display:grid;gap:.6rem;
+  grid-template-columns:repeat(3,1fr);
+}
+@media(min-width:420px){.genre-grid{grid-template-columns:repeat(4,1fr)}}
+@media(min-width:600px){.genre-grid{grid-template-columns:repeat(4,1fr);gap:.75rem}}
+@media(min-width:800px){.genre-grid{grid-template-columns:repeat(5,1fr)}}
+@media(min-width:1050px){.genre-grid{grid-template-columns:repeat(6,1fr);gap:1rem}}
+
+/* Card label for series */
+.card-series-label{
+  position:absolute;top:.3rem;left:.3rem;
+  background:rgba(21,101,192,.85);backdrop-filter:blur(4px);
+  color:#fff;font-size:.58rem;font-weight:700;border-radius:4px;
+  padding:.15rem .38rem;
+}
+.movie-card{position:relative}
+
+/* ══ PAGINATION ══ */
+.genre-pager{display:flex;gap:.35rem;justify-content:center;flex-wrap:wrap;margin:1.25rem 0}
+.genre-pager a,.genre-pager span{background:var(--card);border:1px solid var(--border);color:var(--muted);padding:.42rem .85rem;border-radius:7px;font-size:.85rem;transition:all .15s}
+.genre-pager a:hover{border-color:var(--accent);color:#fff}
+.genre-pager .cur{background:var(--accent);color:#fff;border-color:var(--accent)}
+.genre-pager .dots{pointer-events:none}
+
+/* ══ RELATED GENRES ══ */
+.related-wrap{max-width:1200px;margin:0 auto 2rem;padding:0 1rem}
+.related-wrap h2{font-size:.88rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.65rem}
+.related-grid{display:flex;flex-wrap:wrap;gap:.45rem}
+.rel-chip{
+  display:inline-flex;align-items:center;gap:.35rem;
+  background:var(--card);border:1px solid var(--border);border-radius:8px;
+  padding:.42rem .85rem;font-size:.82rem;color:var(--muted);
+  text-decoration:none;transition:all .18s;
+}
+.rel-chip:hover{background:#1e1e1e;border-color:#555;color:#fff;transform:translateY(-1px)}
+
+/* ══ EMPTY ══ */
+.genre-empty{text-align:center;padding:4rem 1rem;background:var(--card);border:1px solid var(--border);border-radius:14px;margin:0 1rem 2rem}
+.genre-empty .ei{font-size:3rem;margin-bottom:.75rem}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ══ HERO ══ -->
+<div class="genre-hero">
+  <div class="genre-hero-inner">
+    <div class="genre-breadcrumb">
+      <a href="/">Home</a> › <a href="/search">Browse</a> › {{ genre }}
+    </div>
+    <div class="genre-title-row">
+      <div class="genre-icon-badge">{{ meta.icon }}</div>
+      <div>
+        <h1 class="genre-name">{{ genre }}</h1>
+        <p style="font-size:.72rem;color:var(--muted);margin-top:.15rem">Subtitles Collection</p>
+      </div>
+    </div>
+    <p class="genre-desc">{{ meta.desc }} — download free Malayalam, Tamil &amp; Hindi subtitles.</p>
+    <div class="genre-stats">
+      <span class="gstat">🎬 {{ total }} title{{ 's' if total != 1 }}</span>
+      <span class="gstat">🌐 Malayalam · Tamil · Hindi</span>
+      <span class="gstat">📄 Free SRT download</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CONTROLS ══ -->
+<div class="genre-controls">
+  <div class="type-tabs">
+    <a href="/subtitles/{{ genre|urlencode }}?sort={{ sort }}"
+       class="type-tab {{ 'active' if not mtype }}">All</a>
+    <a href="/subtitles/{{ genre|urlencode }}?sort={{ sort }}&type=movie"
+       class="type-tab {{ 'active' if mtype=='movie' }}">🎬 Movies</a>
+    <a href="/subtitles/{{ genre|urlencode }}?sort={{ sort }}&type=series"
+       class="type-tab {{ 'active' if mtype=='series' }}">📺 Series</a>
+  </div>
+
+  <span class="ctrl-label">Sort:</span>
+  <select class="ctrl-sel" onchange="location.href='/subtitles/{{ genre|urlencode }}?sort='+this.value+'&type={{ mtype }}'">
+    <option value="newest"  {{ 'selected' if sort=='newest'  }}>🆕 Newest</option>
+    <option value="popular" {{ 'selected' if sort=='popular' }}>🔥 Most Viewed</option>
+    <option value="rating"  {{ 'selected' if sort=='rating'  }}>⭐ Top Rated</option>
+    <option value="title"   {{ 'selected' if sort=='title'   }}>🔤 A → Z</option>
+  </select>
+
+  <span class="result-count">{{ total }} result{{ 's' if total != 1 }}</span>
+</div>
+
+<!-- ══ GRID ══ -->
+<div class="genre-grid-wrap">
+  {% if items %}
+  <div class="genre-grid">
+    {% for m in items %}
+    <a href="{{ '/movie/'+m.slug if m.slug and m.media_type=='movie' else ('/series/'+m.title|urlencode if m.media_type=='series' else '/movie/'+m.id|string) }}"
+       class="movie-card">
+      {% if m.media_type == 'series' %}
+      <span class="card-series-label">📺 Series</span>
+      {% endif %}
+      <img src="{{ m.poster_url or 'https://placehold.co/300x450/1a1a1a/555?text=?' }}"
+           alt="{{ m.title }} subtitles"
+           loading="lazy"
+           onerror="this.src='https://placehold.co/300x450/1a1a1a/555?text=?'">
+      <div class="card-body">
+        <div class="card-title">{{ m.title }}</div>
+        <div class="card-meta">
+          <span><span class="star">⭐</span>{{ m.rating or 'N/A' }}</span>
+          <span class="badge-type {{ 'series' if m.media_type=='series' }}">{{ m.year or '—' }}</span>
+        </div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+
+  <!-- Pagination -->
+  {% if total_pages > 1 %}
+  <nav class="genre-pager" aria-label="Pages">
+    {% set base_url = '/subtitles/'+genre|urlencode+'?sort='+sort+('&type='+mtype if mtype else '')+'&page=' %}
+    {% if page > 1 %}
+    <a href="{{ base_url }}{{ page-1 }}" aria-label="Previous">‹ Prev</a>
+    {% endif %}
+    {% for p in range(1, total_pages+1) %}
+      {% if p == 1 or p == total_pages or (p >= page-2 and p <= page+2) %}
+        {% if p == page %}<span class="cur">{{ p }}</span>
+        {% else %}<a href="{{ base_url }}{{ p }}">{{ p }}</a>{% endif %}
+      {% elif p == page-3 or p == page+3 %}
+        <span class="dots">…</span>
+      {% endif %}
+    {% endfor %}
+    {% if page < total_pages %}
+    <a href="{{ base_url }}{{ page+1 }}" aria-label="Next">Next ›</a>
+    {% endif %}
+  </nav>
+  {% endif %}
+
+  {% else %}
+  <div class="genre-empty">
+    <div class="ei">{{ meta.icon }}</div>
+    <p style="font-size:1rem;font-weight:600;margin-bottom:.4rem">No {{ genre }} titles yet</p>
+    <p style="color:var(--muted);font-size:.85rem;margin-bottom:1rem">
+      Be the first to request one!
+    </p>
+    <a href="/requests" class="btn-red">🙋 Request a Subtitle</a>
+  </div>
+  {% endif %}
+</div>
+
+<!-- ══ RELATED GENRES ══ -->
+<div class="related-wrap">
+  <h2>🎭 Browse Other Genres</h2>
+  <div class="related-grid">
+    {% for g in related_genres %}
+    {% set gm = {'Action':'💥','Adventure':'🗺️','Animation':'🎨','Comedy':'😂','Crime':'🔍',
+                 'Documentary':'🎬','Drama':'🎭','Family':'👨‍👩‍👧','Fantasy':'🧙','History':'📜',
+                 'Horror':'👻','Music':'🎵','Mystery':'🔮','Romance':'❤️','Science Fiction':'🚀',
+                 'Thriller':'😱','War':'⚔️','Western':'🤠'} %}
+    <a href="/subtitles/{{ g|urlencode }}" class="rel-chip">
+      {{ gm.get(g,'🎬') }} {{ g }}
+    </a>
+    {% endfor %}
+  </div>
+</div>
+
+{% endblock %}

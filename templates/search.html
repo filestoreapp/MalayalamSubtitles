@@ -133,9 +133,18 @@
   </div>
 
   {% if pagination.items %}
+  {# Deduplicate — one poster per series #}
+  {% set ss = namespace(t=[]) %}
+  {% set si = namespace(l=[]) %}
+  {% for m in pagination.items %}
+    {% if m.media_type=='series' %}{% if m.title not in ss.t %}{% set _=ss.t.append(m.title) %}{% set _=si.l.append(m) %}{% endif %}
+    {% else %}{% set _=si.l.append(m) %}{% endif %}
+  {% endfor %}
   <div class="movie-grid">
-    {% for m in pagination.items %}
-    <a href="{{ '/movie/'+m.slug if m.slug and m.media_type=='movie' else ('/series/'+m.title|urlencode if m.media_type=='series' else '/movie/'+m.id|string) }}" class="movie-card">
+    {% for m in si.l %}
+    <a href="{{ '/movie/'+m.slug if m.slug and m.media_type=='movie' else ('/series/'+m.title|urlencode if m.media_type=='series' else '/movie/'+m.id|string) }}"
+       class="movie-card" style="position:relative">
+      {% if m.media_type=='series' %}<span style="position:absolute;top:.3rem;left:.3rem;background:rgba(21,101,192,.85);color:#fff;font-size:.58rem;font-weight:700;border-radius:4px;padding:.15rem .38rem;z-index:1">📺</span>{% endif %}
       <img src="{{ m.poster_url or 'https://placehold.co/300x450/1a1a1a/555?text=?' }}" alt="{{ m.title }}" loading="lazy"
            onerror="this.src='https://placehold.co/300x450/1a1a1a/555?text=?'">
       <div class="card-body">

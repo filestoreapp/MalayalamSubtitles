@@ -287,7 +287,7 @@
   <div class="cat-inner">
     <a href="/" class="cat-chip {% if not request.args.get('cat') %}active{% endif %}">All</a>
     {% for cat in categories %}
-    <a href="/?cat={{ cat | urlencode }}" class="cat-chip {% if request.args.get('cat') == cat %}active{% endif %}">{{ cat }}</a>
+    <a href="/subtitles/{{ cat | urlencode }}" class="cat-chip {% if request.path == '/subtitles/'+cat %}active{% endif %}">{{ cat }}</a>
     {% endfor %}
   </div>
 </div>
