@@ -16,6 +16,15 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, or_, cast, Float
 from sqlalchemy.orm import joinedload
 
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('logged_in'):
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+
 app = Flask(__name__)
 
 # ------------------ CONFIG ------------------
