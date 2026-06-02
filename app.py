@@ -69,12 +69,15 @@ class TranslationCache(db.Model):
     movie = db.relationship('Movie', backref=db.backref('translations', cascade='all, delete-orphan'))
 
 class TranslationJob(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    movie_id = db.Column(db.Integer, db.ForeignKey('movie.id', ondelete='CASCADE'))
-    language = db.Column(db.String(10))
-    status = db.Column(db.String(20), default='Pending')
-    progress = db.Column(db.Integer, default=0)
-    movie = db.relationship('Movie', backref=db.backref('jobs', cascade='all, delete-orphan'))
+    id         = db.Column(db.Integer, primary_key=True)
+    movie_id   = db.Column(db.Integer, db.ForeignKey('movie.id', ondelete='CASCADE'))
+    language   = db.Column(db.String(10))
+    status     = db.Column(db.String(20), default='Pending')
+    progress   = db.Column(db.Integer, default=0)
+    # priority: 1 = movie (processed first), 2 = series (batched)
+    priority   = db.Column(db.Integer, default=2)
+    queued_at  = db.Column(db.DateTime, server_default=func.now())
+    movie      = db.relationship('Movie', backref=db.backref('jobs', cascade='all, delete-orphan'))
 
 class SiteStat(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -229,48 +232,187 @@ def build_seo_meta(movie):
     }
 
 # ------------------ TRIGGER TRANSLATION ------------------
-HF_WORKER_URL = os.environ.get('HF_WORKER_URL', '')
-HF_SECRET = os.environ.get('HF_SECRET', 'shared-secret')
-TELEGRAM_SECRET = os.environ.get('TELEGRAM_SECRET', '')
+HF_WORKER_URL  = os.environ.get('HF_WORKER_URL', '')
+HF_SECRET      = os.environ.get('HF_SECRET', 'shared-secret')
+TELEGRAM_SECRET= os.environ.get('TELEGRAM_SECRET', '')
+
+# How many HF worker slots to keep busy at once (env-configurable)
+MAX_CONCURRENT     = int(os.environ.get('MAX_CONCURRENT_JOBS', '5'))
+# Max series episodes dispatched per cycle (movies are unlimited)
+SERIES_BATCH_SIZE  = int(os.environ.get('SERIES_BATCH_SIZE', '3'))
+# Avg minutes per translation job — used for ETA
+AVG_MINS_PER_JOB   = float(os.environ.get('AVG_TRANSLATION_MINS', '4'))
+
+def _send_to_hf(job, movie):
+    """Actually POST a single job to the HF worker. Returns True on success."""
+    try:
+        resp = requests.post(HF_WORKER_URL, json={
+            "movie_id":         movie.id,
+            "english_srt_url":  movie.english_srt,
+            "language":         job.language
+        }, timeout=10)
+        if resp.status_code == 200:
+            job.status   = 'Processing'
+            job.progress = 0
+            print(f"✅ Dispatched {job.language.upper()} job {job.id} (movie {movie.id}, priority {job.priority})")
+            return True
+        else:
+            job.status = 'Failed'
+            print(f"❌ HF rejected job {job.id}: HTTP {resp.status_code}")
+            return False
+    except Exception as e:
+        job.status = 'Failed'
+        print(f"❌ HF error job {job.id}: {e}")
+        return False
+
+
+def dispatch_pending_jobs():
+    """
+    Smart dispatcher — called after every callback and on auto-retry.
+
+    Priority rules:
+      1. Movies (priority=1) always go first.
+      2. Series (priority=2) are batched: at most SERIES_BATCH_SIZE series jobs
+         are dispatched per cycle so movies are never starved.
+      3. Never exceed MAX_CONCURRENT active (Processing) jobs total.
+    """
+    if not HF_WORKER_URL:
+        return
+
+    with app.app_context():
+        processing_now = TranslationJob.query.filter_by(status='Processing').count()
+        free_slots = max(0, MAX_CONCURRENT - processing_now)
+        if free_slots == 0:
+            return
+
+        # ── Fetch pending, movies first ──────────────────────────────────────
+        pending = (TranslationJob.query
+                   .filter_by(status='Pending')
+                   .join(Movie, TranslationJob.movie_id == Movie.id)
+                   .order_by(TranslationJob.priority.asc(),   # 1 (movie) before 2 (series)
+                             TranslationJob.queued_at.asc())  # oldest first within same priority
+                   .limit(free_slots + SERIES_BATCH_SIZE)     # fetch a bit extra to apply batch cap
+                   .all())
+
+        dispatched_series = 0
+        dispatched_total  = 0
+
+        for job in pending:
+            if dispatched_total >= free_slots:
+                break
+            movie = Movie.query.get(job.movie_id)
+            if not movie or not movie.english_srt:
+                job.status = 'Failed'
+                db.session.commit()
+                continue
+
+            is_series = movie.media_type == 'series'
+
+            # Enforce series batch cap
+            if is_series and dispatched_series >= SERIES_BATCH_SIZE:
+                continue  # skip this series job this cycle; come back next callback
+
+            ok = _send_to_hf(job, movie)
+            db.session.commit()
+
+            if ok:
+                dispatched_total += 1
+                if is_series:
+                    dispatched_series += 1
+
 
 def trigger_hf_translation(movie_id: int, english_srt_url: str):
+    """
+    Queue translation jobs for a movie/episode and immediately dispatch
+    using the priority dispatcher so movies jump ahead of series.
+    """
     if not HF_WORKER_URL:
         print("⚠️ HF_WORKER_URL not set")
         return
 
-    languages = ['ml', 'ta', 'hi']
     with app.app_context():
-        for lang in languages:
+        movie    = Movie.query.get(movie_id)
+        priority = 1 if (movie and movie.media_type == 'movie') else 2
+
+        for lang in ['ml', 'ta', 'hi']:
             job = TranslationJob.query.filter_by(movie_id=movie_id, language=lang).first()
             if not job:
-                job = TranslationJob(movie_id=movie_id, language=lang, status='Pending', progress=0)
+                job = TranslationJob(
+                    movie_id=movie_id, language=lang,
+                    status='Pending', progress=0, priority=priority
+                )
                 db.session.add(job)
-                db.session.commit()
-
-            try:
-                resp = requests.post(HF_WORKER_URL, json={
-                    "movie_id": movie_id,
-                    "english_srt_url": english_srt_url,
-                    "language": lang
-                }, timeout=10)
-                if resp.status_code == 200:
-                    job.status = 'Processing'
+            else:
+                # Reset if previously failed
+                if job.status in ('Failed', 'Completed'):
+                    job.status   = 'Pending'
                     job.progress = 0
-                    db.session.commit()
-                    print(f"✅ {lang.upper()} job accepted for movie {movie_id}")
-                else:
-                    job.status = 'Failed'
-                    db.session.commit()
-                    print(f"❌ {lang.upper()} trigger failed: {resp.status_code}")
-            except Exception as e:
-                print(f"❌ {lang.upper()} trigger error: {e}")
-                job.status = 'Failed'
-                db.session.commit()
+                    job.priority = priority
+            db.session.commit()
+
+        # Trigger the smart dispatcher to pick up the best pending jobs
+        threading.Thread(target=dispatch_pending_jobs, daemon=True).start()
+
+
+# ── Translation Stats API ────────────────────────────────────────────────────
+@app.route('/api/translation_stats')
+@login_required
+def translation_stats():
+    pending    = TranslationJob.query.filter_by(status='Pending').count()
+    processing = TranslationJob.query.filter_by(status='Processing').count()
+    failed     = TranslationJob.query.filter_by(status='Failed').count()
+    completed  = TranslationJob.query.filter(
+                     TranslationJob.status.in_(['Completed', 'Success'])).count()
+
+    active     = pending + processing
+    grand_total= active + completed + failed
+    pct_done   = round(completed / grand_total * 100, 1) if grand_total else 100.0
+
+    # Pending breakdown by media type
+    movie_pending = (db.session.query(func.count(TranslationJob.id))
+                    .join(Movie, TranslationJob.movie_id == Movie.id)
+                    .filter(TranslationJob.status == 'Pending',
+                            Movie.media_type == 'movie')
+                    .scalar() or 0)
+    series_pending = (db.session.query(func.count(TranslationJob.id))
+                     .join(Movie, TranslationJob.movie_id == Movie.id)
+                     .filter(TranslationJob.status == 'Pending',
+                             Movie.media_type == 'series')
+                     .scalar() or 0)
+
+    # ETA — active jobs * avg minutes, adjusted for concurrency
+    est_minutes = round(active * AVG_MINS_PER_JOB / max(1, MAX_CONCURRENT))
+    est_text    = (f"{est_minutes // 60}h {est_minutes % 60}m"
+                  if est_minutes >= 60 else f"{est_minutes}m")
+
+    # Per-language breakdown of pending
+    lang_pending = {}
+    for lang in ['ml', 'ta', 'hi']:
+        lang_pending[lang] = TranslationJob.query.filter_by(
+            status='Pending', language=lang).count()
+
+    return jsonify({
+        'pending':        pending,
+        'processing':     processing,
+        'failed':         failed,
+        'completed':      completed,
+        'total':          grand_total,
+        'active':         active,
+        'pct_done':       pct_done,
+        'est_minutes':    est_minutes,
+        'est_text':       est_text,
+        'movie_pending':  movie_pending,
+        'series_pending': series_pending,
+        'lang_pending':   lang_pending,
+        'max_concurrent': MAX_CONCURRENT,
+        'batch_size':     SERIES_BATCH_SIZE,
+    })
+
 
 # ------------------ CALLBACK ENDPOINT ------------------
 @app.route('/api/translation_callback', methods=['POST'])
 def translation_callback():
-    data = request.json
+    data   = request.json
     secret = request.headers.get('Authorization', '').replace('Bearer ', '')
     if secret != HF_SECRET:
         return jsonify({"error": "unauthorized"}), 401
@@ -286,9 +428,11 @@ def translation_callback():
         job.progress = progress
         db.session.commit()
 
-    if status == 'Completed' and movie_id:
+    if status in ('Completed', 'Success') and movie_id:
+        # Check if all languages done → Telegram post
         all_jobs = TranslationJob.query.filter_by(movie_id=movie_id).all()
-        all_done = all(j.status == 'Completed' for j in all_jobs if j.language in ['ml', 'ta', 'hi'])
+        all_done = all(j.status in ('Completed', 'Success')
+                       for j in all_jobs if j.language in ['ml', 'ta', 'hi'])
         if all_done:
             try:
                 requests.get(
@@ -298,6 +442,9 @@ def translation_callback():
                 )
             except Exception as e:
                 print(f"⚠️ Auto Telegram post failed: {e}")
+
+    # Every callback frees a slot — dispatch next best job immediately
+    threading.Thread(target=dispatch_pending_jobs, daemon=True).start()
 
     return jsonify({"ok": True})
 
@@ -1188,6 +1335,186 @@ def delete_job(job_id):
     db.session.commit()
     return redirect(url_for('dashboard'))
 
+
+# ══════════════════════════════════════════════════════════════
+# SERIES MANAGEMENT PAGE
+# ══════════════════════════════════════════════════════════════
+
+@app.route('/admin/series')
+@login_required
+def admin_series():
+    """Dedicated series management: all series grouped, health status, gaps."""
+    # Get every series episode in one query
+    all_eps = (Movie.query
+               .filter_by(media_type='series')
+               .options(joinedload(Movie.translations))
+               .order_by(Movie.title.asc(), Movie.season.asc(), Movie.episode.asc())
+               .all())
+
+    # Group by title
+    from collections import defaultdict
+    series_map = defaultdict(list)
+    for ep in all_eps:
+        series_map[ep.title].append(ep)
+
+    series_list = []
+    for title, eps in series_map.items():
+        seasons = defaultdict(list)
+        for ep in eps:
+            seasons[ep.season or 1].append(ep)
+
+        total_eps     = len(eps)
+        season_count  = len(seasons)
+        representative = eps[0]           # for poster / meta
+
+        # Health: count episodes with EN + all 3 translated
+        en_count   = sum(1 for e in eps if e.english_srt)
+        full_count = sum(1 for e in eps
+                         if e.english_srt
+                         and len(e.translations) >= 3)
+
+        if full_count == total_eps:
+            health = 'full'        # all subs complete
+        elif en_count == total_eps:
+            health = 'partial'     # EN only
+        elif en_count > 0:
+            health = 'incomplete'  # some EN
+        else:
+            health = 'none'        # nothing
+
+        # Detect episode gaps per season
+        gaps = []
+        for s_num, s_eps in seasons.items():
+            ep_nums = sorted(e.episode for e in s_eps if e.episode)
+            if ep_nums:
+                for i in range(ep_nums[0], ep_nums[-1] + 1):
+                    if i not in ep_nums:
+                        gaps.append(f"S{s_num:02d}E{i:02d}")
+
+        series_list.append({
+            'title':        title,
+            'rep':          representative,
+            'total_eps':    total_eps,
+            'season_count': season_count,
+            'seasons':      dict(seasons),
+            'en_count':     en_count,
+            'full_count':   full_count,
+            'health':       health,
+            'gaps':         gaps,
+            'imdb_id':      representative.imdb_id,
+        })
+
+    # Sort: newest first (by max episode id)
+    series_list.sort(key=lambda s: max(e.id for e in s['seasons'].get(1, s['rep'] and [s['rep']] or [])), reverse=True)
+
+    return render_template('admin_series.html',
+                           series_list=series_list,
+                           categories=get_categories_list())
+
+
+@app.route('/admin/series/delete_all/<path:title>', methods=['POST'])
+@login_required
+def delete_series_all(title):
+    """Delete every episode of a series in one shot."""
+    eps = Movie.query.filter_by(media_type='series', title=title).all()
+    count = len(eps)
+    for ep in eps:
+        db.session.delete(ep)
+    db.session.commit()
+    log_admin_action('DeleteSeries', f"Deleted all {count} episodes of '{title}'")
+    return jsonify({'ok': True, 'deleted': count})
+
+
+@app.route('/admin/series/fetch_missing/<path:title>', methods=['POST'])
+@login_required
+def fetch_missing_series(title):
+    """Queue translation for every episode of a series that still has no translations."""
+    eps = (Movie.query
+           .filter_by(media_type='series', title=title)
+           .filter(Movie.english_srt.isnot(None), Movie.english_srt != '')
+           .all())
+    queued = 0
+    for ep in eps:
+        if not ep.translations:
+            threading.Thread(
+                target=trigger_hf_translation,
+                args=(ep.id, ep.english_srt)
+            ).start()
+            queued += 1
+    return jsonify({'ok': True, 'queued': queued})
+
+
+# ══════════════════════════════════════════════════════════════
+# DUPLICATE DETECTION
+# ══════════════════════════════════════════════════════════════
+
+@app.route('/admin/duplicates')
+@login_required
+def admin_duplicates():
+    """Find duplicate entries: same IMDb ID or same title+year."""
+
+    # --- Duplicates by IMDb ID ---
+    imdb_dups = []
+    imdb_counts = (db.session.query(Movie.imdb_id, Movie.media_type,
+                                    func.count(Movie.id).label('cnt'))
+                   .filter(Movie.imdb_id.isnot(None), Movie.imdb_id != '')
+                   .group_by(Movie.imdb_id, Movie.media_type)
+                   .having(func.count(Movie.id) > 1)
+                   .all())
+    for row in imdb_counts:
+        movies = Movie.query.filter_by(imdb_id=row.imdb_id,
+                                       media_type=row.media_type).all()
+        if len(movies) > 1:
+            imdb_dups.append({'key': row.imdb_id, 'type': row.media_type,
+                              'movies': movies})
+
+    # --- Duplicates by title + year (movies only) ---
+    title_dups = []
+    title_counts = (db.session.query(Movie.title, Movie.year,
+                                     func.count(Movie.id).label('cnt'))
+                    .filter(Movie.media_type == 'movie')
+                    .group_by(Movie.title, Movie.year)
+                    .having(func.count(Movie.id) > 1)
+                    .all())
+    for row in title_counts:
+        movies = Movie.query.filter_by(title=row.title, year=row.year,
+                                       media_type='movie').all()
+        # Only flag if not already caught by IMDb check
+        imdb_ids = {m.imdb_id for m in movies if m.imdb_id}
+        if len(movies) > 1 and (len(imdb_ids) > 1 or not imdb_ids):
+            title_dups.append({'key': f"{row.title} ({row.year})",
+                               'movies': movies})
+
+    return render_template('admin_duplicates.html',
+                           imdb_dups=imdb_dups,
+                           title_dups=title_dups,
+                           total=len(imdb_dups) + len(title_dups),
+                           categories=get_categories_list())
+
+
+# ══════════════════════════════════════════════════════════════
+# BULK DELETE
+# ══════════════════════════════════════════════════════════════
+
+@app.route('/admin/bulk_delete', methods=['POST'])
+@login_required
+def bulk_delete():
+    """Delete multiple media entries at once."""
+    data = request.json
+    ids  = data.get('ids', [])
+    if not ids:
+        return jsonify({'error': 'No IDs provided'}), 400
+
+    deleted = 0
+    for mid in ids:
+        m = Movie.query.get(int(mid))
+        if m:
+            db.session.delete(m)
+            deleted += 1
+    db.session.commit()
+    log_admin_action('BulkDelete', f"Deleted {deleted} entries: {ids}")
+    return jsonify({'ok': True, 'deleted': deleted})
+
 @app.route('/delete/<int:movie_id>')
 @login_required
 def delete_media(movie_id):
@@ -1988,14 +2315,17 @@ def auto_retry_failed():
     while True:
         time.sleep(1800)
         with app.app_context():
-            for job in TranslationJob.query.filter_by(status='Failed').all():
-                movie = Movie.query.get(job.movie_id)
-                if movie and movie.english_srt:
-                    job.status   = 'Pending'
-                    job.progress = 0
-                    db.session.commit()
-                    threading.Thread(target=trigger_hf_translation,
-                                     args=(movie.id, movie.english_srt)).start()
+            failed = TranslationJob.query.filter_by(status='Failed').all()
+            if failed:
+                for job in failed:
+                    movie = Movie.query.get(job.movie_id)
+                    if movie and movie.english_srt:
+                        job.status   = 'Pending'
+                        job.progress = 0
+                        job.priority = 1 if movie.media_type == 'movie' else 2
+                db.session.commit()
+                print(f"🔁 Re-queued {len(failed)} failed jobs — dispatching…")
+                dispatch_pending_jobs()
 
 threading.Thread(target=auto_retry_failed, daemon=True).start()
 
