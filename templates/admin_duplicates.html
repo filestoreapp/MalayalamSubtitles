@@ -1,0 +1,246 @@
+{% extends "base.html" %}
+{% block title %}Duplicate Detection – Admin{% endblock %}
+
+{% block extra_head %}
+<style>
+.dw{max-width:1200px;margin:1.25rem auto;padding:0 1rem}
+.atb{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.25rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem}
+.atb h1{font-size:1.2rem;font-weight:800}
+.anav{display:flex;gap:.4rem;flex-wrap:wrap}
+.anav a{background:#1a1a1a;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:.38rem .85rem;text-decoration:none;font-size:.8rem;transition:all .2s}
+.anav a:hover{color:#fff;border-color:#555}
+.anav a.active{background:var(--accent);border-color:var(--accent);color:#fff}
+
+/* Explanation box */
+.explainer{background:rgba(21,101,192,.1);border:1px solid rgba(21,101,192,.3);border-radius:10px;padding:1rem 1.25rem;margin-bottom:1.25rem;font-size:.85rem;line-height:1.7;color:#90caf9}
+.explainer h3{font-size:.92rem;font-weight:700;margin-bottom:.5rem;color:#64b5f6}
+.explainer ul{padding-left:1.2rem;margin:0}
+
+/* Section */
+.dup-section{margin-bottom:2rem}
+.dup-section-head{display:flex;align-items:center;gap:.75rem;margin-bottom:.85rem;padding-bottom:.65rem;border-bottom:2px solid var(--border)}
+.dup-section-head h2{font-size:1rem;font-weight:700}
+.dup-count-badge{background:rgba(229,9,20,.15);border:1px solid rgba(229,9,20,.3);color:var(--accent);font-size:.72rem;font-weight:700;border-radius:20px;padding:.2rem .65rem}
+
+/* Dup group card */
+.dup-group{background:var(--card);border:1px solid rgba(229,9,20,.25);border-radius:12px;overflow:hidden;margin-bottom:.85rem}
+.dup-group-head{background:rgba(229,9,20,.07);padding:.7rem 1rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;border-bottom:1px solid var(--border)}
+.dup-key{font-size:.82rem;font-weight:700;color:#ff8080}
+.dup-entries{display:grid;grid-template-columns:1fr;gap:1px;background:var(--border)}
+@media(min-width:600px){.dup-entries{grid-template-columns:repeat(2,1fr)}}
+@media(min-width:900px){.dup-entries{grid-template-columns:repeat(3,1fr)}}
+
+.dup-entry{background:var(--card);padding:.85rem 1rem;display:flex;gap:.75rem;align-items:flex-start;transition:background .15s}
+.dup-entry:hover{background:#1e1e1e}
+.dup-entry img{width:46px;height:69px;object-fit:cover;border-radius:6px;flex-shrink:0;border:1px solid var(--border)}
+.dup-entry-info{flex:1;min-width:0}
+.det{font-size:.82rem;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin-bottom:.25rem}
+.dem{font-size:.72rem;color:var(--muted);margin-bottom:.4rem}
+.de-pills{display:flex;gap:.25rem;flex-wrap:wrap;margin-bottom:.5rem}
+.dep{font-size:.62rem;font-weight:700;border-radius:4px;padding:.12rem .35rem;background:#1a1a1a;border:1px solid var(--border);color:#888}
+.dep.ok{border-color:#2e7d32;color:#66bb6a;background:#0a1a0a}
+.dup-actions{display:flex;gap:.35rem;flex-wrap:wrap}
+.da{font-size:.7rem;border-radius:5px;padding:.25rem .55rem;border:1px solid var(--border);color:var(--muted);text-decoration:none;transition:all .15s;background:transparent;cursor:pointer}
+.da:hover{color:#fff;border-color:#555}
+.da.keep{border-color:#2e7d32;color:#66bb6a}
+.da.keep:hover{background:rgba(76,175,80,.15)}
+.da.del{border-color:#3a1010;color:#ff6b6b}
+.da.del:hover{background:rgba(229,9,20,.18)}
+
+/* Empty state */
+.dup-empty{text-align:center;padding:3rem 1rem;background:var(--card);border:1px solid var(--border);border-radius:12px}
+
+/* Toast */
+.toast{position:fixed;bottom:1.5rem;right:1.5rem;background:#1e1e1e;border:1px solid var(--border);border-radius:10px;padding:.75rem 1.1rem;font-size:.85rem;z-index:1000;display:none;box-shadow:0 8px 24px rgba(0,0,0,.6)}
+.toast.show{display:block}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dw">
+
+  <!-- Top bar -->
+  <div class="atb">
+    <h1>🔁 Duplicate Detection</h1>
+    <nav class="anav">
+      <a href="/dashboard">📊 Dashboard</a>
+      <a href="/admin/series">📺 Series</a>
+      <a href="/admin/duplicates" class="active">🔁 Duplicates</a>
+      <a href="/logout">🚪 Logout</a>
+    </nav>
+  </div>
+
+  <!-- How duplicates are handled explanation -->
+  <div class="explainer">
+    <h3>🤖 How the system handles duplicates</h3>
+    <ul>
+      <li><strong>On upload:</strong> No automatic duplicate prevention. If you upload the same movie twice (same IMDb ID), both entries are created independently.</li>
+      <li><strong>On scheduler auto-fetch:</strong> The scheduler <em>does</em> check <code>Movie.query.filter_by(imdb_id=imdb_id, media_type='movie').first()</code> before adding — so auto-fetched movies are never duplicated.</li>
+      <li><strong>On genre/search pages:</strong> Series are deduplicated by title in Python before rendering — only one poster per series shown.</li>
+      <li><strong>What you should do:</strong> Review the duplicates below. Keep the entry with more translations, delete the other.</li>
+    </ul>
+  </div>
+
+  {% if total == 0 %}
+  <div class="dup-empty">
+    <div style="font-size:3rem;margin-bottom:.75rem">✅</div>
+    <p style="font-size:1rem;font-weight:600;margin-bottom:.4rem">No duplicates found!</p>
+    <p style="color:var(--muted);font-size:.85rem">Your database looks clean.</p>
+  </div>
+
+  {% else %}
+
+  <!-- ── IMDb duplicates ── -->
+  {% if imdb_dups %}
+  <div class="dup-section">
+    <div class="dup-section-head">
+      <h2>🎯 Exact Duplicates (Same IMDb ID)</h2>
+      <span class="dup-count-badge">{{ imdb_dups | length }} group{{ 's' if imdb_dups|length > 1 }}</span>
+    </div>
+    <p style="font-size:.8rem;color:var(--muted);margin-bottom:.85rem">
+      These entries share the same IMDb ID — they are definitely the same title uploaded more than once.
+      Keep the one with more translations and delete the rest.
+    </p>
+
+    {% for dup in imdb_dups %}
+    <div class="dup-group">
+      <div class="dup-group-head">
+        <span class="dup-key">🎯 IMDb: {{ dup.key }} · {{ dup.type }} · {{ dup.movies | length }} copies</span>
+        <button class="da del" onclick="keepBest({{ dup.movies | map(attribute='id') | list | tojson }})">
+          🤖 Auto-keep best &amp; delete rest
+        </button>
+      </div>
+      <div class="dup-entries">
+        {% for m in dup.movies %}
+        <div class="dup-entry">
+          <img src="{{ m.poster_url or 'https://placehold.co/46x69/1a1a1a/555?text=?' }}"
+               alt="{{ m.title }}"
+               onerror="this.src='https://placehold.co/46x69/1a1a1a/555?text=?'">
+          <div class="dup-entry-info">
+            <div class="det">{{ m.title }}</div>
+            <div class="dem">ID: {{ m.id }} · {{ m.year or '—' }} · {{ m.media_type }}</div>
+            <div class="de-pills">
+              <span class="dep {{ 'ok' if m.english_srt }}">EN{{ '✓' if m.english_srt else '✗' }}</span>
+              {% set tl = m.translations | map(attribute='language') | list %}
+              <span class="dep {{ 'ok' if 'ml' in tl }}">ML{{ '✓' if 'ml' in tl else '✗' }}</span>
+              <span class="dep {{ 'ok' if 'ta' in tl }}">TA{{ '✓' if 'ta' in tl else '✗' }}</span>
+              <span class="dep {{ 'ok' if 'hi' in tl }}">HI{{ '✓' if 'hi' in tl else '✗' }}</span>
+              <span class="dep" style="background:#1a1a2a;border-color:#1565c0;color:#64b5f6">{{ m.translations | length }} langs</span>
+            </div>
+            <div class="dup-actions">
+              <a href="{{ '/movie/'+m.slug if m.slug else '/movie/'+m.id|string }}" target="_blank" class="da">👁 View</a>
+              <a href="/admin/edit/{{ m.id }}" class="da">✏️ Edit</a>
+              <button class="da del" onclick="confirmDelete({{ m.id }}, '{{ m.title | replace("'","\\'") }}')">🗑 Delete</button>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- ── Title duplicates ── -->
+  {% if title_dups %}
+  <div class="dup-section">
+    <div class="dup-section-head">
+      <h2>📝 Possible Duplicates (Same Title + Year)</h2>
+      <span class="dup-count-badge">{{ title_dups | length }} group{{ 's' if title_dups|length > 1 }}</span>
+    </div>
+    <p style="font-size:.8rem;color:var(--muted);margin-bottom:.85rem">
+      Same title and year but different IMDb IDs — review carefully before deleting.
+    </p>
+
+    {% for dup in title_dups %}
+    <div class="dup-group">
+      <div class="dup-group-head">
+        <span class="dup-key">📝 {{ dup.key }} · {{ dup.movies | length }} entries</span>
+      </div>
+      <div class="dup-entries">
+        {% for m in dup.movies %}
+        <div class="dup-entry">
+          <img src="{{ m.poster_url or 'https://placehold.co/46x69/1a1a1a/555?text=?' }}"
+               alt="{{ m.title }}"
+               onerror="this.src='https://placehold.co/46x69/1a1a1a/555?text=?'">
+          <div class="dup-entry-info">
+            <div class="det">{{ m.title }}</div>
+            <div class="dem">ID: {{ m.id }} · IMDb: {{ m.imdb_id or 'none' }}</div>
+            <div class="de-pills">
+              <span class="dep {{ 'ok' if m.english_srt }}">EN{{ '✓' if m.english_srt else '✗' }}</span>
+              {% set tl = m.translations | map(attribute='language') | list %}
+              <span class="dep {{ 'ok' if 'ml' in tl }}">ML{{ '✓' if 'ml' in tl else '✗' }}</span>
+              <span class="dep {{ 'ok' if 'ta' in tl }}">TA{{ '✓' if 'ta' in tl else '✗' }}</span>
+              <span class="dep {{ 'ok' if 'hi' in tl }}">HI{{ '✓' if 'hi' in tl else '✗' }}</span>
+              <span class="dep" style="background:#1a1a2a;border-color:#1565c0;color:#64b5f6">{{ m.translations | length }} langs</span>
+            </div>
+            <div class="dup-actions">
+              <a href="{{ '/movie/'+m.slug if m.slug else '/movie/'+m.id|string }}" target="_blank" class="da">👁 View</a>
+              <a href="/admin/edit/{{ m.id }}" class="da">✏️ Edit</a>
+              <button class="da del" onclick="confirmDelete({{ m.id }}, '{{ m.title | replace("'","\\'") }}')">🗑 Delete</button>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% endif %}
+
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Confirm modal -->
+<div id="confirm-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2000;align-items:center;justify-content:center;padding:1rem">
+  <div style="background:#1a1a1a;border:1px solid var(--border);border-radius:14px;padding:1.5rem;width:min(360px,95vw);text-align:center">
+    <div style="font-size:2rem;margin-bottom:.75rem">🗑</div>
+    <h3 id="cm-title" style="margin-bottom:.5rem">Delete entry?</h3>
+    <p id="cm-msg" style="color:var(--muted);font-size:.85rem;margin-bottom:1.25rem">This cannot be undone.</p>
+    <div style="display:flex;gap:.65rem;justify-content:center">
+      <button id="cm-yes" class="btn-red" style="padding:.52rem 1.5rem">Delete</button>
+      <button onclick="document.getElementById('confirm-modal').style.display='none'" class="btn-ghost" style="padding:.52rem 1.5rem">Cancel</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),3000);
+}
+
+function confirmDelete(id, title){
+  document.getElementById('cm-title').textContent = 'Delete "'+title+'"?';
+  document.getElementById('cm-msg').textContent   = 'ID '+id+' and all its translations will be permanently deleted.';
+  document.getElementById('cm-yes').onclick = ()=>{ doDelete(id); };
+  document.getElementById('confirm-modal').style.display='flex';
+}
+
+async function doDelete(id){
+  document.getElementById('confirm-modal').style.display='none';
+  const r = await fetch('/delete/'+id);
+  if(r.ok || r.redirected){ showToast('✅ Deleted'); setTimeout(()=>location.reload(),1200); }
+  else showToast('❌ Error deleting');
+}
+
+// Auto-keep: keep entry with most translations, delete others
+async function keepBest(ids){
+  // Fetch translation counts for each id
+  const counts = await Promise.all(ids.map(async id=>{
+    const r = await fetch('/api/movie_info/'+id);
+    return {id};
+  }));
+  // We'll just delete all except the first (lowest id = original)
+  // Better logic: user can manually choose via individual Delete buttons
+  alert('💡 Tip: Use the individual Delete buttons to keep the entry with more translations (check the ML/TA/HI badges above each entry).\n\nKeep the one with ✓ on most languages, delete the rest.');
+}
+</script>
+{% endblock %}

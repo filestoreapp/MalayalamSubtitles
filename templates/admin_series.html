@@ -1,0 +1,372 @@
+{% extends "base.html" %}
+{% block title %}Series Management – Admin{% endblock %}
+
+{% block extra_head %}
+<style>
+.sw{max-width:1300px;margin:1.25rem auto;padding:0 1rem}
+.atb{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.25rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem}
+.atb h1{font-size:1.2rem;font-weight:800}
+.anav{display:flex;gap:.4rem;flex-wrap:wrap}
+.anav a{background:#1a1a1a;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:.38rem .85rem;text-decoration:none;font-size:.8rem;transition:all .2s}
+.anav a:hover{color:#fff;border-color:#555}
+.anav a.active{background:var(--accent);border-color:var(--accent);color:#fff}
+
+/* Stats bar */
+.stats-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.65rem;margin-bottom:1.25rem}
+.scard{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:.85rem 1rem;position:relative;overflow:hidden}
+.scard::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.scard.red::before{background:var(--accent)}
+.scard.blue::before{background:#1565c0}
+.scard.green::before{background:#2e7d32}
+.scard.yellow::before{background:#f9a825}
+.scard.purple::before{background:#6a1b9a}
+.sv{font-size:1.5rem;font-weight:800;line-height:1;margin-bottom:.2rem}
+.sl{font-size:.72rem;color:var(--muted)}
+
+/* Search + filters */
+.sf-row{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem;align-items:center}
+.sf-input{background:#1a1a1a;border:1px solid var(--border);color:var(--text);border-radius:8px;padding:.45rem .8rem;font-size:.85rem;flex:1;min-width:160px;font-family:inherit}
+.sf-input:focus{outline:none;border-color:var(--accent)}
+.sf-sel{background:#1a1a1a;border:1px solid var(--border);color:var(--text);border-radius:8px;padding:.45rem .7rem;font-size:.82rem;font-family:inherit}
+
+/* Series cards grid */
+.series-grid{display:grid;grid-template-columns:1fr;gap:.75rem}
+@media(min-width:700px){.series-grid{grid-template-columns:repeat(2,1fr)}}
+@media(min-width:1100px){.series-grid{grid-template-columns:repeat(3,1fr)}}
+
+.sc{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:border-color .18s}
+.sc:hover{border-color:#3a3a3a}
+.sc-head{display:flex;gap:.85rem;padding:.85rem 1rem;align-items:flex-start}
+.sc-poster{width:58px;height:87px;object-fit:cover;border-radius:7px;flex-shrink:0;border:1px solid var(--border)}
+.sc-info{flex:1;min-width:0}
+.sc-title{font-size:.92rem;font-weight:700;margin-bottom:.3rem;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.sc-meta{font-size:.72rem;color:var(--muted);margin-bottom:.4rem}
+
+/* Health bar */
+.health-bar{height:5px;background:#1a1a1a;border-radius:3px;overflow:hidden;margin-bottom:.4rem}
+.health-fill{height:100%;border-radius:3px;transition:width .3s}
+.hf-full{background:#4caf50}
+.hf-partial{background:#f9a825}
+.hf-incomplete{background:#ff9800}
+.hf-none{background:#c62828}
+
+/* Lang pills */
+.lang-pills{display:flex;gap:.25rem;flex-wrap:wrap}
+.lp{font-size:.64rem;font-weight:700;border-radius:4px;padding:.15rem .4rem;border:1px solid transparent}
+.lp-en{background:#1e1e1e;border-color:#444;color:#888}
+.lp-ml{background:#0a2010;border-color:#2e7d32;color:#66bb6a}
+.lp-ta{background:#2d0a0a;border-color:#c62828;color:#ef9a9a}
+.lp-hi{background:#0a0a2d;border-color:#1565c0;color:#64b5f6}
+.lp-ok{opacity:1}
+.lp-miss{opacity:.3}
+
+/* Gap badge */
+.gap-badge{background:rgba(255,193,7,.12);border:1px solid rgba(255,193,7,.3);color:#ffd54f;font-size:.68rem;border-radius:5px;padding:.2rem .5rem;display:inline-flex;align-items:center;gap:.25rem}
+
+/* Health badge */
+.hbadge{font-size:.68rem;font-weight:700;border-radius:4px;padding:.18rem .5rem;display:inline-flex;align-items:center;gap:.25rem}
+.hb-full{background:rgba(76,175,80,.15);color:#81c784}
+.hb-partial{background:rgba(249,168,37,.15);color:#ffd54f}
+.hb-incomplete{background:rgba(255,152,0,.15);color:#ffcc80}
+.hb-none{background:rgba(229,9,20,.12);color:#ef9a9a}
+
+/* Action buttons */
+.sc-actions{display:flex;gap:.35rem;padding:.65rem 1rem;border-top:1px solid var(--border);background:#111;flex-wrap:wrap}
+.act-btn{font-size:.72rem;border-radius:6px;padding:.32rem .65rem;border:1px solid var(--border);color:var(--muted);background:transparent;cursor:pointer;transition:all .15s;text-decoration:none;display:inline-flex;align-items:center;gap:.25rem}
+.act-btn:hover{color:#fff;border-color:#555}
+.act-del{border-color:#3a1010;color:#ff6b6b}
+.act-del:hover{background:rgba(229,9,20,.18);border-color:#c62828}
+
+/* Episode detail expand */
+.sc-detail{display:none;border-top:1px solid var(--border);padding:.65rem 1rem;background:#0d0d0d}
+.sc-detail.open{display:block}
+.season-row{margin-bottom:.65rem}
+.season-row h4{font-size:.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem}
+.ep-mini-grid{display:flex;flex-wrap:wrap;gap:.3rem}
+.epm{
+  font-size:.68rem;font-weight:700;border-radius:5px;padding:.22rem .45rem;
+  border:1px solid var(--border);color:var(--muted);background:#1a1a1a;
+  cursor:pointer;text-decoration:none;transition:all .15s;
+}
+.epm:hover{border-color:#555;color:#fff}
+.epm.full{border-color:#2e7d32;color:#66bb6a;background:#0a2010}
+.epm.partial{border-color:#f9a825;color:#ffd54f;background:#1a1500}
+.epm.none{border-color:#3a1010;color:#ef9a9a;background:#1a0505}
+
+/* Bulk select */
+.bulk-bar{
+  display:none;position:fixed;bottom:1.25rem;left:50%;transform:translateX(-50%);
+  background:#1a1a1a;border:1px solid var(--border);border-radius:12px;
+  padding:.75rem 1.25rem;box-shadow:0 8px 32px rgba(0,0,0,.7);
+  z-index:500;align-items:center;gap:.85rem;white-space:nowrap;
+}
+.bulk-bar.show{display:flex}
+.bulk-count{font-size:.88rem;font-weight:700;color:#fff}
+.bulk-del-btn{background:var(--accent);border:none;color:#fff;border-radius:8px;padding:.45rem 1rem;font-size:.85rem;cursor:pointer;font-weight:600}
+.bulk-clear{background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:.45rem .75rem;font-size:.82rem;cursor:pointer}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="sw">
+
+  <!-- Top bar -->
+  <div class="atb">
+    <h1>📺 Series Management</h1>
+    <nav class="anav">
+      <a href="/dashboard">📊 Dashboard</a>
+      <a href="/admin">➕ Upload</a>
+      <a href="/admin/series" class="active">📺 Series</a>
+      <a href="/admin/duplicates">🔁 Duplicates</a>
+      <a href="/admin/requests">🙋 Requests</a>
+      <a href="/logout">🚪 Logout</a>
+    </nav>
+  </div>
+
+  <!-- Stats -->
+  {% set total_series = series_list | length %}
+  {% set full_health  = series_list | selectattr('health','eq','full')       | list | length %}
+  {% set partial      = series_list | selectattr('health','eq','partial')    | list | length %}
+  {% set incomplete   = series_list | selectattr('health','eq','incomplete') | list | length %}
+  {% set none_health  = series_list | selectattr('health','eq','none')       | list | length %}
+  {% set with_gaps    = series_list | selectattr('gaps') | list | length %}
+
+  <div class="stats-row">
+    <div class="scard blue">  <div class="sv">{{ total_series }}</div><div class="sl">Total Series</div></div>
+    <div class="scard green"> <div class="sv">{{ full_health }}</div><div class="sl">Fully Translated</div></div>
+    <div class="scard yellow"><div class="sv">{{ partial }}</div>    <div class="sl">EN Only</div></div>
+    <div class="scard red">   <div class="sv">{{ incomplete + none_health }}</div><div class="sl">Incomplete</div></div>
+    <div class="scard purple"><div class="sv">{{ with_gaps }}</div>  <div class="sl">Has Episode Gaps</div></div>
+  </div>
+
+  <!-- Search + filter -->
+  <div class="sf-row">
+    <input class="sf-input" type="text" id="series-search" placeholder="🔍 Search series title…" oninput="filterSeries()">
+    <select class="sf-sel" id="health-filter" onchange="filterSeries()">
+      <option value="">All Health</option>
+      <option value="full">✅ Fully Translated</option>
+      <option value="partial">🟡 EN Only</option>
+      <option value="incomplete">🟠 Incomplete</option>
+      <option value="none">🔴 No Subtitles</option>
+    </select>
+    <select class="sf-sel" id="gap-filter" onchange="filterSeries()">
+      <option value="">All</option>
+      <option value="gaps">⚠️ Has Gaps</option>
+    </select>
+    <button class="act-btn" onclick="selectAll()" style="margin-left:auto">☑ Select All</button>
+    <button class="act-btn" onclick="clearAll()">✕ Clear</button>
+  </div>
+
+  <!-- Series grid -->
+  <div class="series-grid" id="series-grid">
+    {% for s in series_list %}
+    {% set teps = s.total_eps %}
+    {% set pct  = ((s.full_count / teps * 100) | int) if teps else 0 %}
+    <div class="sc" data-title="{{ s.title | lower }}" data-health="{{ s.health }}" data-gaps="{{ 'gaps' if s.gaps else '' }}" id="sc-{{ loop.index }}">
+
+      <div class="sc-head">
+        <!-- Checkbox -->
+        <input type="checkbox" class="series-cb" data-title="{{ s.title }}"
+               onchange="updateBulkBar()" style="margin-top:.2rem;flex-shrink:0;width:16px;height:16px;cursor:pointer;accent-color:var(--accent)">
+
+        <img class="sc-poster"
+             src="{{ s.rep.poster_url or 'https://placehold.co/58x87/1a1a1a/555?text=?' }}"
+             alt="{{ s.title }}"
+             onerror="this.src='https://placehold.co/58x87/1a1a1a/555?text=?'">
+
+        <div class="sc-info">
+          <div class="sc-title" title="{{ s.title }}">{{ s.title }}</div>
+          <div class="sc-meta">
+            {{ s.rep.year or '—' }}
+            {% if s.rep.rating and s.rep.rating not in ('N/A','0') %} · ⭐ {{ s.rep.rating }}{% endif %}
+            · {{ s.season_count }} Season{{ 's' if s.season_count > 1 }}
+            · {{ teps }} Episodes
+          </div>
+
+          <!-- Health bar -->
+          <div class="health-bar">
+            <div class="health-fill hf-{{ s.health }}" style="width:{{ pct }}%"></div>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;margin-bottom:.4rem">
+            <span class="hbadge hb-{{ s.health }}">
+              {{ '✅' if s.health=='full' else ('🟡' if s.health=='partial' else ('🟠' if s.health=='incomplete' else '🔴')) }}
+              {{ pct }}% translated
+            </span>
+            {% if s.gaps %}
+            <span class="gap-badge">⚠️ {{ s.gaps | length }} gap{{ 's' if s.gaps|length > 1 }}</span>
+            {% endif %}
+          </div>
+
+          <!-- Language availability -->
+          <div class="lang-pills">
+            <span class="lp lp-en {{ 'lp-ok' if s.en_count > 0 else 'lp-miss' }}">EN {{ s.en_count }}/{{ teps }}</span>
+            {% set ml_c = namespace(n=0) %}{% set ta_c = namespace(n=0) %}{% set hi_c = namespace(n=0) %}
+            {% for ss_eps in s.seasons.values() %}{% for ep in ss_eps %}
+              {% for t in ep.translations %}
+                {% if t.language=='ml' %}{% set ml_c.n = ml_c.n + 1 %}{% endif %}
+                {% if t.language=='ta' %}{% set ta_c.n = ta_c.n + 1 %}{% endif %}
+                {% if t.language=='hi' %}{% set hi_c.n = hi_c.n + 1 %}{% endif %}
+              {% endfor %}
+            {% endfor %}{% endfor %}
+            <span class="lp lp-ml {{ 'lp-ok' if ml_c.n > 0 else 'lp-miss' }}">ML {{ ml_c.n }}/{{ teps }}</span>
+            <span class="lp lp-ta {{ 'lp-ok' if ta_c.n > 0 else 'lp-miss' }}">TA {{ ta_c.n }}/{{ teps }}</span>
+            <span class="lp lp-hi {{ 'lp-ok' if hi_c.n > 0 else 'lp-miss' }}">HI {{ hi_c.n }}/{{ teps }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Gap warning detail -->
+      {% if s.gaps %}
+      <div style="padding:.4rem 1rem;background:rgba(255,193,7,.06);border-top:1px solid rgba(255,193,7,.15)">
+        <span style="font-size:.72rem;color:#ffd54f">⚠️ Missing: {{ s.gaps[:6] | join(', ') }}{% if s.gaps|length > 6 %} +{{ s.gaps|length - 6 }} more{% endif %}</span>
+      </div>
+      {% endif %}
+
+      <!-- Episode mini grid (expandable) -->
+      <div class="sc-detail" id="detail-{{ loop.index }}">
+        {% for season_num, s_eps in s.seasons.items() | sort %}
+        <div class="season-row">
+          <h4>Season {{ season_num }}</h4>
+          <div class="ep-mini-grid">
+            {% for ep in s_eps %}
+            {% set tl = ep.translations | map(attribute='language') | list %}
+            {% set ep_class = 'full' if (ep.english_srt and tl|length >= 3) else ('partial' if ep.english_srt else 'none') %}
+            <a href="/movie/{{ ep.slug or ep.id }}" target="_blank" class="epm {{ ep_class }}"
+               title="E{{ '%02d'|format(ep.episode or 1) }} · EN{{ '✓' if ep.english_srt else '✗' }} ML{{ '✓' if 'ml' in tl else '✗' }} TA{{ '✓' if 'ta' in tl else '✗' }} HI{{ '✓' if 'hi' in tl else '✗' }}">
+              E{{ '%02d'|format(ep.episode or 1) }}
+            </a>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Action bar -->
+      <div class="sc-actions">
+        <a href="/series/{{ s.title | urlencode }}" target="_blank" class="act-btn">👁 View</a>
+        <button class="act-btn" onclick="toggleDetail({{ loop.index }})" id="tog-{{ loop.index }}">📋 Episodes</button>
+        <button class="act-btn" onclick="fetchMissing('{{ s.title | replace("'","\\'")}}')" title="Queue translation for episodes without subtitles">⚡ Fetch Missing</button>
+        <button class="act-btn act-del" onclick="confirmDeleteSeries('{{ s.title | replace("'","\\'")}}')" title="Delete ALL episodes of this series">🗑 Delete All</button>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% if not series_list %}
+  <div style="text-align:center;padding:3rem;background:var(--card);border:1px solid var(--border);border-radius:12px">
+    <div style="font-size:2.5rem">📺</div>
+    <p style="margin-top:.75rem;color:var(--muted)">No series uploaded yet.</p>
+  </div>
+  {% endif %}
+
+</div>
+
+<!-- Bulk action bar -->
+<div class="bulk-bar" id="bulk-bar">
+  <span class="bulk-count" id="bulk-count">0 selected</span>
+  <button class="bulk-del-btn" onclick="bulkDeleteSeries()">🗑 Delete Selected</button>
+  <button class="bulk-clear" onclick="clearAll()">✕ Cancel</button>
+</div>
+
+<!-- Confirm modal -->
+<div id="confirm-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2000;align-items:center;justify-content:center;padding:1rem">
+  <div style="background:#1a1a1a;border:1px solid var(--border);border-radius:14px;padding:1.5rem;width:min(380px,95vw);text-align:center">
+    <div style="font-size:2rem;margin-bottom:.75rem">🗑</div>
+    <h3 style="margin-bottom:.5rem" id="confirm-title">Delete Series?</h3>
+    <p style="color:var(--muted);font-size:.85rem;margin-bottom:1.25rem" id="confirm-msg">This will delete all episodes permanently.</p>
+    <div style="display:flex;gap:.65rem;justify-content:center">
+      <button id="confirm-yes" class="btn-red" style="padding:.52rem 1.5rem">Yes, Delete</button>
+      <button onclick="closeConfirm()" class="btn-ghost" style="padding:.52rem 1.5rem">Cancel</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// ── Filter ──────────────────────────────────────────────────────────────────
+function filterSeries(){
+  const q      = document.getElementById('series-search').value.toLowerCase();
+  const health = document.getElementById('health-filter').value;
+  const gap    = document.getElementById('gap-filter').value;
+  document.querySelectorAll('.sc').forEach(el => {
+    const matchQ = !q      || el.dataset.title.includes(q);
+    const matchH = !health || el.dataset.health === health;
+    const matchG = !gap    || el.dataset.gaps === gap;
+    el.style.display = (matchQ && matchH && matchG) ? '' : 'none';
+  });
+}
+
+// ── Episode expand ───────────────────────────────────────────────────────────
+function toggleDetail(idx){
+  const d = document.getElementById('detail-'+idx);
+  const b = document.getElementById('tog-'+idx);
+  const open = d.classList.toggle('open');
+  b.textContent = open ? '▲ Hide' : '📋 Episodes';
+}
+
+// ── Fetch missing translations ───────────────────────────────────────────────
+function fetchMissing(title){
+  fetch('/admin/series/fetch_missing/'+encodeURIComponent(title),{method:'POST'})
+  .then(r=>r.json())
+  .then(d=>{ alert(d.ok ? `✅ Queued ${d.queued} translation job(s).` : '❌ Error'); });
+}
+
+// ── Delete series confirmation ───────────────────────────────────────────────
+let pendingDeleteTitle = null;
+function confirmDeleteSeries(title){
+  pendingDeleteTitle = title;
+  document.getElementById('confirm-title').textContent = `Delete "${title}"?`;
+  document.getElementById('confirm-msg').textContent   =
+    'This will permanently delete ALL episodes, subtitles and translations.';
+  document.getElementById('confirm-yes').onclick = doDeleteSeries;
+  document.getElementById('confirm-modal').style.display = 'flex';
+}
+function doDeleteSeries(){
+  if(!pendingDeleteTitle) return;
+  fetch('/admin/series/delete_all/'+encodeURIComponent(pendingDeleteTitle),{method:'POST'})
+  .then(r=>r.json())
+  .then(d=>{
+    if(d.ok){ closeConfirm(); location.reload(); }
+    else alert('❌ Error deleting series');
+  });
+}
+function closeConfirm(){
+  document.getElementById('confirm-modal').style.display='none';
+  pendingDeleteTitle = null;
+}
+document.getElementById('confirm-modal').addEventListener('click', e=>{ if(e.target===e.currentTarget) closeConfirm(); });
+
+// ── Bulk select ──────────────────────────────────────────────────────────────
+function updateBulkBar(){
+  const checked = document.querySelectorAll('.series-cb:checked');
+  const bar     = document.getElementById('bulk-bar');
+  document.getElementById('bulk-count').textContent = checked.length + ' series selected';
+  bar.classList.toggle('show', checked.length > 0);
+}
+function selectAll(){
+  document.querySelectorAll('.sc:not([style*="none"]) .series-cb').forEach(cb=>cb.checked=true);
+  updateBulkBar();
+}
+function clearAll(){
+  document.querySelectorAll('.series-cb').forEach(cb=>cb.checked=false);
+  updateBulkBar();
+}
+function bulkDeleteSeries(){
+  const titles = [...document.querySelectorAll('.series-cb:checked')].map(cb=>cb.dataset.title);
+  if(!titles.length) return;
+  pendingDeleteTitle = '__bulk__';
+  document.getElementById('confirm-title').textContent = `Delete ${titles.length} series?`;
+  document.getElementById('confirm-msg').textContent   =
+    `This will permanently delete ALL episodes for: ${titles.slice(0,3).join(', ')}${titles.length>3?' and more...':''}`;
+  document.getElementById('confirm-yes').onclick = async ()=>{
+    for(const t of titles){
+      await fetch('/admin/series/delete_all/'+encodeURIComponent(t),{method:'POST'});
+    }
+    closeConfirm(); location.reload();
+  };
+  document.getElementById('confirm-modal').style.display='flex';
+}
+</script>
+{% endblock %}
