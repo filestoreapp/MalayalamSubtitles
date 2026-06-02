@@ -112,6 +112,47 @@
   .st-Failed     { background: rgba(229,9,20,.15); color: var(--accent); }
   .st-Completed  { background: rgba(76,175,80,.15); color: #81c784; }
 
+  /* ── Translation Queue Widget ── */
+  .tq-widget{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.25rem;margin-bottom:1.25rem;position:relative;overflow:hidden}
+  .tq-widget::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--accent),#ff6b35)}
+  .tq-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem}
+  .tq-head h2{font-size:.95rem;font-weight:700}
+  .tq-refresh{font-size:.72rem;color:var(--muted)}
+  .tq-stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:.65rem;margin-bottom:1rem}
+  .tqs{background:#111;border:1px solid var(--border);border-radius:9px;padding:.7rem .85rem;text-align:center}
+  .tqs .n{font-size:1.4rem;font-weight:800;line-height:1;margin-bottom:.2rem}
+  .tqs .l{font-size:.68rem;color:var(--muted)}
+  .tqs.pending .n{color:#ffd54f}
+  .tqs.processing .n{color:#64b5f6}
+  .tqs.failed .n{color:var(--accent)}
+  .tqs.done .n{color:#81c784}
+  /* Main progress bar */
+  .tq-pbar-wrap{margin-bottom:.75rem}
+  .tq-pbar-label{display:flex;justify-content:space-between;font-size:.78rem;color:var(--muted);margin-bottom:.35rem}
+  .tq-pbar{height:10px;background:#1a1a1a;border-radius:5px;overflow:hidden}
+  .tq-pbar-fill{height:100%;background:linear-gradient(90deg,#4caf50,#81c784);border-radius:5px;transition:width .5s ease}
+  /* Language breakdown */
+  .tq-langs{display:flex;gap:.6rem;margin-bottom:.75rem;flex-wrap:wrap}
+  .tql{flex:1;min-width:80px;background:#111;border:1px solid var(--border);border-radius:8px;padding:.5rem .65rem}
+  .tql-name{font-size:.7rem;font-weight:700;margin-bottom:.3rem;display:flex;justify-content:space-between}
+  .tql-bar{height:5px;background:#1a1a1a;border-radius:3px;overflow:hidden}
+  .tql-fill{height:100%;border-radius:3px}
+  .tql-ml .tql-fill{background:#4caf50}
+  .tql-ta .tql-fill{background:#ef5350}
+  .tql-hi .tql-fill{background:#42a5f5}
+  /* Type breakdown */
+  .tq-types{display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:.75rem}
+  .tqt{background:#111;border:1px solid var(--border);border-radius:8px;padding:.5rem .85rem;font-size:.8rem;flex:1;min-width:120px}
+  .tqt .tv{font-size:1.1rem;font-weight:800}
+  .tqt .tl{font-size:.68rem;color:var(--muted);margin-top:.1rem}
+  /* ETA */
+  .tq-eta{background:rgba(245,197,24,.08);border:1px solid rgba(245,197,24,.2);border-radius:8px;padding:.6rem .9rem;font-size:.82rem;color:#ffd54f;display:flex;align-items:center;gap:.5rem}
+  /* Config info */
+  .tq-config{font-size:.72rem;color:#555;margin-top:.6rem}
+  /* Pulse animation for processing */
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+  .pulse{animation:pulse 1.5s ease-in-out infinite}
+
   /* Pagination */
   .pager { display: flex; gap: .35rem; justify-content: center; flex-wrap: wrap; margin: .75rem 0; }
   .pager a, .pager span {
@@ -142,6 +183,67 @@
       <a href="/admin/export_csv">📥 CSV</a>
       <a href="/logout">🚪 Logout</a>
     </nav>
+  </div>
+
+  <!-- ── Translation Queue Widget ── -->
+  <div class="tq-widget" id="tq-widget">
+    <div class="tq-head">
+      <h2>⚙️ Translation Queue</h2>
+      <span class="tq-refresh" id="tq-refresh-label">Auto-refreshes every 10s</span>
+    </div>
+
+    <!-- Main progress bar -->
+    <div class="tq-pbar-wrap">
+      <div class="tq-pbar-label">
+        <span id="tq-pct-label">Loading…</span>
+        <span id="tq-eta-label" style="color:var(--gold)"></span>
+      </div>
+      <div class="tq-pbar"><div class="tq-pbar-fill" id="tq-pbar-fill" style="width:0%"></div></div>
+    </div>
+
+    <!-- Stat cards -->
+    <div class="tq-stats">
+      <div class="tqs pending"><div class="n" id="tq-pending">—</div><div class="l">Pending</div></div>
+      <div class="tqs processing"><div class="n pulse" id="tq-processing">—</div><div class="l">Processing</div></div>
+      <div class="tqs done"><div class="n" id="tq-completed">—</div><div class="l">Completed</div></div>
+      <div class="tqs failed"><div class="n" id="tq-failed">—</div><div class="l">Failed</div></div>
+    </div>
+
+    <!-- Type breakdown -->
+    <div class="tq-types">
+      <div class="tqt">
+        <div class="tv" id="tq-movie-pending" style="color:#ef9a9a">—</div>
+        <div class="tl">🎬 Movie jobs pending (priority 1)</div>
+      </div>
+      <div class="tqt">
+        <div class="tv" id="tq-series-pending" style="color:#64b5f6">—</div>
+        <div class="tl">📺 Series jobs pending (priority 2)</div>
+      </div>
+    </div>
+
+    <!-- Per-language breakdown -->
+    <div class="tq-langs">
+      <div class="tql tql-ml">
+        <div class="tql-name"><span>🟢 Malayalam</span><span id="tq-ml">—</span></div>
+        <div class="tql-bar"><div class="tql-fill" id="tq-ml-bar" style="width:0%"></div></div>
+      </div>
+      <div class="tql tql-ta">
+        <div class="tql-name"><span>🔴 Tamil</span><span id="tq-ta">—</span></div>
+        <div class="tql-bar"><div class="tql-fill" id="tq-ta-bar" style="width:0%"></div></div>
+      </div>
+      <div class="tql tql-hi">
+        <div class="tql-name"><span>🔵 Hindi</span><span id="tq-hi">—</span></div>
+        <div class="tql-bar"><div class="tql-fill" id="tq-hi-bar" style="width:0%"></div></div>
+      </div>
+    </div>
+
+    <!-- ETA -->
+    <div class="tq-eta" id="tq-eta-box" style="display:none">
+      ⏱ <strong>Estimated time remaining: <span id="tq-eta-val">—</span></strong>
+      &nbsp;·&nbsp; Based on avg {{ "%.0f"|format(4) }} min/job with {{ 5 }} concurrent workers
+    </div>
+
+    <div class="tq-config" id="tq-config">Loading config…</div>
   </div>
 
   <!-- Stats -->
@@ -432,5 +534,64 @@ fetch('/api/analytics_data')
 
   })
   .catch(err => console.warn('Analytics load failed:', err));
+
+// ── Translation Queue Widget ─────────────────────────────────────────────────
+let tqTimer = null;
+
+function loadTranslationStats(){
+  fetch('/api/translation_stats')
+    .then(r => r.json())
+    .then(d => {
+      // Progress bar
+      document.getElementById('tq-pbar-fill').style.width = d.pct_done + '%';
+      document.getElementById('tq-pct-label').textContent =
+        d.pct_done + '% complete (' + d.completed + ' of ' + d.total + ' jobs)';
+
+      // ETA
+      const etaBox = document.getElementById('tq-eta-box');
+      if(d.active > 0){
+        etaBox.style.display = 'flex';
+        document.getElementById('tq-eta-val').textContent = d.est_text;
+        document.getElementById('tq-eta-label').textContent = '~' + d.est_text + ' left';
+      } else {
+        etaBox.style.display = 'none';
+        document.getElementById('tq-eta-label').textContent = '✅ Queue clear';
+      }
+
+      // Cards
+      document.getElementById('tq-pending').textContent    = d.pending;
+      document.getElementById('tq-processing').textContent = d.processing;
+      document.getElementById('tq-completed').textContent  = d.completed;
+      document.getElementById('tq-failed').textContent     = d.failed;
+
+      // Type breakdown
+      document.getElementById('tq-movie-pending').textContent  = d.movie_pending;
+      document.getElementById('tq-series-pending').textContent = d.series_pending;
+
+      // Per-language bars (pending as % of all pending)
+      const total_pending = d.pending || 1;
+      ['ml','ta','hi'].forEach(lang => {
+        const cnt  = d.lang_pending[lang] || 0;
+        const pct  = Math.round(cnt / total_pending * 100);
+        document.getElementById('tq-'+lang).textContent    = cnt + ' pending';
+        document.getElementById('tq-'+lang+'-bar').style.width = pct + '%';
+      });
+
+      // Config line
+      document.getElementById('tq-config').textContent =
+        `⚙️ ${d.max_concurrent} concurrent workers · Series batch: ${d.batch_size} episodes/cycle · Avg ${(4).toFixed(0)} min/job`;
+
+      // Timestamp
+      document.getElementById('tq-refresh-label').textContent =
+        'Updated ' + new Date().toLocaleTimeString();
+    })
+    .catch(() => {
+      document.getElementById('tq-refresh-label').textContent = 'Failed to load stats';
+    });
+}
+
+// Load on page open and every 10 seconds
+loadTranslationStats();
+tqTimer = setInterval(loadTranslationStats, 10000);
 </script>
 {% endblock %}
