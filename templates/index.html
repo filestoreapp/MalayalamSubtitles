@@ -126,9 +126,15 @@
 
 <div class="page">
 
+  <!-- Trending This Week -->
+  <div class="section" id="trending-week-section" style="display:none">
+    <div class="sec-head"><h2>🔥 Trending This Week</h2><a href="/new-this-week">New this week →</a></div>
+    <div class="scroll-row" id="trending-week-row"></div>
+  </div>
+
   <!-- Recent Uploads -->
   <div class="section">
-    <div class="sec-head"><h2>🆕 Recent Uploads</h2><a href="/search?sort=newest">All →</a></div>
+    <div class="sec-head"><h2>🆕 Recent Uploads</h2><a href="/new-this-week">All →</a></div>
     <div class="scroll-row">{% for m in recent_uploads %}<a href="{{ '/movie/'+m.slug if m.slug and m.media_type=='movie' else ('/series/'+m.title|urlencode if m.media_type=='series' else '/movie/'+m.id|string) }}" class="movie-card"><img src="{{ m.poster_url or 'https://placehold.co/300x450/1a1a1a/555?text=?' }}" alt="{{ m.title }}" loading="lazy" onerror="this.src='https://placehold.co/300x450/1a1a1a/555?text=?'"><div class="card-body"><div class="card-title">{{ m.title }}</div><div class="card-meta"><span class="star">⭐</span><span>{{ m.rating or 'N/A' }}</span><span class="badge-type {{ 'series' if m.media_type=='series' }}">{{ m.year or '—' }}</span></div></div></a>{% endfor %}</div>
   </div>
 
@@ -198,6 +204,24 @@ function voteReq(btn,id){
     btn.closest('.req-item').querySelector('.req-item-votes').textContent='🔼 '+d.votes+' votes'}
   });
 }
+// Trending this week
+fetch('/api/trending_week').then(r=>r.json()).then(d=>{
+  if(!d.movies||!d.movies.length) return;
+  const sec = document.getElementById('trending-week-section');
+  const row = document.getElementById('trending-week-row');
+  if(!sec||!row) return;
+  sec.style.display='';
+  row.innerHTML = d.movies.map(m=>`
+    <a href="${m.url}" class="movie-card">
+      <img src="${m.poster||'https://placehold.co/300x450/1a1a1a/555?text=?'}" alt="${m.title}" loading="lazy"
+           onerror="this.src='https://placehold.co/300x450/1a1a1a/555?text=?'">
+      <div class="card-body">
+        <div class="card-title">${m.title}</div>
+        <div class="card-meta"><span>🔥${m.downloads}</span><span class="badge-type ${m.type==='series'?'series':''}">${m.year||'—'}</span></div>
+      </div>
+    </a>`).join('');
+}).catch(()=>{});
+
 fetch('/api/recently_viewed').then(r=>r.json()).then(d=>{
   const el=document.getElementById('rv-list');if(!el)return;
   if(!d.movies||!d.movies.length){el.innerHTML='<div style="color:var(--muted);font-size:.78rem">Browse some titles first!</div>';return}

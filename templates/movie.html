@@ -157,7 +157,9 @@
                 onclick="toggleFav(this,{{ movie.id }})">
           {{ '❤️ Saved' if is_favorite else '🤍 Watchlist' }}
         </button>
-        <button class="share-btn" onclick="shareMovie()">📤 Share</button>
+        <button class="share-btn" onclick="shareWhatsApp()">📱 WhatsApp</button>
+        <button class="share-btn" onclick="shareTelegram()">✈️ Telegram</button>
+        <button class="share-btn" onclick="copyLink(this)">🔗 Copy Link</button>
         {% if movie.imdb_id %}<a href="https://www.imdb.com/title/{{ movie.imdb_id }}" target="_blank" rel="noopener" class="share-btn">🎞 IMDb</a>{% endif %}
       </div>
     </div>
@@ -187,7 +189,14 @@
       <div class="dl-item">
         <div class="dl-lang-row"><span class="flag">🇮🇳</span><span class="lang-name">Malayalam</span><span class="lang-tag ml-tag">ML</span></div>
         {% if lang_ratings.get('ml') %}<div class="rating-row"><span class="stars">{{ '★'*(lang_ratings['ml']['avg']|int) }}{{ '☆'*(5-lang_ratings['ml']['avg']|int) }}</span> {{ lang_ratings['ml']['avg'] }}/5</div>{% endif %}
-        {% if 'ml' in ready_languages %}<button class="dl-btn dl-ml" onclick="dlCountdown(this,'/download/{{ movie.id }}/ml')"><div class="btn-fill"></div><span class="btn-txt">⬇ Malayalam</span></button><button onclick="openRateModal('ml','Malayalam')" class="dl-btn rate-btn">⭐ Rate</button>
+        {% if 'ml' in ready_languages %}
+        {% set ml_cache = movie.translations | selectattr('language','eq','ml') | first | default(none) %}
+        {% if ml_cache and ml_cache.quality_score is not none %}
+        <div style="font-size:.7rem;margin-bottom:.3rem;{% if ml_cache.quality_score >= 80 %}color:#81c784{% elif ml_cache.quality_score >= 60 %}color:#ffd54f{% else %}color:#ef9a9a{% endif %}">
+          {{ '✅' if ml_cache.quality_score >= 80 else ('⚠️' if ml_cache.quality_score >= 60 else '❌') }} Quality: {{ ml_cache.quality_score }}/100
+        </div>
+        {% endif %}
+        <button class="dl-btn dl-ml" onclick="dlCountdown(this,'/download/{{ movie.id }}/ml')"><div class="btn-fill"></div><span class="btn-txt">⬇ Malayalam</span></button><button onclick="openRateModal('ml','Malayalam')" class="dl-btn rate-btn">⭐ Rate</button>
         {% else %}<div class="dl-btn pend" id="ml-st">⏳ Translating…</div><div class="prog-bar"><div class="prog-fill" id="ml-bar"></div></div>{% endif %}
       </div>
 

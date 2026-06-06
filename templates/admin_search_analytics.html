@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Search Analytics – Admin{% endblock %}
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<style>
+.aw{max-width:1200px;margin:1.25rem auto;padding:0 1rem}
+.atb{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.25rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem}
+.atb h1{font-size:1.2rem;font-weight:800}
+.anav{display:flex;gap:.4rem;flex-wrap:wrap}
+.anav a{background:#1a1a1a;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:.38rem .85rem;text-decoration:none;font-size:.8rem;transition:all .2s}
+.anav a:hover{color:#fff;border-color:#555}
+.anav a.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.sg{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.65rem;margin-bottom:1.25rem}
+.sc{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:.85rem 1rem;position:relative;overflow:hidden}
+.sc::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.sc.r::before{background:var(--accent)}.sc.b::before{background:#1565c0}.sc.g::before{background:#2e7d32}.sc.y::before{background:#f9a825}
+.sv{font-size:1.5rem;font-weight:800;line-height:1;margin-bottom:.2rem}
+.sl{font-size:.72rem;color:var(--muted)}
+.chart-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.1rem 1.25rem;margin-bottom:1.25rem}
+.chart-card h3{font-size:.88rem;font-weight:700;margin-bottom:1rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.25rem}
+@media(max-width:700px){.two-col{grid-template-columns:1fr}}
+.q-table{border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.q-thead{background:#1e1e1e;display:grid;grid-template-columns:1fr 80px 80px;padding:.55rem 1rem;font-size:.72rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border)}
+.q-row{display:grid;grid-template-columns:1fr 80px 80px;padding:.62rem 1rem;border-bottom:1px solid var(--border);font-size:.82rem;align-items:center;transition:background .15s}
+.q-row:last-child{border-bottom:none}
+.q-row:hover{background:#1a1a1a}
+.q-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.q-cnt{text-align:center;font-weight:700}
+.q-avg{text-align:center;font-size:.75rem;color:var(--muted)}
+.zero-badge{background:rgba(229,9,20,.12);border:1px solid rgba(229,9,20,.25);color:var(--accent);font-size:.68rem;font-weight:700;border-radius:4px;padding:.12rem .4rem;margin-left:.35rem}
+.opportunity{background:rgba(245,197,24,.08);border:1px solid rgba(245,197,24,.2);border-radius:8px;padding:.6rem .9rem;font-size:.8rem;color:#ffd54f;margin-bottom:1rem}
+</style>
+{% endblock %}
+{% block content %}
+<div class="aw">
+  <div class="atb">
+    <h1>🔍 Search Analytics</h1>
+    <nav class="anav">
+      <a href="/dashboard">📊 Dashboard</a>
+      <a href="/admin/series">📺 Series</a>
+      <a href="/admin/duplicates">🔁 Duplicates</a>
+      <a href="/admin/upload_planner">📅 Planner</a>
+      <a href="/admin/search_analytics" class="active">🔍 Analytics</a>
+      <a href="/logout">🚪 Logout</a>
+    </nav>
+  </div>
+  <!-- Stats -->
+  <div class="sg">
+    <div class="sc b"><div class="sv">{{ total_searches }}</div><div class="sl">Total Searches</div></div>
+    <div class="sc r"><div class="sv">{{ total_zero }}</div><div class="sl">Zero Results</div></div>
+    <div class="sc y"><div class="sv">{{ "%.0f"|format(total_zero/total_searches*100 if total_searches else 0) }}%</div><div class="sl">Miss Rate</div></div>
+    <div class="sc g"><div class="sv">{{ (total_searches - total_zero) }}</div><div class="sl">Successful</div></div>
+  </div>
+  <!-- Zero results = upload opportunities -->
+  {% if zero_results %}
+  <div class="opportunity">
+    💡 <strong>Upload Opportunity:</strong> These {{ zero_results|length }} searches returned no results — they're your highest-priority upload targets.
+  </div>
+  {% endif %}
+  <!-- Daily volume chart -->
+  {% if daily_volume %}
+  <div class="chart-card">
+    <h3>📈 Daily Search Volume (Last 14 Days)</h3>
+    <div style="height:200px"><canvas id="vol-chart"></canvas></div>
+  </div>
+  {% endif %}
+  <div class="two-col">
+    <!-- Top queries -->
+    <div>
+      <div class="chart-card" style="margin-bottom:0">
+        <h3>🔥 Top Searches</h3>
+        <div class="q-table">
+          <div class="q-thead"><div>Query</div><div class="q-cnt">Count</div><div class="q-avg">Avg Results</div></div>
+          {% for q in top_queries[:20] %}
+          <div class="q-row">
+            <div class="q-text">{{ q.query }}</div>
+            <div class="q-cnt">{{ q.cnt }}</div>
+            <div class="q-avg">{{ "%.0f"|format(q.avg_results or 0) }}</div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    <!-- Zero result queries -->
+    <div>
+      <div class="chart-card" style="margin-bottom:0">
+        <h3>❌ Zero-Result Searches <span style="color:var(--muted);font-size:.75rem;text-transform:none;letter-spacing:0">(upload these!)</span></h3>
+        <div class="q-table">
+          <div class="q-thead"><div>Missing Title</div><div class="q-cnt">Searches</div><div></div></div>
+          {% for q in zero_results %}
+          <div class="q-row">
+            <div class="q-text">{{ q.query }}<span class="zero-badge">missing</span></div>
+            <div class="q-cnt" style="color:var(--accent)">{{ q.cnt }}</div>
+            <div><a href="/admin?title={{ q.query|urlencode }}" style="font-size:.7rem;color:var(--muted);text-decoration:none;border:1px solid var(--border);border-radius:4px;padding:.15rem .4rem">➕</a></div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+{% if daily_volume %}
+<script>
+new Chart(document.getElementById('vol-chart'),{
+  type:'line',
+  data:{
+    labels:{{ daily_volume|map(attribute=0)|map('string')|list|tojson }},
+    datasets:[{label:'Searches',data:{{ daily_volume|map(attribute=1)|list|tojson }},
+      borderColor:'#e50914',backgroundColor:'rgba(229,9,20,.12)',
+      borderWidth:2,pointRadius:3,fill:true,tension:.3}]
+  },
+  options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false}},
+    scales:{x:{ticks:{color:'#666',font:{size:10}},grid:{color:'#1e1e1e'}},
+            y:{ticks:{color:'#666',font:{size:10}},grid:{color:'#1e1e1e'}}}}
+});
+</script>
+{% endif %}
+{% endblock %}

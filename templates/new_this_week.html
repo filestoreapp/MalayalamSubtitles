@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}{{ seo_title }}{% endblock %}
+{% block extra_head %}
+<meta name="description" content="{{ seo_desc }}">
+<style>
+.ntw-wrap{max-width:1200px;margin:1.5rem auto;padding:0 1rem}
+.ntw-hero{background:linear-gradient(135deg,#1a0a00,#0d0d0d);border-bottom:1px solid var(--border);padding:1.75rem 1rem;text-align:center;margin-bottom:1.5rem}
+.ntw-hero h1{font-size:clamp(1.4rem,4vw,2rem);font-weight:900;margin-bottom:.4rem}
+.ntw-hero p{color:var(--muted);font-size:.9rem}
+.ntw-hero .badge{display:inline-block;background:var(--accent);color:#fff;font-size:.8rem;font-weight:700;border-radius:20px;padding:.3rem .9rem;margin-top:.5rem}
+.sec-wrap{margin-bottom:2rem}
+.sec-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:.85rem;padding-bottom:.65rem;border-bottom:2px solid var(--border)}
+.sec-head h2{font-size:1rem;font-weight:700}
+.sec-count{font-size:.78rem;color:var(--muted)}
+.empty-sec{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1.5rem;text-align:center;color:var(--muted);font-size:.85rem}
+/* Share row */
+.share-row{display:flex;gap:.5rem;justify-content:center;flex-wrap:wrap;margin-top:1rem}
+.share-btn-link{display:inline-flex;align-items:center;gap:.4rem;border-radius:8px;padding:.45rem 1rem;font-size:.82rem;font-weight:600;text-decoration:none;transition:all .18s}
+.wa{background:#25d366;color:#fff}.wa:hover{background:#20ba5a;color:#fff}
+.tg{background:#0088cc;color:#fff}.tg:hover{background:#0077b3;color:#fff}
+.cp{background:var(--card);border:1px solid var(--border);color:var(--muted)}.cp:hover{color:#fff}
+</style>
+{% endblock %}
+{% block content %}
+<div class="ntw-hero">
+  <h1>🆕 New This Week</h1>
+  <p>Subtitles added between {{ week_ago.strftime('%b %d') }} – today</p>
+  <span class="badge">{{ total }} new title{{ 's' if total != 1 }}</span>
+  <div class="share-row">
+    <a class="share-btn-link wa" href="https://api.whatsapp.com/send?text={{ ('Check out ' + total|string + ' new Malayalam subtitles this week! ' + request.url)|urlencode }}" target="_blank">📱 WhatsApp</a>
+    <a class="share-btn-link tg" href="https://t.me/share/url?url={{ request.url|urlencode }}&text={{ ('🆕 ' + total|string + ' new subtitles this week on MalSubs!')|urlencode }}" target="_blank">✈️ Telegram</a>
+    <button class="share-btn-link cp" onclick="navigator.clipboard.writeText(location.href);this.textContent='✅ Copied!'">🔗 Copy Link</button>
+  </div>
+</div>
+<div class="ntw-wrap">
+  <!-- New Movies -->
+  <div class="sec-wrap">
+    <div class="sec-head">
+      <h2>🎬 New Movies</h2>
+      <span class="sec-count">{{ new_movies|length }} title{{ 's' if new_movies|length != 1 }}</span>
+    </div>
+    {% if new_movies %}
+    <div class="movie-grid">
+      {% for m in new_movies %}
+      <a href="/movie/{{ m.slug or m.id }}" class="movie-card">
+        <img src="{{ m.poster_url or 'https://placehold.co/300x450/1a1a1a/555?text=?' }}" alt="{{ m.title }}" loading="lazy" onerror="this.src='https://placehold.co/300x450/1a1a1a/555?text=?'">
+        <div class="card-body">
+          <div class="card-title">{{ m.title }}</div>
+          <div class="card-meta"><span class="star">⭐</span><span>{{ m.rating or 'N/A' }}</span><span class="badge-type">{{ m.year or '—' }}</span></div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}<div class="empty-sec">No new movies added this week.</div>{% endif %}
+  </div>
+  <!-- New Series -->
+  <div class="sec-wrap">
+    <div class="sec-head">
+      <h2>📺 New Series / Episodes</h2>
+      <span class="sec-count">{{ new_series|length }} series</span>
+    </div>
+    {% if new_series %}
+    <div class="movie-grid">
+      {% for m in new_series %}
+      <a href="/series/{{ m.title|urlencode }}" class="movie-card">
+        <img src="{{ m.poster_url or 'https://placehold.co/300x450/1a1a1a/555?text=?' }}" alt="{{ m.title }}" loading="lazy" onerror="this.src='https://placehold.co/300x450/1a1a1a/555?text=?'">
+        <div class="card-body">
+          <div class="card-title">{{ m.title }}</div>
+          <div class="card-meta"><span class="star">⭐</span><span>{{ m.rating or 'N/A' }}</span><span class="badge-type series">{{ m.year or '—' }}</span></div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}<div class="empty-sec">No new series added this week.</div>{% endif %}
+  </div>
+</div>
+{% endblock %}

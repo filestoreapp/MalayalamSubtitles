@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% block title %}Upload Planner – Admin{% endblock %}
+{% block extra_head %}
+<style>
+.uw{max-width:1200px;margin:1.25rem auto;padding:0 1rem}
+.atb{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.25rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem}
+.atb h1{font-size:1.2rem;font-weight:800}
+.anav{display:flex;gap:.4rem;flex-wrap:wrap}
+.anav a{background:#1a1a1a;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:.38rem .85rem;text-decoration:none;font-size:.8rem;transition:all .2s}
+.anav a:hover{color:#fff;border-color:#555}
+.anav a.active{background:var(--accent);border-color:var(--accent);color:#fff}
+/* Add form */
+.add-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.25rem;margin-bottom:1.25rem}
+.add-card h2{font-size:.95rem;font-weight:700;margin-bottom:.9rem}
+.fg{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.75rem}
+.fg-full{grid-column:1/-1}
+.fl{font-size:.72rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.28rem;display:block}
+.fi{background:#1a1a1a;border:1px solid var(--border);color:var(--text);border-radius:8px;padding:.48rem .75rem;width:100%;font-size:.85rem;font-family:inherit}
+.fi:focus{outline:none;border-color:var(--accent)}
+/* Overdue alert */
+.overdue-alert{background:rgba(229,9,20,.1);border:1px solid rgba(229,9,20,.3);border-radius:10px;padding:.75rem 1rem;margin-bottom:1rem;font-size:.85rem;color:#ef9a9a}
+/* Plan table */
+.plan-section{margin-bottom:1.5rem}
+.plan-section h2{font-size:.92rem;font-weight:700;margin-bottom:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.plan-card{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:.6rem;display:flex;align-items:stretch}
+.plan-card.overdue{border-color:rgba(229,9,20,.4)}
+.plan-card.done{opacity:.6}
+.plan-pri{width:6px;flex-shrink:0}
+.pri-1{background:var(--accent)}.pri-2{background:#1565c0}.pri-3{background:#555}
+.plan-poster{width:48px;height:72px;object-fit:cover;flex-shrink:0;border-right:1px solid var(--border)}
+.plan-body{flex:1;padding:.75rem 1rem;min-width:0}
+.plan-title{font-size:.9rem;font-weight:700;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin-bottom:.2rem}
+.plan-meta{font-size:.72rem;color:var(--muted);margin-bottom:.4rem}
+.plan-notes{font-size:.75rem;color:#aaa;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.plan-actions{display:flex;flex-direction:column;justify-content:center;gap:.3rem;padding:.65rem;border-left:1px solid var(--border);flex-shrink:0}
+.pa{font-size:.7rem;border-radius:5px;padding:.25rem .55rem;border:1px solid var(--border);color:var(--muted);text-decoration:none;cursor:pointer;background:transparent;white-space:nowrap;transition:all .15s;text-align:center}
+.pa:hover{color:#fff;border-color:#555}
+.pa.start{border-color:#1565c0;color:#64b5f6}
+.pa.done{border-color:#2e7d32;color:#81c784}
+.pa.del{border-color:#3a1010;color:#ff6b6b}
+.pa.del:hover{background:rgba(229,9,20,.18)}
+.status-badge{font-size:.68rem;font-weight:700;border-radius:4px;padding:.15rem .4rem}
+.sb-planned{background:rgba(100,181,246,.15);color:#64b5f6}
+.sb-inprogress{background:rgba(249,168,37,.15);color:#ffd54f}
+.sb-done{background:rgba(129,199,132,.15);color:#81c784}
+.sb-cancelled{background:#1a1a1a;color:#555}
+.date-chip{display:inline-flex;align-items:center;gap:.25rem;font-size:.7rem;border-radius:4px;padding:.15rem .45rem;background:#1a1a1a;border:1px solid var(--border);color:var(--muted)}
+.date-chip.overdue{background:rgba(229,9,20,.1);border-color:rgba(229,9,20,.3);color:#ef9a9a}
+.date-chip.today{background:rgba(245,197,24,.1);border-color:rgba(245,197,24,.3);color:#ffd54f}
+</style>
+{% endblock %}
+{% block content %}
+<div class="uw">
+  <div class="atb">
+    <h1>📅 Upload Planner</h1>
+    <nav class="anav">
+      <a href="/dashboard">📊 Dashboard</a>
+      <a href="/admin">➕ Upload</a>
+      <a href="/admin/series">📺 Series</a>
+      <a href="/admin/upload_planner" class="active">📅 Planner</a>
+      <a href="/admin/search_analytics">🔍 Analytics</a>
+      <a href="/logout">🚪 Logout</a>
+    </nav>
+  </div>
+
+  {% if overdue %}
+  <div class="overdue-alert">⚠️ <strong>{{ overdue|length }} overdue plan{{ 's' if overdue|length>1 }}</strong> — these were scheduled for a past date.</div>
+  {% endif %}
+
+  <!-- Add new plan -->
+  <div class="add-card">
+    <h2>➕ Add to Plan</h2>
+    <form action="/admin/upload_plan/add" method="post">
+      <div class="fg">
+        <div class="fg-full">
+          <label class="fl">Title *</label>
+          <input class="fi" type="text" name="title" placeholder="Movie or series title" required>
+        </div>
+        <div>
+          <label class="fl">IMDb ID</label>
+          <input class="fi" type="text" name="imdb_id" placeholder="tt1375666">
+        </div>
+        <div>
+          <label class="fl">Type</label>
+          <select class="fi" name="media_type">
+            <option value="movie">🎬 Movie</option>
+            <option value="series">📺 Series</option>
+          </select>
+        </div>
+        <div>
+          <label class="fl">Target Date</label>
+          <input class="fi" type="date" name="scheduled_date" value="{{ today.isoformat() }}">
+        </div>
+        <div>
+          <label class="fl">Priority</label>
+          <select class="fi" name="priority">
+            <option value="1">🔴 High</option>
+            <option value="2" selected>🟡 Normal</option>
+            <option value="3">⚪ Low</option>
+          </select>
+        </div>
+        <div>
+          <label class="fl">Poster URL</label>
+          <input class="fi" type="url" name="poster_url" placeholder="https://…">
+        </div>
+        <div class="fg-full">
+          <label class="fl">Notes</label>
+          <input class="fi" type="text" name="notes" placeholder="Any notes…" maxlength="500">
+        </div>
+      </div>
+      <button type="submit" class="btn-red" style="margin-top:.85rem">Add to Plan</button>
+    </form>
+  </div>
+
+  <!-- Upcoming -->
+  {% if upcoming %}
+  <div class="plan-section">
+    <h2>📋 Upcoming ({{ upcoming|length }})</h2>
+    {% for p in upcoming %}
+    {% set is_overdue = p.scheduled_date and p.scheduled_date < today and p.status == 'Planned' %}
+    <div class="plan-card {{ 'overdue' if is_overdue }}">
+      <div class="plan-pri pri-{{ p.priority }}"></div>
+      {% if p.poster_url %}
+      <img class="plan-poster" src="{{ p.poster_url }}" alt="{{ p.title }}" onerror="this.style.display='none'">
+      {% endif %}
+      <div class="plan-body">
+        <div class="plan-title">{{ p.title }}</div>
+        <div class="plan-meta">
+          {{ '🎬' if p.media_type=='movie' else '📺' }} {{ p.media_type }}
+          {% if p.imdb_id %} · <a href="https://www.imdb.com/title/{{ p.imdb_id }}" target="_blank" style="color:var(--gold)">{{ p.imdb_id }}</a>{% endif %}
+          &nbsp;
+          <span class="status-badge sb-{{ p.status.lower().replace(' ','') }}">{{ p.status }}</span>
+          &nbsp;
+          {% if p.scheduled_date %}
+          <span class="date-chip {{ 'overdue' if is_overdue else ('today' if p.scheduled_date == today) }}">
+            📅 {{ p.scheduled_date.strftime('%b %d, %Y') }}{{ ' ⚠️ Overdue' if is_overdue else (' · Today' if p.scheduled_date == today else '') }}
+          </span>
+          {% endif %}
+        </div>
+        {% if p.notes %}<div class="plan-notes">📝 {{ p.notes }}</div>{% endif %}
+      </div>
+      <div class="plan-actions">
+        <a href="/admin?title={{ p.title|urlencode }}{% if p.imdb_id %}&imdb={{ p.imdb_id }}{% endif %}" class="pa start">➕ Upload</a>
+        <button class="pa done" onclick="updateStatus({{ p.id }},'Done')">✅ Done</button>
+        <button class="pa" onclick="updateStatus({{ p.id }},'InProgress')">⚙️ WIP</button>
+        <form action="/admin/upload_plan/delete/{{ p.id }}" method="post" style="margin:0">
+          <button type="submit" class="pa del" onclick="return confirm('Remove from plan?')">🗑</button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Done -->
+  {% if done %}
+  <div class="plan-section">
+    <h2>✅ Completed ({{ done|length }})</h2>
+    {% for p in done[:10] %}
+    <div class="plan-card done">
+      <div class="plan-pri pri-{{ p.priority }}"></div>
+      <div class="plan-body">
+        <div class="plan-title">{{ p.title }} <span class="status-badge sb-done">Done</span></div>
+        <div class="plan-meta">{{ '🎬' if p.media_type=='movie' else '📺' }} {{ p.media_type }}{% if p.scheduled_date %} · {{ p.scheduled_date.strftime('%b %d') }}{% endif %}</div>
+      </div>
+      <div class="plan-actions">
+        <form action="/admin/upload_plan/delete/{{ p.id }}" method="post" style="margin:0">
+          <button type="submit" class="pa del">🗑</button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if not plans %}
+  <div style="text-align:center;padding:3rem;background:var(--card);border:1px solid var(--border);border-radius:12px">
+    <div style="font-size:2.5rem">📅</div>
+    <p style="margin-top:.75rem;color:var(--muted)">No plans yet. Add titles you intend to upload above.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+function updateStatus(id, status){
+  const fd = new FormData();
+  fd.append('status', status);
+  fetch('/admin/upload_plan/update/'+id, {method:'POST', body:fd})
+    .then(r=>r.json()).then(d=>{ if(d.ok) location.reload(); });
+}
+</script>
+{% endblock %}

@@ -112,6 +112,27 @@
   .st-Failed     { background: rgba(229,9,20,.15); color: var(--accent); }
   .st-Completed  { background: rgba(76,175,80,.15); color: #81c784; }
 
+  /* ── HF Health Widget ── */
+  .hf-widget{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.1rem 1.25rem;margin-bottom:1.25rem}
+  .hf-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;flex-wrap:wrap;gap:.5rem}
+  .hf-head h2{font-size:.95rem;font-weight:700}
+  .hf-status-row{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}
+  .hf-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+  .hf-dot.online{background:#4caf50;box-shadow:0 0 8px rgba(76,175,80,.5)}
+  .hf-dot.offline{background:#c62828;box-shadow:0 0 8px rgba(198,40,40,.5)}
+  .hf-dot.timeout{background:#f9a825}
+  .hf-dot.unknown{background:#555}
+  .hf-status-text{font-size:.88rem;font-weight:700}
+  .hf-meta{font-size:.75rem;color:var(--muted)}
+  .hf-stats{display:flex;gap:.65rem;flex-wrap:wrap;margin-top:.65rem}
+  .hfs{background:#111;border:1px solid var(--border);border-radius:8px;padding:.5rem .75rem;font-size:.8rem;flex:1;min-width:100px}
+  .hfs .v{font-size:1.1rem;font-weight:800;margin-bottom:.1rem}
+  .hfs .l{font-size:.68rem;color:var(--muted)}
+  .hf-wake-btn{background:var(--accent);border:none;color:#fff;border-radius:7px;padding:.38rem .85rem;font-size:.78rem;cursor:pointer;transition:all .18s}
+  .hf-wake-btn:hover{background:var(--acc2)}
+  .hf-refresh-btn{background:none;border:1px solid var(--border);color:var(--muted);border-radius:7px;padding:.38rem .75rem;font-size:.78rem;cursor:pointer;transition:all .18s}
+  .hf-refresh-btn:hover{border-color:#555;color:#fff}
+
   /* ── Translation Queue Widget ── */
   .tq-widget{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.25rem;margin-bottom:1.25rem;position:relative;overflow:hidden}
   .tq-widget::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--accent),#ff6b35)}
@@ -181,10 +202,37 @@
       <a href="/admin">➕ Upload</a>
       <a href="/admin/series">📺 Series</a>
       <a href="/admin/duplicates">🔁 Duplicates</a>
+      <a href="/admin/upload_planner">📅 Planner</a>
+      <a href="/admin/search_analytics">🔍 Analytics</a>
       <a href="/admin/requests">🙋 Requests{% if pending_requests %} <span style="background:var(--accent);color:#fff;border-radius:10px;padding:.05rem .35rem;font-size:.65rem">{{ pending_requests }}</span>{% endif %}</a>
       <a href="/admin/export_csv">📥 CSV</a>
       <a href="/logout">🚪 Logout</a>
     </nav>
+  </div>
+
+  <!-- ── HF Worker Health Monitor ── -->
+  <div class="hf-widget">
+    <div class="hf-head">
+      <h2>🤖 HF Translation Worker</h2>
+      <div style="display:flex;gap:.4rem">
+        <button class="hf-refresh-btn" onclick="loadHFHealth(true)">🔄 Refresh</button>
+        <button class="hf-wake-btn" onclick="wakeWorker()" id="wake-btn" style="display:none">⚡ Wake Up</button>
+      </div>
+    </div>
+    <div class="hf-status-row">
+      <div class="hf-dot unknown" id="hf-dot"></div>
+      <span class="hf-status-text" id="hf-status-text">Checking…</span>
+      <span class="hf-meta" id="hf-response-time"></span>
+    </div>
+    <div class="hf-stats" id="hf-stats" style="display:none">
+      <div class="hfs"><div class="v" id="hf-queue">—</div><div class="l">Queue Depth</div></div>
+      <div class="hfs"><div class="v" id="hf-inflight">—</div><div class="l">In Flight</div></div>
+      <div class="hfs"><div class="v" id="hf-workers">—</div><div class="l">Workers</div></div>
+      <div class="hfs"><div class="v" id="hf-completed">—</div><div class="l">Completed</div></div>
+      <div class="hfs"><div class="v" id="hf-failed">—</div><div class="l">Failed</div></div>
+    </div>
+    <div id="hf-error-msg" style="margin-top:.6rem;font-size:.78rem;color:#ef9a9a;display:none"></div>
+    <div style="margin-top:.5rem;font-size:.7rem;color:#444" id="hf-checked-at"></div>
   </div>
 
   <!-- ── Translation Queue Widget ── -->
@@ -362,6 +410,33 @@
         <div style="font-size:1.6rem;margin-bottom:.4rem">🎭</div>
         <div style="font-weight:700;font-size:.92rem">Genre Pages</div>
         <div style="font-size:.75rem;color:var(--muted);margin-top:.2rem">SEO landing pages · All genres live</div>
+      </div>
+    </a>
+
+    <a href="/admin/upload_planner" style="text-decoration:none">
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.1rem;transition:border-color .18s;position:relative;overflow:hidden">
+        <div style="position:absolute;top:0;left:0;right:0;height:3px;background:#00695c"></div>
+        <div style="font-size:1.6rem;margin-bottom:.4rem">📅</div>
+        <div style="font-weight:700;font-size:.92rem">Upload Planner</div>
+        <div style="font-size:.75rem;color:var(--muted);margin-top:.2rem">Content calendar · Schedule uploads</div>
+      </div>
+    </a>
+
+    <a href="/admin/search_analytics" style="text-decoration:none">
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.1rem;transition:border-color .18s;position:relative;overflow:hidden">
+        <div style="position:absolute;top:0;left:0;right:0;height:3px;background:#0277bd"></div>
+        <div style="font-size:1.6rem;margin-bottom:.4rem">🔍</div>
+        <div style="font-weight:700;font-size:.92rem">Search Analytics</div>
+        <div style="font-size:.75rem;color:var(--muted);margin-top:.2rem">Top searches · Zero-result gaps</div>
+      </div>
+    </a>
+
+    <a href="/new-this-week" style="text-decoration:none">
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.1rem;transition:border-color .18s;position:relative;overflow:hidden">
+        <div style="position:absolute;top:0;left:0;right:0;height:3px;background:#e65100"></div>
+        <div style="font-size:1.6rem;margin-bottom:.4rem">🆕</div>
+        <div style="font-weight:700;font-size:.92rem">New This Week</div>
+        <div style="font-size:.75rem;color:var(--muted);margin-top:.2rem">Public weekly page · SEO indexed</div>
       </div>
     </a>
 
@@ -582,7 +657,65 @@ fetch('/api/analytics_data')
   })
   .catch(err => console.warn('Analytics load failed:', err));
 
-// ── Translation Queue Widget ─────────────────────────────────────────────────
+// ── HF Worker Health Monitor ──────────────────────────────────────────────────
+function loadHFHealth(force){
+  const dot    = document.getElementById('hf-dot');
+  const stxt   = document.getElementById('hf-status-text');
+  const rtime  = document.getElementById('hf-response-time');
+  const stats  = document.getElementById('hf-stats');
+  const errMsg = document.getElementById('hf-error-msg');
+  const wakeBtn= document.getElementById('wake-btn');
+  const checkedAt = document.getElementById('hf-checked-at');
+  const url = '/api/hf_health' + (force ? '?force=1' : '');
+  fetch(url).then(r=>r.json()).then(d=>{
+    dot.className = 'hf-dot ' + (d.status||'unknown');
+    if(d.status==='online'){
+      stxt.textContent = '🟢 Online';
+      stxt.style.color = '#81c784';
+      const ms = d.data?.response_ms;
+      rtime.textContent = ms ? `(${ms}ms)` : '';
+      stats.style.display = 'flex';
+      document.getElementById('hf-queue').textContent     = d.data?.queue_depth ?? '—';
+      document.getElementById('hf-inflight').textContent  = d.data?.in_flight ?? '—';
+      document.getElementById('hf-workers').textContent   = d.data?.workers ?? '—';
+      document.getElementById('hf-completed').textContent = d.data?.completed ?? '—';
+      document.getElementById('hf-failed').textContent    = d.data?.failed ?? '—';
+      errMsg.style.display = 'none';
+      wakeBtn.style.display = 'none';
+    } else if(d.status==='not_configured'){
+      stxt.textContent = '⚙️ HF_WORKER_URL not set';
+      stxt.style.color = '#888';
+      stats.style.display = 'none';
+      wakeBtn.style.display = 'none';
+    } else {
+      const labels = {offline:'🔴 Offline',timeout:'🟡 Timeout',error:'🟠 Error'};
+      stxt.textContent = labels[d.status] || '❓ Unknown';
+      stxt.style.color = '#ef9a9a';
+      stats.style.display = 'none';
+      wakeBtn.style.display = '';
+      errMsg.textContent = d.data?.error || `Status: ${d.status}`;
+      errMsg.style.display = 'block';
+    }
+    checkedAt.textContent = 'Checked ' + new Date().toLocaleTimeString();
+  }).catch(()=>{
+    stxt.textContent = '❓ Could not reach health endpoint';
+    stxt.style.color = '#888';
+  });
+}
+
+function wakeWorker(){
+  const btn = document.getElementById('wake-btn');
+  btn.textContent = '⏳ Waking…'; btn.disabled = true;
+  // Sending a dummy request to the HF space wakes it up from sleep
+  fetch('/api/hf_health?force=1').then(()=>{
+    setTimeout(()=>{ loadHFHealth(true); btn.textContent='⚡ Wake Up'; btn.disabled=false; }, 3000);
+  });
+}
+
+loadHFHealth(false);
+setInterval(()=>loadHFHealth(false), 30000);
+
+// ── Translation Queue Widget ──────────────────────────────────────────────────
 let tqTimer = null;
 
 function loadTranslationStats(){
