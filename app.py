@@ -16,14 +16,6 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, or_, cast, Float
 from sqlalchemy.orm import joinedload
 
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not session.get('logged_in'):
-            return redirect(url_for('login'))
-        return f(*args, **kwargs)
-    return decorated_function
-
 app = Flask(__name__)
 
 # ------------------ CONFIG ------------------
@@ -109,7 +101,7 @@ class AdminLog(db.Model):
 class SearchLog(db.Model):
     """Every search query + result count for analytics."""
     id            = db.Column(db.Integer, primary_key=True)
-    query         = db.Column(db.String(300))
+    search_query  = db.Column(db.String(300))
     results_count = db.Column(db.Integer, default=0)
     searched_at   = db.Column(db.DateTime, server_default=func.now())
 
@@ -823,7 +815,7 @@ def index():
         ).order_by(Movie.id.desc()).paginate(page=page, per_page=12, error_out=False)
         # Log search query
         try:
-            db.session.add(SearchLog(query=search_query[:300],
+            db.session.add(SearchLog(search_query=search_query[:300],
                                      results_count=pagination.total))
             db.session.commit()
         except Exception:
@@ -2462,18 +2454,18 @@ def api_generate_seo_desc(movie_id):
 @login_required
 def search_analytics():
     from datetime import datetime, timedelta
-    top_queries = (db.session.query(SearchLog.query,
+    top_queries = (db.session.query(SearchLog.search_query,
         func.count(SearchLog.id).label('cnt'),
         func.avg(SearchLog.results_count).label('avg_results'))
-        .group_by(SearchLog.query).order_by(func.count(SearchLog.id).desc()).limit(50).all())
-    zero_results = (db.session.query(SearchLog.query,
+        .group_by(SearchLog.search_query).order_by(func.count(SearchLog.id).desc()).limit(50).all())
+    zero_results = (db.session.query(SearchLog.search_query,
         func.count(SearchLog.id).label('cnt'))
-        .filter(SearchLog.results_count==0).group_by(SearchLog.query)
+        .filter(SearchLog.results_count==0).group_by(SearchLog.search_query)
         .order_by(func.count(SearchLog.id).desc()).limit(30).all())
     try:
         daily_volume = db.session.execute(db.text(
             "SELECT DATE(searched_at) as day, COUNT(*) as cnt FROM search_log "
-            "WHERE searched_at >= :c GROUP BY day ORDER BY day ASC"),
+            "WHERE searched_at >= :cutoff GROUP BY day ORDER BY day ASC"),
             {"c": datetime.utcnow()-timedelta(days=14)}).fetchall()
     except Exception:
         daily_volume = []
