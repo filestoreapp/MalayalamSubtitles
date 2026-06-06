@@ -2555,7 +2555,7 @@ def trigger_telegram(movie_id):
                                for t in clean_category.split(',') if t.strip()]) or "#General"
     footer         = ("\n\n━━━━━━━━━━━━━━━━━━━━\n"
                       "📢 *Join Channel:* @malayalam\\_sub1\n"
-                      "💬 *Request Subtitles:* @Subrequest\\_bot")
+                      "💬 *Request Subtitles:* @SubmanagerRobot")
 
     safe_title  = movie.title or "Unknown Title"
     safe_rating = movie.rating or "N/A"
