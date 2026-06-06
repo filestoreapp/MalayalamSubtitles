@@ -16,14 +16,6 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, or_, cast, Float
 from sqlalchemy.orm import joinedload
 
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not session.get('logged_in'):
-            return redirect(url_for('login'))
-        return f(*args, **kwargs)
-    return decorated_function
-
 app = Flask(__name__)
 
 # ------------------ CONFIG ------------------
@@ -69,12 +61,14 @@ class Movie(db.Model):
     created_at = db.Column(db.DateTime, server_default=func.now())
 
 class TranslationCache(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    movie_id = db.Column(db.Integer, db.ForeignKey('movie.id', ondelete='CASCADE'))
-    language = db.Column(db.String(10))
+    id             = db.Column(db.Integer, primary_key=True)
+    movie_id       = db.Column(db.Integer, db.ForeignKey('movie.id', ondelete='CASCADE'))
+    language       = db.Column(db.String(10))
     translated_srt = db.Column(db.Text)
-    downloads = db.Column(db.Integer, default=0)
-    movie = db.relationship('Movie', backref=db.backref('translations', cascade='all, delete-orphan'))
+    downloads      = db.Column(db.Integer, default=0)
+    quality_score  = db.Column(db.Integer, nullable=True)   # 0-100; NULL = not yet checked
+    quality_flags  = db.Column(db.Text, nullable=True)      # JSON list of issue strings
+    movie          = db.relationship('Movie', backref=db.backref('translations', cascade='all, delete-orphan'))
 
 class TranslationJob(db.Model):
     id         = db.Column(db.Integer, primary_key=True)
@@ -103,6 +97,44 @@ class AdminLog(db.Model):
     action = db.Column(db.String(200))
     details = db.Column(db.Text)
     ip_address = db.Column(db.String(45))
+
+class SearchLog(db.Model):
+    """Every search query + result count for analytics."""
+    id            = db.Column(db.Integer, primary_key=True)
+    query         = db.Column(db.String(300))
+    results_count = db.Column(db.Integer, default=0)
+    searched_at   = db.Column(db.DateTime, server_default=func.now())
+
+class DownloadLog(db.Model):
+    """Per-download log — used for weekly trending."""
+    id            = db.Column(db.Integer, primary_key=True)
+    movie_id      = db.Column(db.Integer, db.ForeignKey('movie.id', ondelete='CASCADE'))
+    language      = db.Column(db.String(10))
+    downloaded_at = db.Column(db.DateTime, server_default=func.now())
+    movie         = db.relationship('Movie', backref=db.backref('download_logs', cascade='all, delete-orphan'))
+
+class UploadPlan(db.Model):
+    """Content calendar — scheduled upload intentions."""
+    id             = db.Column(db.Integer, primary_key=True)
+    title          = db.Column(db.String(200))
+    imdb_id        = db.Column(db.String(20))
+    media_type     = db.Column(db.String(10), default='movie')
+    scheduled_date = db.Column(db.Date)
+    status         = db.Column(db.String(20), default='Planned')  # Planned|InProgress|Done|Cancelled
+    notes          = db.Column(db.Text)
+    poster_url     = db.Column(db.String(500))
+    priority       = db.Column(db.Integer, default=2)             # 1=high, 2=normal, 3=low
+    created_at     = db.Column(db.DateTime, server_default=func.now())
+
+class TelegramSubscription(db.Model):
+    """User subscriptions — notify when a title's subtitle is ready."""
+    id          = db.Column(db.Integer, primary_key=True)
+    chat_id     = db.Column(db.String(50), index=True)
+    movie_title = db.Column(db.String(200))
+    imdb_id     = db.Column(db.String(20))
+    language    = db.Column(db.String(10), default='ml')
+    notified    = db.Column(db.Boolean, default=False)
+    created_at  = db.Column(db.DateTime, server_default=func.now())
 
 # ------------------ NEW MODELS ------------------
 
@@ -152,6 +184,160 @@ def get_session_id():
     if 'user_id' not in session:
         session['user_id'] = str(uuid.uuid4())
     return session['user_id']
+
+# ══════════════════════════════════════════════════════════════
+# SEO DESCRIPTION GENERATOR
+# ══════════════════════════════════════════════════════════════
+
+def generate_seo_description(movie) -> str:
+    """
+    Generate an SEO-optimised subtitle page description.
+    If ANTHROPIC_API_KEY is set, enhances with Claude.
+    Falls back to a clean template-based description.
+    """
+    genres = (movie.category or '').replace('SilentMode', '').strip(', ')
+    genre_str = ', '.join(g.strip() for g in genres.split(',') if g.strip())[:60]
+    year_str   = f"({movie.year}) " if movie.year else ""
+    rating_str = (f"IMDb {movie.rating} " if movie.rating
+                  and movie.rating not in ('N/A', '0') else "")
+    langs = "Malayalam, Tamil and Hindi"
+
+    if movie.media_type == 'series':
+        base = (f"Download free {langs} subtitles for {movie.title} "
+                f"Season {movie.season or 1}. {genre_str} series. "
+                f"High-quality SRT with perfect sync. Free download.")
+    else:
+        base = (f"Download free {langs} subtitles for "
+                f"{movie.title} {year_str}— {rating_str}"
+                f"{genre_str} movie. Perfect sync SRT. Free download.")
+
+    # Optional: Claude enhancement
+    anthropic_key = os.environ.get('ANTHROPIC_API_KEY')
+    if anthropic_key and movie.plot:
+        try:
+            import anthropic
+            client  = anthropic.Anthropic(api_key=anthropic_key)
+            prompt  = (
+                f"Write a 1-sentence SEO meta description (max 155 chars) for a subtitle "
+                f"download page. The page is for: '{movie.title}' {year_str}({genre_str}). "
+                f"Plot summary: {movie.plot[:200]}. "
+                f"Focus on: Malayalam/Tamil/Hindi subtitle download, free, SRT format. "
+                f"Be concise and keyword-rich. Return ONLY the description text."
+            )
+            resp = client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=100,
+                messages=[{"role": "user", "content": prompt}]
+            )
+            enhanced = resp.content[0].text.strip().strip('"').strip("'")
+            if 10 < len(enhanced) < 160:
+                return enhanced
+        except Exception as e:
+            print(f"Claude SEO gen failed: {e}")
+
+    return base[:300]
+
+
+# ══════════════════════════════════════════════════════════════
+# TRANSLATION QUALITY CHECKER
+# ══════════════════════════════════════════════════════════════
+
+def check_translation_quality(english_srt: str, translated_srt: str,
+                               language: str) -> tuple:
+    """
+    Returns (score: int 0-100, flags: list[str]).
+    Score 90-100 = good, 70-89 = acceptable, <70 = needs review.
+    """
+    import json
+    flags = []
+    score = 100
+
+    en_blocks = re.split(r'\n\s*\n', english_srt.strip())
+    tr_blocks = re.split(r'\n\s*\n', translated_srt.strip())
+    en_count  = len(en_blocks)
+    tr_count  = len(tr_blocks)
+
+    # 1. Block count ratio
+    if en_count > 0:
+        ratio = tr_count / en_count
+        if ratio < 0.70:
+            flags.append(f"Only {int(ratio*100)}% of subtitle blocks translated (expected ≥70%)")
+            score -= 35
+        elif ratio < 0.85:
+            flags.append(f"Partial translation: {int(ratio*100)}% blocks covered")
+            score -= 15
+
+    # 2. File size ratio
+    en_bytes = len(english_srt.encode('utf-8'))
+    tr_bytes = len(translated_srt.encode('utf-8'))
+    if en_bytes > 0:
+        sz_ratio = tr_bytes / en_bytes
+        if sz_ratio < 0.35:
+            flags.append(f"File size too small ({sz_ratio:.2f}x English) — possible truncation")
+            score -= 25
+        elif sz_ratio < 0.55:
+            flags.append(f"File size low ({sz_ratio:.2f}x English)")
+            score -= 10
+
+    # 3. English leak check (for non-EN targets)
+    if language != 'en':
+        # Sample the translated text (middle 20 blocks)
+        sample_start = max(0, tr_count // 2 - 10)
+        sample = '\n'.join(tr_blocks[sample_start:sample_start + 20])
+        en_words = re.findall(r'\b[a-zA-Z]{5,}\b', sample)
+        ignore   = {'season', 'episode', 'subtitle', 'english', 'really', 'about',
+                    'would', 'could', 'should', 'their', 'there', 'where', 'which',
+                    'other', 'before', 'after', 'these', 'those', 'being'}
+        suspect  = [w for w in en_words if w.lower() not in ignore]
+        if len(suspect) > 30:
+            flags.append(f"High English word leakage ({len(suspect)} words) in sample — check sync")
+            score -= 15
+        elif len(suspect) > 15:
+            flags.append(f"Some English words in translation ({len(suspect)}) — minor issue")
+            score -= 5
+
+    return max(0, min(100, score)), flags
+
+
+# ══════════════════════════════════════════════════════════════
+# HF WORKER HEALTH CHECK
+# ══════════════════════════════════════════════════════════════
+
+_hf_health_cache = {"status": "unknown", "data": {}, "checked_at": 0}
+
+def check_hf_health(force: bool = False) -> dict:
+    """Ping the HF worker /api/status endpoint. Cache result for 30s."""
+    now = time.time()
+    if not force and now - _hf_health_cache["checked_at"] < 30:
+        return _hf_health_cache
+
+    if not HF_WORKER_URL:
+        _hf_health_cache.update({"status": "not_configured", "data": {}, "checked_at": now})
+        return _hf_health_cache
+
+    # Derive status URL from worker URL
+    base = HF_WORKER_URL.rsplit('/api/', 1)[0]
+    status_url = f"{base}/api/status"
+    try:
+        t0   = time.time()
+        resp = requests.get(status_url, timeout=8)
+        ms   = round((time.time() - t0) * 1000)
+        if resp.status_code == 200:
+            data = resp.json()
+            data['response_ms'] = ms
+            _hf_health_cache.update({"status": "online", "data": data, "checked_at": now})
+        else:
+            _hf_health_cache.update({
+                "status": "error", "checked_at": now,
+                "data": {"http_status": resp.status_code, "response_ms": ms}
+            })
+    except requests.exceptions.Timeout:
+        _hf_health_cache.update({"status": "timeout", "data": {}, "checked_at": now})
+    except Exception as e:
+        _hf_health_cache.update({"status": "offline", "data": {"error": str(e)}, "checked_at": now})
+
+    return _hf_health_cache
+
 
 # ------------------ CACHED CATEGORIES ------------------
 _categories_cache = {'data': [], 'last_update': 0}
@@ -451,6 +637,43 @@ def translation_callback():
             except Exception as e:
                 print(f"⚠️ Auto Telegram post failed: {e}")
 
+    # Quality check when a translation completes
+    if status in ('Completed', 'Success') and movie_id and language:
+        def run_quality_check(mid, lang):
+            with app.app_context():
+                try:
+                    cache = TranslationCache.query.filter_by(
+                        movie_id=mid, language=lang).first()
+                    movie = Movie.query.get(mid)
+                    if not cache or not movie or not movie.english_srt:
+                        return
+                    # Fetch English SRT
+                    if movie.english_srt.startswith('http'):
+                        en_resp = requests.get(movie.english_srt, timeout=20)
+                        english_srt = en_resp.text
+                    else:
+                        english_srt = movie.english_srt
+                    # Fetch translated SRT
+                    if cache.translated_srt.startswith('http'):
+                        tr_resp = requests.get(cache.translated_srt, timeout=20)
+                        translated_srt = tr_resp.text
+                    else:
+                        translated_srt = cache.translated_srt
+                    score, flags = check_translation_quality(
+                        english_srt, translated_srt, lang)
+                    import json as _json
+                    cache.quality_score = score
+                    cache.quality_flags = _json.dumps(flags)
+                    db.session.commit()
+                    print(f"✅ Quality check: movie {mid} [{lang}] = {score}/100 "
+                          f"({'OK' if score >= 80 else 'NEEDS REVIEW'})")
+                    # Notify subscribers
+                    notify_telegram_subscribers(mid, lang)
+                except Exception as e:
+                    print(f"Quality check failed: {e}")
+        threading.Thread(target=run_quality_check,
+                        args=(movie_id, language), daemon=True).start()
+
     # Every callback frees a slot — dispatch next best job immediately
     threading.Thread(target=dispatch_pending_jobs, daemon=True).start()
 
@@ -590,6 +813,13 @@ def index():
             (Movie.title.ilike(f'%{search_query}%')) |
             (Movie.category.ilike(f'%{search_query}%'))
         ).order_by(Movie.id.desc()).paginate(page=page, per_page=12, error_out=False)
+        # Log search query
+        try:
+            db.session.add(SearchLog(query=search_query[:300],
+                                     results_count=pagination.total))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
         return render_template('index.html',
                                pagination=pagination,
                                search_query=search_query,
@@ -777,6 +1007,13 @@ def download(movie_id, language):
         srt_data = cache.translated_srt
         cache.downloads = (cache.downloads or 0) + 1
         db.session.commit()
+
+    # Log this download for weekly trending
+    try:
+        db.session.add(DownloadLog(movie_id=movie_id, language=language))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
 
     if srt_data.startswith('http'):
         try:
@@ -2048,6 +2285,245 @@ def admin():
         return redirect(url_for('dashboard'))
 
     return render_template('admin.html')
+
+# ══════════════════════════════════════════════════════════════
+# TELEGRAM SUBSCRIBER NOTIFICATIONS
+# ══════════════════════════════════════════════════════════════
+def notify_telegram_subscribers(movie_id: int, language: str):
+    movie = Movie.query.get(movie_id)
+    if not movie: return
+    subs = TelegramSubscription.query.filter_by(notified=False, language=language).filter(
+        db.or_(TelegramSubscription.imdb_id == movie.imdb_id,
+               TelegramSubscription.movie_title.ilike(f'%{movie.title}%'))).all()
+    TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
+    if not TOKEN or not subs: return
+    lang_names = {'ml':'Malayalam','ta':'Tamil','hi':'Hindi','en':'English'}
+    link = f"{WEBSITE_BASE_URL}/movie/{movie.slug or movie.id}"
+    for sub in subs:
+        try:
+            lang_label = lang_names.get(language, language.upper())
+            year_part  = f" ({movie.year})" if movie.year else ""
+            msg = (f"✅ *{lang_label} subtitle ready!*\n\n"
+                   f"🎬 *{movie.title}*{year_part}\n\n"
+                   f"Your requested subtitle is now available!")
+            requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage",
+                json={"chat_id":sub.chat_id,"text":msg,"parse_mode":"Markdown",
+                      "reply_markup":{"inline_keyboard":[[{"text":"📥 Download Now","url":link}]]}},
+                timeout=8)
+            sub.notified = True
+        except Exception as e:
+            print(f"Sub notify error: {e}")
+    db.session.commit()
+
+
+# ══════════════════════════════════════════════════════════════
+# TELEGRAM BOT WEBHOOK
+# ══════════════════════════════════════════════════════════════
+@app.route('/api/telegram_webhook', methods=['POST'])
+def telegram_webhook():
+    TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
+    if not TOKEN: return jsonify({"ok":True})
+    data    = request.json or {}
+    message = data.get('message', {})
+    chat_id = str(message.get('chat', {}).get('id', ''))
+    text    = (message.get('text') or '').strip()
+    if not chat_id or not text: return jsonify({"ok":True})
+
+    def send(msg, buttons=None):
+        payload = {"chat_id":chat_id,"text":msg,"parse_mode":"Markdown"}
+        if buttons: payload["reply_markup"] = {"inline_keyboard":buttons}
+        requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage",
+                      json=payload, timeout=8)
+
+    if text == '/start':
+        send("👋 *Welcome to MalSubs Bot!*\n\n"
+             "📌 *Commands:*\n"
+             "🔍 `/search Interstellar` \u2014 find a subtitle\n"
+             "🙋 `/request Interstellar` \u2014 request a missing subtitle\n"
+             "📊 `/status` \u2014 site statistics\n\n"
+             "Or just *type a movie name* to search!")
+        return jsonify({"ok":True})
+
+    if text == '/status':
+        mv  = Movie.query.filter_by(media_type='movie').count()
+        srv = Movie.query.filter(Movie.media_type=='series').distinct(Movie.title).count()
+        trl = TranslationCache.query.count()
+        pnd = TranslationJob.query.filter_by(status='Pending').count()
+        send(f"📊 *MalSubs*\n\n🎬 Movies: {mv}\n📺 Series: {srv}\n🌐 Translations: {trl}\n⏳ Pending jobs: {pnd}")
+        return jsonify({"ok":True})
+
+    query, command = text, None
+    if text.startswith('/search '): query, command = text[8:].strip(), 'search'
+    elif text.startswith('/request '): query, command = text[9:].strip(), 'request'
+    elif text.startswith('/'): send("❓ Unknown command. Try /start"); return jsonify({"ok":True})
+
+    if not query: send("Please add a title. Example: `/search Oppenheimer`"); return jsonify({"ok":True})
+
+    if command == 'request':
+        db.session.add(SubtitleRequest(title=query,details="Requested via Telegram bot",votes=1))
+        db.session.commit()
+        send(f"✅ *Request submitted!*\n🎬 *{query}*\n\nWe'll notify you when ready!\n{WEBSITE_BASE_URL}/requests")
+        return jsonify({"ok":True})
+
+    results = Movie.query.filter(Movie.title.ilike(f'%{query}%')).order_by(Movie.views.desc()).limit(6).all()
+    seen, deduped = set(), []
+    for m in results:
+        k = m.title if m.media_type=='series' else m.id
+        if k not in seen: seen.add(k); deduped.append(m)
+
+    if not deduped:
+        send(f"😔 No subtitle found for *{query}*",
+             buttons=[[{"text":f"🙋 Request it","url":f"{WEBSITE_BASE_URL}/requests"}]])
+        return jsonify({"ok":True})
+
+    lines = [f"🔍 Results for *{query}*:\n"]
+    btns  = []
+    for m in deduped[:4]:
+        langs = ('EN ' if m.english_srt else '') + ' '.join(t.language.upper() for t in m.translations)
+        lines.append(f"• *{m.title}*{' ('+m.year+')' if m.year else ''} — {langs.strip() or 'No subs'}")
+        url = (f"{WEBSITE_BASE_URL}/series/{urllib.parse.quote(m.title)}"
+               if m.media_type=='series' else f"{WEBSITE_BASE_URL}/movie/{m.slug or m.id}")
+        btns.append([{"text":f"📥 {m.title[:30]}","url":url}])
+    send('\n'.join(lines), buttons=btns)
+    return jsonify({"ok":True})
+
+
+# ══════════════════════════════════════════════════════════════
+# NEW THIS WEEK + TRENDING + HF HEALTH + SEO + PLANNER + ANALYTICS
+# ══════════════════════════════════════════════════════════════
+
+@app.route('/new-this-week')
+def new_this_week():
+    from datetime import datetime, timedelta
+    week_ago = datetime.utcnow() - timedelta(days=7)
+    new_movies = Movie.query.filter(Movie.created_at >= week_ago,
+                 Movie.media_type=='movie').order_by(Movie.created_at.desc()).all()
+    raw_series = Movie.query.filter(Movie.created_at >= week_ago,
+                 Movie.media_type=='series').order_by(Movie.created_at.desc()).all()
+    seen, new_series = set(), []
+    for ep in raw_series:
+        if ep.title not in seen: seen.add(ep.title); new_series.append(ep)
+    total = len(new_movies) + len(new_series)
+    return render_template('new_this_week.html',
+        new_movies=new_movies, new_series=new_series, total=total,
+        week_ago=week_ago, categories=get_categories_list(),
+        seo_title=f"New Subtitles This Week ({total} titles) | MalSubs",
+        seo_desc=f"{total} new subtitles added this week.")
+
+
+@app.route('/api/trending_week')
+def trending_week():
+    from datetime import datetime, timedelta
+    week_ago = datetime.utcnow() - timedelta(days=7)
+    rows = (db.session.query(DownloadLog.movie_id,
+                             func.count(DownloadLog.id).label('cnt'))
+            .filter(DownloadLog.downloaded_at >= week_ago)
+            .group_by(DownloadLog.movie_id)
+            .order_by(func.count(DownloadLog.id).desc()).limit(12).all())
+    result, seen = [], set()
+    for row in rows:
+        m = Movie.query.get(row.movie_id)
+        if not m: continue
+        k = m.title if m.media_type=='series' else m.id
+        if k in seen: continue
+        seen.add(k)
+        result.append({'id':m.id,'title':m.title,'year':m.year,'rating':m.rating,
+            'poster':m.poster_url,'slug':m.slug,'type':m.media_type,'downloads':row.cnt,
+            'url':(f"/series/{urllib.parse.quote(m.title)}" if m.media_type=='series'
+                   else f"/movie/{m.slug or m.id}")})
+    return jsonify({'movies': result})
+
+
+@app.route('/api/hf_health')
+@login_required
+def hf_health_api():
+    return jsonify(check_hf_health(force=request.args.get('force','0')=='1'))
+
+
+@app.route('/api/generate_seo_desc/<int:movie_id>', methods=['POST'])
+@login_required
+def api_generate_seo_desc(movie_id):
+    movie = Movie.query.get_or_404(movie_id)
+    desc  = generate_seo_description(movie)
+    if not movie.plot or len(movie.plot) < 30:
+        movie.plot = desc; db.session.commit()
+    return jsonify({'ok':True,'description':desc})
+
+
+@app.route('/admin/search_analytics')
+@login_required
+def search_analytics():
+    from datetime import datetime, timedelta
+    top_queries = (db.session.query(SearchLog.query,
+        func.count(SearchLog.id).label('cnt'),
+        func.avg(SearchLog.results_count).label('avg_results'))
+        .group_by(SearchLog.query).order_by(func.count(SearchLog.id).desc()).limit(50).all())
+    zero_results = (db.session.query(SearchLog.query,
+        func.count(SearchLog.id).label('cnt'))
+        .filter(SearchLog.results_count==0).group_by(SearchLog.query)
+        .order_by(func.count(SearchLog.id).desc()).limit(30).all())
+    try:
+        daily_volume = db.session.execute(db.text(
+            "SELECT DATE(searched_at) as day, COUNT(*) as cnt FROM search_log "
+            "WHERE searched_at >= :c GROUP BY day ORDER BY day ASC"),
+            {"c": datetime.utcnow()-timedelta(days=14)}).fetchall()
+    except Exception:
+        daily_volume = []
+    return render_template('admin_search_analytics.html',
+        top_queries=top_queries, zero_results=zero_results,
+        daily_volume=daily_volume,
+        total_searches=SearchLog.query.count(),
+        total_zero=SearchLog.query.filter_by(results_count=0).count(),
+        categories=get_categories_list())
+
+
+@app.route('/admin/upload_planner')
+@login_required
+def upload_planner():
+    from datetime import date
+    plans = UploadPlan.query.order_by(
+        UploadPlan.scheduled_date.asc().nullslast(), UploadPlan.priority.asc()).all()
+    today = date.today()
+    return render_template('admin_upload_planner.html',
+        plans=plans, today=today,
+        overdue=[p for p in plans if p.scheduled_date and p.scheduled_date < today and p.status=='Planned'],
+        upcoming=[p for p in plans if p.status in ('Planned','InProgress')],
+        done=[p for p in plans if p.status=='Done'],
+        categories=get_categories_list())
+
+@app.route('/admin/upload_plan/add', methods=['POST'])
+@login_required
+def upload_plan_add():
+    from datetime import date as dt
+    raw = request.form.get('scheduled_date')
+    db.session.add(UploadPlan(
+        title=request.form.get('title','').strip()[:200],
+        imdb_id=request.form.get('imdb_id','').strip(),
+        media_type=request.form.get('media_type','movie'),
+        scheduled_date=dt.fromisoformat(raw) if raw else None,
+        notes=request.form.get('notes','').strip()[:500],
+        poster_url=request.form.get('poster_url','').strip(),
+        priority=int(request.form.get('priority',2)),
+        status='Planned'))
+    db.session.commit()
+    return redirect(url_for('upload_planner'))
+
+@app.route('/admin/upload_plan/update/<int:pid>', methods=['POST'])
+@login_required
+def upload_plan_update(pid):
+    p = UploadPlan.query.get_or_404(pid)
+    p.status = request.form.get('status', p.status)
+    p.notes  = request.form.get('notes', p.notes)
+    db.session.commit()
+    return jsonify({'ok':True})
+
+@app.route('/admin/upload_plan/delete/<int:pid>', methods=['POST'])
+@login_required
+def upload_plan_delete(pid):
+    db.session.delete(UploadPlan.query.get_or_404(pid))
+    db.session.commit()
+    return redirect(url_for('upload_planner'))
+
 
 # ------------------ TELEGRAM TRIGGER ------------------
 
