@@ -20,6 +20,8 @@
   }
   .admin-nav a:hover { color: #fff; border-color: #555; }
   .admin-nav a.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .admin-nav a.bot-link { border-color: #0088cc44; color: #29b6f6; }
+  .admin-nav a.bot-link:hover { background: rgba(0,136,204,.15); border-color: #0088cc; }
 
   /* Stat cards */
   .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px,1fr)); gap: .75rem; margin-bottom: 1.25rem; }
@@ -28,12 +30,13 @@
     padding: 1rem 1.1rem; position: relative; overflow: hidden;
   }
   .stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--accent); }
-  .stat-card.blue::before  { background: #1565c0; }
-  .stat-card.green::before { background: #2e7d32; }
-  .stat-card.gold::before  { background: var(--gold); }
-  .stat-card.purple::before{ background: #6a1b9a; }
-  .stat-card.teal::before  { background: #00695c; }
-  .stat-icon { font-size: 1.6rem; margin-bottom: .4rem; }
+  .stat-card.blue::before   { background: #1565c0; }
+  .stat-card.green::before  { background: #2e7d32; }
+  .stat-card.gold::before   { background: var(--gold); }
+  .stat-card.purple::before { background: #6a1b9a; }
+  .stat-card.teal::before   { background: #00695c; }
+  .stat-card.cyan::before   { background: #0088cc; }
+  .stat-icon  { font-size: 1.6rem; margin-bottom: .4rem; }
   .stat-value { font-size: 1.6rem; font-weight: 800; line-height: 1; margin-bottom: .2rem; }
   .stat-label { font-size: .75rem; color: var(--text-muted); }
 
@@ -57,6 +60,8 @@
   }
   .action-btn:hover { border-color: var(--accent); color: var(--accent); }
   .action-btn.danger:hover { border-color: #ff4444; color: #ff4444; }
+  .action-btn.bot { border-color: #0088cc44; color: #29b6f6; }
+  .action-btn.bot:hover { border-color: #0088cc; background: rgba(0,136,204,.1); }
 
   /* Failed jobs alert */
   .failed-alert {
@@ -107,13 +112,13 @@
   .job-info .job-title { font-size: .82rem; font-weight: 600; }
   .job-info .job-meta  { font-size: .72rem; color: var(--text-muted); margin-top: .15rem; }
   .job-status { font-size: .72rem; font-weight: 700; border-radius: 20px; padding: .2rem .6rem; white-space: nowrap; }
-  .st-Pending    { background: rgba(255,193,7,.15); color: #ffc107; }
+  .st-Pending    { background: rgba(255,193,7,.15);  color: #ffc107; }
   .st-Processing { background: rgba(33,150,243,.15); color: #64b5f6; }
-  .st-Failed     { background: rgba(229,9,20,.15); color: var(--accent); }
-  .st-Completed  { background: rgba(76,175,80,.15); color: #81c784; }
+  .st-Failed     { background: rgba(229,9,20,.15);   color: var(--accent); }
+  .st-Completed  { background: rgba(76,175,80,.15);  color: #81c784; }
 
   /* ── HF Health Widget ── */
-  .hf-widget{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.1rem 1.25rem;margin-bottom:1.25rem}
+  .hf-widget{background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:1.1rem 1.25rem;margin-bottom:1.25rem}
   .hf-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;flex-wrap:wrap;gap:.5rem}
   .hf-head h2{font-size:.95rem;font-weight:700}
   .hf-status-row{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}
@@ -123,36 +128,34 @@
   .hf-dot.timeout{background:#f9a825}
   .hf-dot.unknown{background:#555}
   .hf-status-text{font-size:.88rem;font-weight:700}
-  .hf-meta{font-size:.75rem;color:var(--muted)}
+  .hf-meta{font-size:.75rem;color:var(--text-muted)}
   .hf-stats{display:flex;gap:.65rem;flex-wrap:wrap;margin-top:.65rem}
   .hfs{background:#111;border:1px solid var(--border);border-radius:8px;padding:.5rem .75rem;font-size:.8rem;flex:1;min-width:100px}
   .hfs .v{font-size:1.1rem;font-weight:800;margin-bottom:.1rem}
-  .hfs .l{font-size:.68rem;color:var(--muted)}
+  .hfs .l{font-size:.68rem;color:var(--text-muted)}
   .hf-wake-btn{background:var(--accent);border:none;color:#fff;border-radius:7px;padding:.38rem .85rem;font-size:.78rem;cursor:pointer;transition:all .18s}
-  .hf-wake-btn:hover{background:var(--acc2)}
-  .hf-refresh-btn{background:none;border:1px solid var(--border);color:var(--muted);border-radius:7px;padding:.38rem .75rem;font-size:.78rem;cursor:pointer;transition:all .18s}
+  .hf-wake-btn:hover{opacity:.85}
+  .hf-refresh-btn{background:none;border:1px solid var(--border);color:var(--text-muted);border-radius:7px;padding:.38rem .75rem;font-size:.78rem;cursor:pointer;transition:all .18s}
   .hf-refresh-btn:hover{border-color:#555;color:#fff}
 
   /* ── Translation Queue Widget ── */
-  .tq-widget{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.25rem;margin-bottom:1.25rem;position:relative;overflow:hidden}
+  .tq-widget{background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:1.25rem;margin-bottom:1.25rem;position:relative;overflow:hidden}
   .tq-widget::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--accent),#ff6b35)}
   .tq-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem}
   .tq-head h2{font-size:.95rem;font-weight:700}
-  .tq-refresh{font-size:.72rem;color:var(--muted)}
+  .tq-refresh{font-size:.72rem;color:var(--text-muted)}
   .tq-stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:.65rem;margin-bottom:1rem}
   .tqs{background:#111;border:1px solid var(--border);border-radius:9px;padding:.7rem .85rem;text-align:center}
   .tqs .n{font-size:1.4rem;font-weight:800;line-height:1;margin-bottom:.2rem}
-  .tqs .l{font-size:.68rem;color:var(--muted)}
+  .tqs .l{font-size:.68rem;color:var(--text-muted)}
   .tqs.pending .n{color:#ffd54f}
   .tqs.processing .n{color:#64b5f6}
   .tqs.failed .n{color:var(--accent)}
   .tqs.done .n{color:#81c784}
-  /* Main progress bar */
   .tq-pbar-wrap{margin-bottom:.75rem}
-  .tq-pbar-label{display:flex;justify-content:space-between;font-size:.78rem;color:var(--muted);margin-bottom:.35rem}
+  .tq-pbar-label{display:flex;justify-content:space-between;font-size:.78rem;color:var(--text-muted);margin-bottom:.35rem}
   .tq-pbar{height:10px;background:#1a1a1a;border-radius:5px;overflow:hidden}
   .tq-pbar-fill{height:100%;background:linear-gradient(90deg,#4caf50,#81c784);border-radius:5px;transition:width .5s ease}
-  /* Language breakdown */
   .tq-langs{display:flex;gap:.6rem;margin-bottom:.75rem;flex-wrap:wrap}
   .tql{flex:1;min-width:80px;background:#111;border:1px solid var(--border);border-radius:8px;padding:.5rem .65rem}
   .tql-name{font-size:.7rem;font-weight:700;margin-bottom:.3rem;display:flex;justify-content:space-between}
@@ -161,18 +164,31 @@
   .tql-ml .tql-fill{background:#4caf50}
   .tql-ta .tql-fill{background:#ef5350}
   .tql-hi .tql-fill{background:#42a5f5}
-  /* Type breakdown */
   .tq-types{display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:.75rem}
   .tqt{background:#111;border:1px solid var(--border);border-radius:8px;padding:.5rem .85rem;font-size:.8rem;flex:1;min-width:120px}
   .tqt .tv{font-size:1.1rem;font-weight:800}
-  .tqt .tl{font-size:.68rem;color:var(--muted);margin-top:.1rem}
-  /* ETA */
+  .tqt .tl{font-size:.68rem;color:var(--text-muted);margin-top:.1rem}
   .tq-eta{background:rgba(245,197,24,.08);border:1px solid rgba(245,197,24,.2);border-radius:8px;padding:.6rem .9rem;font-size:.82rem;color:#ffd54f;display:flex;align-items:center;gap:.5rem}
-  /* Config info */
   .tq-config{font-size:.72rem;color:#555;margin-top:.6rem}
-  /* Pulse animation for processing */
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
   .pulse{animation:pulse 1.5s ease-in-out infinite}
+
+  /* ── Bot Stats Widget ── */
+  .bot-widget {
+    background: var(--bg-card); border: 1px solid #0088cc33;
+    border-radius: 14px; padding: 1.1rem 1.25rem; margin-bottom: 1.25rem;
+    position: relative; overflow: hidden;
+  }
+  .bot-widget::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:linear-gradient(90deg,#0088cc,#29b6f6); }
+  .bot-widget-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:.85rem; flex-wrap:wrap; gap:.5rem; }
+  .bot-widget-head h2 { font-size:.95rem; font-weight:700; }
+  .bot-stats { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:.65rem; margin-bottom:.85rem; }
+  .bstat { background:#111; border:1px solid var(--border); border-radius:9px; padding:.7rem .85rem; text-align:center; }
+  .bstat .n { font-size:1.4rem; font-weight:800; line-height:1; margin-bottom:.2rem; }
+  .bstat .l { font-size:.68rem; color:var(--text-muted); }
+  .bstat.users .n  { color:#29b6f6; }
+  .bstat.subs .n   { color:#4caf50; }
+  .bstat.reqs .n   { color:#ffd54f; }
 
   /* Pagination */
   .pager { display: flex; gap: .35rem; justify-content: center; flex-wrap: wrap; margin: .75rem 0; }
@@ -188,6 +204,25 @@
   .log-row:last-child { border-bottom: none; }
   .log-ok   { color: #81c784; }
   .log-fail { color: var(--accent); }
+
+  /* Tool cards grid */
+  .tool-cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:.75rem; margin-bottom:1.25rem; }
+  .tool-card {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius:12px;
+    padding:1.1rem; transition:border-color .18s; position:relative; overflow:hidden;
+    text-decoration:none; display:block;
+  }
+  .tool-card:hover { border-color:#555; }
+  .tool-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:var(--accent); }
+  .tool-card.blue::before   { background:#1565c0; }
+  .tool-card.green::before  { background:#2e7d32; }
+  .tool-card.purple::before { background:#6a1b9a; }
+  .tool-card.gold::before   { background:var(--gold,#f9a825); }
+  .tool-card.teal::before   { background:#00695c; }
+  .tool-card.cyan::before   { background:#0088cc; }
+  .tool-card-icon { font-size:1.6rem; margin-bottom:.4rem; }
+  .tool-card-title { font-size:.9rem; font-weight:700; color:#fff; margin-bottom:.25rem; }
+  .tool-card-desc  { font-size:.75rem; color:var(--text-muted); }
 </style>
 {% endblock %}
 
@@ -205,6 +240,7 @@
       <a href="/admin/upload_planner">📅 Planner</a>
       <a href="/admin/search_analytics">🔍 Analytics</a>
       <a href="/admin/requests">🙋 Requests{% if pending_requests %} <span style="background:var(--accent);color:#fff;border-radius:10px;padding:.05rem .35rem;font-size:.65rem">{{ pending_requests }}</span>{% endif %}</a>
+      <a href="/admin/bot-dashboard" class="bot-link">🤖 Bot{% if bot_users %} <span style="background:#0088cc;color:#fff;border-radius:10px;padding:.05rem .35rem;font-size:.65rem">{{ bot_users }}</span>{% endif %}</a>
       <a href="/admin/export_csv">📥 CSV</a>
       <a href="/logout">🚪 Logout</a>
     </nav>
@@ -241,8 +277,6 @@
       <h2>⚙️ Translation Queue</h2>
       <span class="tq-refresh" id="tq-refresh-label">Auto-refreshes every 10s</span>
     </div>
-
-    <!-- Main progress bar -->
     <div class="tq-pbar-wrap">
       <div class="tq-pbar-label">
         <span id="tq-pct-label">Loading…</span>
@@ -250,16 +284,12 @@
       </div>
       <div class="tq-pbar"><div class="tq-pbar-fill" id="tq-pbar-fill" style="width:0%"></div></div>
     </div>
-
-    <!-- Stat cards -->
     <div class="tq-stats">
-      <div class="tqs pending"><div class="n" id="tq-pending">—</div><div class="l">Pending</div></div>
-      <div class="tqs processing"><div class="n pulse" id="tq-processing">—</div><div class="l">Processing</div></div>
-      <div class="tqs done"><div class="n" id="tq-completed">—</div><div class="l">Completed</div></div>
-      <div class="tqs failed"><div class="n" id="tq-failed">—</div><div class="l">Failed</div></div>
+      <div class="tqs pending">   <div class="n" id="tq-pending">—</div>              <div class="l">Pending</div></div>
+      <div class="tqs processing"><div class="n pulse" id="tq-processing">—</div>    <div class="l">Processing</div></div>
+      <div class="tqs done">      <div class="n" id="tq-completed">—</div>            <div class="l">Completed</div></div>
+      <div class="tqs failed">    <div class="n" id="tq-failed">—</div>              <div class="l">Failed</div></div>
     </div>
-
-    <!-- Type breakdown -->
     <div class="tq-types">
       <div class="tqt">
         <div class="tv" id="tq-movie-pending" style="color:#ef9a9a">—</div>
@@ -270,8 +300,6 @@
         <div class="tl">📺 Series jobs pending (priority 2)</div>
       </div>
     </div>
-
-    <!-- Per-language breakdown -->
     <div class="tq-langs">
       <div class="tql tql-ml">
         <div class="tql-name"><span>🟢 Malayalam</span><span id="tq-ml">—</span></div>
@@ -286,21 +314,44 @@
         <div class="tql-bar"><div class="tql-fill" id="tq-hi-bar" style="width:0%"></div></div>
       </div>
     </div>
-
-    <!-- ETA -->
     <div class="tq-eta" id="tq-eta-box" style="display:none">
       ⏱ <strong>Estimated time remaining: <span id="tq-eta-val">—</span></strong>
-      &nbsp;·&nbsp; Based on avg {{ "%.0f"|format(4) }} min/job with {{ 5 }} concurrent workers
+      &nbsp;·&nbsp; Based on avg 4 min/job with 5 concurrent workers
     </div>
-
     <div class="tq-config" id="tq-config">Loading config…</div>
+  </div>
+
+  <!-- ── Bot Stats Widget ── -->
+  <div class="bot-widget">
+    <div class="bot-widget-head">
+      <h2>🤖 Telegram Bot</h2>
+      <a href="/admin/bot-dashboard" class="action-btn bot" style="font-size:.78rem;padding:.35rem .8rem;text-decoration:none">Open Bot Dashboard →</a>
+    </div>
+    <div class="bot-stats">
+      <div class="bstat users">
+        <div class="n">{{ bot_users | default(0) }}</div>
+        <div class="l">👥 Bot Users</div>
+      </div>
+      <div class="bstat subs">
+        <div class="n">{{ bot_subs | default(0) }}</div>
+        <div class="l">🔔 Active Subs</div>
+      </div>
+      <div class="bstat reqs">
+        <div class="n">{{ pending_requests | default(0) }}</div>
+        <div class="l">📬 Pending Reqs</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+      <a href="/admin/bot-dashboard" class="action-btn bot" style="text-decoration:none;font-size:.78rem">📊 Full Dashboard</a>
+      <a href="/admin/requests" class="action-btn" style="text-decoration:none;font-size:.78rem">🙋 Manage Requests</a>
+    </div>
   </div>
 
   <!-- Stats -->
   <div class="stat-grid">
     <div class="stat-card">
       <div class="stat-icon">👁</div>
-      <div class="stat-value">{{ visitors | default(0) | int | string }}</div>
+      <div class="stat-value">{{ visitors | default(0) | int }}</div>
       <div class="stat-label">Total Visitors</div>
     </div>
     <div class="stat-card blue">
@@ -327,6 +378,16 @@
       <div class="stat-icon">⭐</div>
       <div class="stat-value">{{ total_ratings }}</div>
       <div class="stat-label">User Ratings</div>
+    </div>
+    <div class="stat-card cyan">
+      <div class="stat-icon">👥</div>
+      <div class="stat-value">{{ bot_users | default(0) }}</div>
+      <div class="stat-label">Bot Users</div>
+    </div>
+    <div class="stat-card cyan">
+      <div class="stat-icon">🔔</div>
+      <div class="stat-value">{{ bot_subs | default(0) }}</div>
+      <div class="stat-label">Bot Subscribers</div>
     </div>
     <div class="stat-card">
       <div class="stat-icon">🙋</div>
@@ -370,200 +431,191 @@
     <a href="/admin/queue_all_missing" class="action-btn">📤 Queue Missing</a>
     <a href="/admin/export_csv" class="action-btn">📥 Export CSV</a>
     <a href="/admin/requests" class="action-btn">🙋 Manage Requests</a>
+    <a href="/admin/bot-dashboard" class="action-btn bot">🤖 Bot Dashboard</a>
   </div>
 
   <!-- Admin Tool Cards -->
-  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:.75rem;margin-bottom:1.25rem">
-
-    <a href="/admin/series" style="text-decoration:none">
-      <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.1rem;transition:border-color .18s;position:relative;overflow:hidden">
-        <div style="position:absolute;top:0;left:0;right:0;height:3px;background:#1565c0"></div>
-        <div style="font-size:1.6rem;margin-bottom:.4rem">📺</div>
-        <div style="font-weight:700;font-size:.92rem">Series Manager</div>
-        <div style="font-size:.75rem;color:var(--muted);margin-top:.2rem">Health status · Episode gaps · Bulk delete per series</div>
-      </div>
+  <div class="tool-cards">
+    <a href="/admin/series" class="tool-card blue">
+      <div class="tool-card-icon">📺</div>
+      <div class="tool-card-title">Series Manager</div>
+      <div class="tool-card-desc">Manage episodes, seasons, gaps and health status</div>
     </a>
-
-    <a href="/admin/duplicates" style="text-decoration:none">
-      <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.1rem;transition:border-color .18s;position:relative;overflow:hidden">
-        <div style="position:absolute;top:0;left:0;right:0;height:3px;background:#6a1b9a"></div>
-        <div style="font-size:1.6rem;margin-bottom:.4rem">🔁</div>
-        <div style="font-weight:700;font-size:.92rem">Duplicate Detector</div>
-        <div style="font-size:.75rem;color:var(--muted);margin-top:.2rem">Find same IMDb ID · Same title+year entries</div>
-      </div>
+    <a href="/admin/duplicates" class="tool-card purple">
+      <div class="tool-card-icon">🔁</div>
+      <div class="tool-card-title">Duplicate Detector</div>
+      <div class="tool-card-desc">Find and remove duplicate IMDb entries</div>
     </a>
-
-    <a href="/admin/requests" style="text-decoration:none">
-      <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.1rem;transition:border-color .18s;position:relative;overflow:hidden">
-        <div style="position:absolute;top:0;left:0;right:0;height:3px;background:#2e7d32"></div>
-        <div style="font-size:1.6rem;margin-bottom:.4rem">🙋</div>
-        <div style="font-weight:700;font-size:.92rem">Subtitle Requests</div>
-        <div style="font-size:.75rem;color:var(--muted);margin-top:.2rem">
-          {% if pending_requests %}<span style="color:var(--accent);font-weight:700">{{ pending_requests }} pending</span>{% else %}Community requests & votes{% endif %}
-        </div>
-      </div>
+    <a href="/admin/upload_planner" class="tool-card gold">
+      <div class="tool-card-icon">📅</div>
+      <div class="tool-card-title">Upload Planner</div>
+      <div class="tool-card-desc">Schedule and track content calendar</div>
     </a>
-
-    <a href="/subtitles/Action" style="text-decoration:none">
-      <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.1rem;transition:border-color .18s;position:relative;overflow:hidden">
-        <div style="position:absolute;top:0;left:0;right:0;height:3px;background:#c62828"></div>
-        <div style="font-size:1.6rem;margin-bottom:.4rem">🎭</div>
-        <div style="font-weight:700;font-size:.92rem">Genre Pages</div>
-        <div style="font-size:.75rem;color:var(--muted);margin-top:.2rem">SEO landing pages · All genres live</div>
-      </div>
+    <a href="/admin/search_analytics" class="tool-card teal">
+      <div class="tool-card-icon">🔍</div>
+      <div class="tool-card-title">Search Analytics</div>
+      <div class="tool-card-desc">Top queries, zero-result searches, daily volume</div>
     </a>
-
-    <a href="/admin/upload_planner" style="text-decoration:none">
-      <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.1rem;transition:border-color .18s;position:relative;overflow:hidden">
-        <div style="position:absolute;top:0;left:0;right:0;height:3px;background:#00695c"></div>
-        <div style="font-size:1.6rem;margin-bottom:.4rem">📅</div>
-        <div style="font-weight:700;font-size:.92rem">Upload Planner</div>
-        <div style="font-size:.75rem;color:var(--muted);margin-top:.2rem">Content calendar · Schedule uploads</div>
-      </div>
+    <a href="/admin/requests" class="tool-card green">
+      <div class="tool-card-icon">🙋</div>
+      <div class="tool-card-title">Subtitle Requests</div>
+      <div class="tool-card-desc">{{ pending_requests }} pending community requests</div>
     </a>
-
-    <a href="/admin/search_analytics" style="text-decoration:none">
-      <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.1rem;transition:border-color .18s;position:relative;overflow:hidden">
-        <div style="position:absolute;top:0;left:0;right:0;height:3px;background:#0277bd"></div>
-        <div style="font-size:1.6rem;margin-bottom:.4rem">🔍</div>
-        <div style="font-weight:700;font-size:.92rem">Search Analytics</div>
-        <div style="font-size:.75rem;color:var(--muted);margin-top:.2rem">Top searches · Zero-result gaps</div>
-      </div>
+    <a href="/admin/bot-dashboard" class="tool-card cyan">
+      <div class="tool-card-icon">🤖</div>
+      <div class="tool-card-title">Bot Dashboard</div>
+      <div class="tool-card-desc">{{ bot_users | default(0) }} users · {{ bot_subs | default(0) }} subscriptions · broadcasts</div>
     </a>
-
-    <a href="/new-this-week" style="text-decoration:none">
-      <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.1rem;transition:border-color .18s;position:relative;overflow:hidden">
-        <div style="position:absolute;top:0;left:0;right:0;height:3px;background:#e65100"></div>
-        <div style="font-size:1.6rem;margin-bottom:.4rem">🆕</div>
-        <div style="font-weight:700;font-size:.92rem">New This Week</div>
-        <div style="font-size:.75rem;color:var(--muted);margin-top:.2rem">Public weekly page · SEO indexed</div>
-      </div>
-    </a>
-
   </div>
 
-  <!-- ── Analytics Charts ── -->
+  <!-- Charts -->
   <div class="charts-grid">
     <div class="chart-card full">
-      <h3>📈 Uploads Per Month (Last 12 Months)</h3>
-      <div class="chart-wrap" style="height:220px"><canvas id="chart-uploads"></canvas></div>
+      <h3>📈 Uploads by Month</h3>
+      <div class="chart-wrap" style="height:220px">
+        <canvas id="uploadsChart"></canvas>
+      </div>
     </div>
     <div class="chart-card">
-      <h3>💾 Downloads by Language</h3>
-      <div class="chart-wrap" style="height:220px"><canvas id="chart-langs"></canvas></div>
+      <h3>🌐 Downloads by Language</h3>
+      <div class="chart-wrap" style="height:220px">
+        <canvas id="langChart"></canvas>
+      </div>
     </div>
     <div class="chart-card">
-      <h3>⚙️ Translation Job Status</h3>
-      <div class="chart-wrap" style="height:220px"><canvas id="chart-jobs"></canvas></div>
+      <h3>🔥 Top 10 by Views</h3>
+      <div class="chart-wrap" style="height:220px">
+        <canvas id="viewsChart"></canvas>
+      </div>
     </div>
     <div class="chart-card">
-      <h3>👁 Top 10 Movies by Views</h3>
-      <div class="chart-wrap" style="height:280px"><canvas id="chart-views"></canvas></div>
+      <h3>📬 Top Subtitle Requests</h3>
+      <div class="chart-wrap" style="height:220px">
+        <canvas id="reqChart"></canvas>
+      </div>
     </div>
     <div class="chart-card">
-      <h3>🔥 Top 10 Subtitle Requests</h3>
-      <div class="chart-wrap" style="height:280px"><canvas id="chart-requests"></canvas></div>
+      <h3>⚙️ Job Status</h3>
+      <div class="chart-wrap" style="height:220px">
+        <canvas id="jobsChart"></canvas>
+      </div>
     </div>
   </div>
 
-  <!-- ── Media list ── -->
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;flex-wrap:wrap;gap:.5rem">
-    <h2 style="font-size:1rem;font-weight:700">🗂 All Media</h2>
-    <span style="font-size:.8rem;color:var(--text-muted)">{{ all_media.total }} entries</span>
-  </div>
-
+  <!-- Media Table -->
   <div class="media-table-wrap">
     <div class="table-head-row">
-      <div></div><div>Title</div>
-      <div class="hide-sm">Type</div><div class="hide-sm">Year</div>
-      <div class="hide-sm">Languages</div><div class="hide-sm">Views</div>
+      <div>Poster</div>
+      <div>Title</div>
+      <div class="hide-sm">Type</div>
+      <div class="hide-sm">Year</div>
+      <div class="hide-sm">Rating</div>
+      <div class="hide-sm">Langs</div>
       <div>Actions</div>
     </div>
     {% for m in all_media.items %}
     <div class="table-body-row">
-      <!-- Poster -->
       <div>
-        <img src="{{ m.poster_url or 'https://via.placeholder.com/54x80/1a1a1a/555?text=?' }}"
-             class="poster-thumb"
-             onerror="this.src='https://via.placeholder.com/54x80/1a1a1a/555?text=?'"
-             alt="{{ m.title }}">
+        {% if m.poster_url %}
+        <img src="{{ m.poster_url }}" class="poster-thumb" alt="" loading="lazy" onerror="this.style.display='none'">
+        {% else %}
+        <div style="width:38px;height:56px;background:#1a1a1a;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:.9rem">🎬</div>
+        {% endif %}
       </div>
-      <!-- Title -->
       <div>
         <div class="media-title">{{ m.title }}</div>
         <div class="media-meta">
-          {% if m.media_type == 'series' %}S{{ m.season or '?' }}E{{ m.episode or '?' }} · {% endif %}
-          ⭐ {{ m.rating or 'N/A' }}
+          {% if m.media_type == 'series' %}S{{ m.season or 1 }}E{{ m.episode or 1 }} · {% endif %}
+          {{ m.imdb_id or '—' }}
         </div>
       </div>
-      <!-- Type -->
       <div class="hide-sm">
-        <span class="type-badge {{ 'type-' + m.media_type }}">{{ '🎬' if m.media_type == 'movie' else '📺' }} {{ m.media_type }}</span>
+        <span class="type-badge {{ 'type-movie' if m.media_type == 'movie' else 'type-series' }}">
+          {{ '🎬' if m.media_type == 'movie' else '📺' }} {{ m.media_type }}
+        </span>
       </div>
-      <!-- Year -->
       <div class="hide-sm" style="font-size:.82rem;color:var(--text-muted)">{{ m.year or '—' }}</div>
-      <!-- Languages -->
+      <div class="hide-sm" style="font-size:.82rem">{{ m.rating or '—' }}</div>
       <div class="hide-sm">
         <div class="lang-dots">
           {% if m.english_srt %}<span class="ld en">EN</span>{% endif %}
           {% for t in m.translations %}
-          <span class="ld {{ t.language }}">{{ t.language | upper }}</span>
+          <span class="ld {{ t.language }}">{{ t.language.upper() }}</span>
           {% endfor %}
         </div>
       </div>
-      <!-- Views -->
-      <div class="hide-sm" style="font-size:.82rem;color:var(--text-muted)">👁 {{ m.views }}</div>
-      <!-- Actions -->
-      <div class="row-actions">
-        <a href="{{ '/movie/' + m.slug if m.media_type == 'movie' else '/series/' + m.title|urlencode }}" target="_blank">View</a>
-        <a href="/admin/edit/{{ m.id }}">Edit</a>
-        <a href="/admin/queue_translations/{{ m.id }}" title="Retrigger translation">⟳</a>
-        <a href="/delete/{{ m.id }}" class="del" onclick="return confirm('Delete {{ m.title }}?')">🗑</a>
+      <div>
+        <div class="row-actions">
+          <a href="/admin/edit/{{ m.id }}">✏️</a>
+          <a href="/admin/queue_translations/{{ m.id }}">🔄</a>
+          {% if m.media_type == 'movie' %}
+          <a href="/movie/{{ m.slug or m.id }}" target="_blank">🔗</a>
+          {% else %}
+          <a href="/series/{{ m.title | urlencode }}/{{ m.season or 1 }}" target="_blank">🔗</a>
+          {% endif %}
+          <a href="/delete/{{ m.id }}" class="del" onclick="return confirm('Delete {{ m.title }}?')">🗑</a>
+        </div>
       </div>
     </div>
+    {% else %}
+    <div style="padding:2rem;text-align:center;color:var(--text-muted)">No media uploaded yet.</div>
     {% endfor %}
   </div>
 
-  <!-- Media pagination -->
+  <!-- Pagination -->
   {% if all_media.pages > 1 %}
-  <nav class="pager">
-    {% if all_media.has_prev %}<a href="?page={{ all_media.prev_num }}">‹</a>{% endif %}
+  <div class="pager">
+    {% if all_media.has_prev %}
+    <a href="?page={{ all_media.prev_num }}">‹ Prev</a>
+    {% endif %}
     {% for p in all_media.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
       {% if p %}
-        {% if p == all_media.page %}<span class="current">{{ p }}</span>
-        {% else %}<a href="?page={{ p }}">{{ p }}</a>{% endif %}
-      {% else %}<span>…</span>{% endif %}
+        {% if p == all_media.page %}
+        <span class="current">{{ p }}</span>
+        {% else %}
+        <a href="?page={{ p }}">{{ p }}</a>
+        {% endif %}
+      {% else %}
+      <span>…</span>
+      {% endif %}
     {% endfor %}
-    {% if all_media.has_next %}<a href="?page={{ all_media.next_num }}">›</a>{% endif %}
-  </nav>
+    {% if all_media.has_next %}
+    <a href="?page={{ all_media.next_num }}">Next ›</a>
+    {% endif %}
+  </div>
   {% endif %}
 
-  <!-- ── Active Jobs ── -->
+  <!-- Active Translation Jobs -->
   {% if jobs %}
-  <h2 style="font-size:1rem;font-weight:700;margin-bottom:.75rem">⚙️ Active Translation Jobs</h2>
+  <div style="margin-bottom:.75rem;font-size:.88rem;font-weight:700;color:var(--text-muted)">⚙️ Active Translation Jobs</div>
   <div class="jobs-grid">
     {% for job in jobs %}
     <div class="job-card">
       <div class="job-info">
         <div class="job-title">{{ job.movie.title if job.movie else 'Unknown' }}</div>
-        <div class="job-meta">{{ job.language | upper }} · Progress: {{ job.progress }}%</div>
+        <div class="job-meta">{{ job.language.upper() }} · Job #{{ job.id }} · P{{ job.priority }}</div>
       </div>
-      <div style="display:flex;align-items:center;gap:.5rem">
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.35rem">
         <span class="job-status st-{{ job.status }}">{{ job.status }}</span>
-        <a href="/admin/delete_job/{{ job.id }}" style="color:#555;font-size:.75rem;text-decoration:none" title="Remove job">✕</a>
+        {% if job.progress > 0 %}
+        <div style="width:80px;height:4px;background:#1a1a1a;border-radius:2px;overflow:hidden">
+          <div style="width:{{ job.progress }}%;height:100%;background:#4caf50;border-radius:2px"></div>
+        </div>
+        {% endif %}
+        <a href="/admin/delete_job/{{ job.id }}" style="font-size:.65rem;color:#555;text-decoration:none" onclick="return confirm('Remove job?')">✕ Remove</a>
       </div>
     </div>
     {% endfor %}
   </div>
   {% endif %}
 
-  <!-- ── Scheduler Logs ── -->
+  <!-- Scheduler Logs -->
   {% if scheduler_logs %}
-  <h2 style="font-size:1rem;font-weight:700;margin:.5rem 0 .75rem">🕐 Recent Scheduler Runs</h2>
-  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:.75rem 1.25rem">
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.25rem">
+    <div style="font-size:.82rem;font-weight:700;color:var(--text-muted);margin-bottom:.6rem">🕐 Scheduler Logs</div>
     {% for log in scheduler_logs %}
     <div class="log-row">
-      <span class="{{ 'log-ok' if log.result == 'success' else 'log-fail' }}">{{ '✅' if log.result == 'success' else '⚠️' }}</span>
+      <span class="{{ 'log-ok' if log.result == 'success' else 'log-fail' }}">{{ '✅' if log.result == 'success' else '❌' }}</span>
       <span style="color:var(--text-muted)">{{ log.run_at.strftime('%b %d %H:%M') if log.run_at else '—' }}</span>
       <span>{{ log.message }}</span>
     </div>
@@ -571,207 +623,176 @@
   </div>
   {% endif %}
 
-</div>
+</div><!-- /dash-wrap -->
 {% endblock %}
 
-{% block extra_scripts %}
+{% block scripts %}
 <script>
-const CHART_DEFAULTS = {
-  plugins: { legend: { labels: { color: '#999', boxWidth: 12, font: { size: 11 } } } },
-  scales: {
-    x: { ticks: { color: '#666', font: { size: 10 } }, grid: { color: '#1e1e1e' } },
-    y: { ticks: { color: '#666', font: { size: 10 } }, grid: { color: '#1e1e1e' } }
-  }
-};
-const ACCENT = '#e50914';
-const COLORS = ['#e50914','#1565c0','#2e7d32','#f5c518','#6a1b9a','#00695c','#e65100','#37474f'];
-
-fetch('/api/analytics_data')
-  .then(r => r.json())
-  .then(data => {
-
-    // 1. Uploads per month
-    new Chart(document.getElementById('chart-uploads'), {
-      type: 'bar',
-      data: {
-        labels: data.uploads_by_month.labels,
-        datasets: [{ label: 'Uploads', data: data.uploads_by_month.data, backgroundColor: ACCENT, borderRadius: 4 }]
-      },
-      options: { ...CHART_DEFAULTS, responsive: true, maintainAspectRatio: false }
-    });
-
-    // 2. Downloads by language
-    new Chart(document.getElementById('chart-langs'), {
-      type: 'doughnut',
-      data: {
-        labels: data.downloads_by_lang.labels,
-        datasets: [{ data: data.downloads_by_lang.data, backgroundColor: COLORS, borderWidth: 0 }]
-      },
-      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#999', font: { size: 11 } } } } }
-    });
-
-    // 3. Job status
-    new Chart(document.getElementById('chart-jobs'), {
-      type: 'doughnut',
-      data: {
-        labels: data.jobs_summary.labels,
-        datasets: [{ data: data.jobs_summary.data, backgroundColor: ['#f5c518','#64b5f6','#e50914','#81c784'], borderWidth: 0 }]
-      },
-      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#999', font: { size: 11 } } } } }
-    });
-
-    // 4. Top views (horizontal bar)
-    new Chart(document.getElementById('chart-views'), {
-      type: 'bar',
-      data: {
-        labels: data.views_top10.labels,
-        datasets: [{ label: 'Views', data: data.views_top10.data, backgroundColor: '#1565c0', borderRadius: 4 }]
-      },
-      options: {
-        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: {
-          x: { ticks: { color: '#666', font: { size: 10 } }, grid: { color: '#1e1e1e' } },
-          y: { ticks: { color: '#aaa', font: { size: 10 } }, grid: { display: false } }
-        }
-      }
-    });
-
-    // 5. Top requests
-    new Chart(document.getElementById('chart-requests'), {
-      type: 'bar',
-      data: {
-        labels: data.requests_top10.labels,
-        datasets: [{ label: 'Votes', data: data.requests_top10.data, backgroundColor: '#6a1b9a', borderRadius: 4 }]
-      },
-      options: {
-        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: {
-          x: { ticks: { color: '#666', font: { size: 10 } }, grid: { color: '#1e1e1e' } },
-          y: { ticks: { color: '#aaa', font: { size: 10 } }, grid: { display: false } }
-        }
-      }
-    });
-
-  })
-  .catch(err => console.warn('Analytics load failed:', err));
-
-// ── HF Worker Health Monitor ──────────────────────────────────────────────────
-function loadHFHealth(force){
-  const dot    = document.getElementById('hf-dot');
-  const stxt   = document.getElementById('hf-status-text');
-  const rtime  = document.getElementById('hf-response-time');
-  const stats  = document.getElementById('hf-stats');
-  const errMsg = document.getElementById('hf-error-msg');
-  const wakeBtn= document.getElementById('wake-btn');
-  const checkedAt = document.getElementById('hf-checked-at');
-  const url = '/api/hf_health' + (force ? '?force=1' : '');
-  fetch(url).then(r=>r.json()).then(d=>{
-    dot.className = 'hf-dot ' + (d.status||'unknown');
-    if(d.status==='online'){
-      stxt.textContent = '🟢 Online';
-      stxt.style.color = '#81c784';
-      const ms = d.data?.response_ms;
-      rtime.textContent = ms ? `(${ms}ms)` : '';
-      stats.style.display = 'flex';
-      document.getElementById('hf-queue').textContent     = d.data?.queue_depth ?? '—';
-      document.getElementById('hf-inflight').textContent  = d.data?.in_flight ?? '—';
-      document.getElementById('hf-workers').textContent   = d.data?.workers ?? '—';
-      document.getElementById('hf-completed').textContent = d.data?.completed ?? '—';
-      document.getElementById('hf-failed').textContent    = d.data?.failed ?? '—';
-      errMsg.style.display = 'none';
-      wakeBtn.style.display = 'none';
-    } else if(d.status==='not_configured'){
-      stxt.textContent = '⚙️ HF_WORKER_URL not set';
-      stxt.style.color = '#888';
-      stats.style.display = 'none';
-      wakeBtn.style.display = 'none';
-    } else {
-      const labels = {offline:'🔴 Offline',timeout:'🟡 Timeout',error:'🟠 Error'};
-      stxt.textContent = labels[d.status] || '❓ Unknown';
-      stxt.style.color = '#ef9a9a';
-      stats.style.display = 'none';
-      wakeBtn.style.display = '';
-      errMsg.textContent = d.data?.error || `Status: ${d.status}`;
-      errMsg.style.display = 'block';
-    }
-    checkedAt.textContent = 'Checked ' + new Date().toLocaleTimeString();
-  }).catch(()=>{
-    stxt.textContent = '❓ Could not reach health endpoint';
-    stxt.style.color = '#888';
-  });
-}
-
-function wakeWorker(){
-  const btn = document.getElementById('wake-btn');
-  btn.textContent = '⏳ Waking…'; btn.disabled = true;
-  // Sending a dummy request to the HF space wakes it up from sleep
-  fetch('/api/hf_health?force=1').then(()=>{
-    setTimeout(()=>{ loadHFHealth(true); btn.textContent='⚡ Wake Up'; btn.disabled=false; }, 3000);
-  });
-}
-
-loadHFHealth(false);
-setInterval(()=>loadHFHealth(false), 30000);
-
-// ── Translation Queue Widget ──────────────────────────────────────────────────
-let tqTimer = null;
-
-function loadTranslationStats(){
+// ── Translation Queue ────────────────────────────────────────────────────────
+function loadTranslationStats() {
   fetch('/api/translation_stats')
     .then(r => r.json())
     .then(d => {
-      // Progress bar
-      document.getElementById('tq-pbar-fill').style.width = d.pct_done + '%';
-      document.getElementById('tq-pct-label').textContent =
-        d.pct_done + '% complete (' + d.completed + ' of ' + d.total + ' jobs)';
-
-      // ETA
-      const etaBox = document.getElementById('tq-eta-box');
-      if(d.active > 0){
-        etaBox.style.display = 'flex';
-        document.getElementById('tq-eta-val').textContent = d.est_text;
-        document.getElementById('tq-eta-label').textContent = '~' + d.est_text + ' left';
-      } else {
-        etaBox.style.display = 'none';
-        document.getElementById('tq-eta-label').textContent = '✅ Queue clear';
-      }
-
-      // Cards
       document.getElementById('tq-pending').textContent    = d.pending;
       document.getElementById('tq-processing').textContent = d.processing;
       document.getElementById('tq-completed').textContent  = d.completed;
       document.getElementById('tq-failed').textContent     = d.failed;
 
-      // Type breakdown
       document.getElementById('tq-movie-pending').textContent  = d.movie_pending;
       document.getElementById('tq-series-pending').textContent = d.series_pending;
 
-      // Per-language bars (pending as % of all pending)
-      const total_pending = d.pending || 1;
+      const pct = d.pct_done;
+      document.getElementById('tq-pbar-fill').style.width = pct + '%';
+      document.getElementById('tq-pct-label').textContent = pct + '% complete';
+      document.getElementById('tq-eta-label').textContent = d.active > 0 ? ('ETA ~' + d.est_text) : '';
+
       ['ml','ta','hi'].forEach(lang => {
-        const cnt  = d.lang_pending[lang] || 0;
-        const pct  = Math.round(cnt / total_pending * 100);
-        document.getElementById('tq-'+lang).textContent    = cnt + ' pending';
-        document.getElementById('tq-'+lang+'-bar').style.width = pct + '%';
+        const count = d.lang_pending[lang] || 0;
+        document.getElementById('tq-' + lang).textContent = count;
+        const maxL = Math.max(d.pending, 1);
+        document.getElementById('tq-' + lang + '-bar').style.width = Math.min(100, count / maxL * 100) + '%';
       });
 
-      // Config line
-      document.getElementById('tq-config').textContent =
-        `⚙️ ${d.max_concurrent} concurrent workers · Series batch: ${d.batch_size} episodes/cycle · Avg ${(4).toFixed(0)} min/job`;
+      const etaBox = document.getElementById('tq-eta-box');
+      if (d.active > 0) {
+        document.getElementById('tq-eta-val').textContent = d.est_text;
+        etaBox.style.display = 'flex';
+      } else {
+        etaBox.style.display = 'none';
+      }
 
-      // Timestamp
-      document.getElementById('tq-refresh-label').textContent =
-        'Updated ' + new Date().toLocaleTimeString();
+      document.getElementById('tq-config').textContent =
+        `Max concurrent: ${d.max_concurrent} · Series batch: ${d.batch_size} · Total jobs: ${d.total}`;
+    })
+    .catch(() => {});
+}
+loadTranslationStats();
+setInterval(loadTranslationStats, 10000);
+
+// ── HF Health ────────────────────────────────────────────────────────────────
+function loadHFHealth(force) {
+  const dot  = document.getElementById('hf-dot');
+  const text = document.getElementById('hf-status-text');
+  dot.className = 'hf-dot unknown';
+  text.textContent = 'Checking…';
+  fetch('/api/hf_health' + (force ? '?force=1' : ''))
+    .then(r => r.json())
+    .then(d => {
+      const status = d.status;
+      dot.className = 'hf-dot ' + (status === 'online' ? 'online' : status === 'timeout' ? 'timeout' : 'offline');
+      const labels = { online:'✅ Online', offline:'❌ Offline', timeout:'⏱ Timeout', error:'⚠️ Error', not_configured:'❓ Not configured' };
+      text.textContent = labels[status] || status;
+
+      const rt = document.getElementById('hf-response-time');
+      rt.textContent = d.data && d.data.response_ms ? d.data.response_ms + 'ms' : '';
+
+      const statsEl = document.getElementById('hf-stats');
+      if (status === 'online' && d.data) {
+        statsEl.style.display = 'flex';
+        document.getElementById('hf-queue').textContent     = d.data.queue_depth ?? '—';
+        document.getElementById('hf-inflight').textContent  = d.data.in_flight   ?? '—';
+        document.getElementById('hf-workers').textContent   = d.data.workers      ?? '—';
+        document.getElementById('hf-completed').textContent = d.data.completed    ?? '—';
+        document.getElementById('hf-failed').textContent    = d.data.failed       ?? '—';
+        document.getElementById('wake-btn').style.display   = 'none';
+        document.getElementById('hf-error-msg').style.display = 'none';
+      } else {
+        statsEl.style.display = 'none';
+        document.getElementById('wake-btn').style.display = 'inline-block';
+        const errEl = document.getElementById('hf-error-msg');
+        if (d.data && d.data.error) { errEl.textContent = d.data.error; errEl.style.display = 'block'; }
+        else { errEl.style.display = 'none'; }
+      }
+      const ca = document.getElementById('hf-checked-at');
+      ca.textContent = 'Last checked: ' + new Date().toLocaleTimeString();
     })
     .catch(() => {
-      document.getElementById('tq-refresh-label').textContent = 'Failed to load stats';
+      document.getElementById('hf-dot').className = 'hf-dot offline';
+      document.getElementById('hf-status-text').textContent = '❌ Request failed';
     });
 }
+loadHFHealth(false);
+setInterval(() => loadHFHealth(false), 30000);
 
-// Load on page open and every 10 seconds
-loadTranslationStats();
-tqTimer = setInterval(loadTranslationStats, 10000);
+function wakeWorker() {
+  const btn = document.getElementById('wake-btn');
+  btn.textContent = 'Waking…';
+  btn.disabled = true;
+  fetch('/api/hf_health?force=1')
+    .then(() => { loadHFHealth(true); btn.textContent = '⚡ Wake Up'; btn.disabled = false; });
+}
+
+// ── Charts ───────────────────────────────────────────────────────────────────
+const CHART_DEFAULTS = {
+  color: '#ccc',
+  font: { family: 'Inter, system-ui, sans-serif', size: 11 }
+};
+Chart.defaults.color = CHART_DEFAULTS.color;
+Chart.defaults.font  = CHART_DEFAULTS.font;
+
+fetch('/api/analytics_data').then(r => r.json()).then(d => {
+  // Uploads by month
+  new Chart(document.getElementById('uploadsChart'), {
+    type: 'bar',
+    data: {
+      labels: d.uploads_by_month.labels,
+      datasets: [{ label: 'Uploads', data: d.uploads_by_month.data,
+        backgroundColor: 'rgba(229,9,20,.7)', borderRadius: 4 }]
+    },
+    options: { responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{x:{grid:{color:'#222'}},y:{grid:{color:'#222'},ticks:{precision:0}}} }
+  });
+
+  // Downloads by lang
+  new Chart(document.getElementById('langChart'), {
+    type: 'doughnut',
+    data: {
+      labels: d.downloads_by_lang.labels,
+      datasets: [{ data: d.downloads_by_lang.data,
+        backgroundColor: ['#4caf50','#ef5350','#42a5f5','#aaa'], borderWidth: 0 }]
+    },
+    options: { responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom'}} }
+  });
+
+  // Top views
+  new Chart(document.getElementById('viewsChart'), {
+    type: 'bar',
+    data: {
+      labels: d.views_top10.labels,
+      datasets: [{ label:'Views', data: d.views_top10.data,
+        backgroundColor:'rgba(21,101,192,.7)', borderRadius:4 }]
+    },
+    options: { indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{x:{grid:{color:'#222'}},y:{grid:{color:'#222'}}} }
+  });
+
+  // Top requests
+  new Chart(document.getElementById('reqChart'), {
+    type: 'bar',
+    data: {
+      labels: d.requests_top10.labels,
+      datasets: [{ label:'Votes', data: d.requests_top10.data,
+        backgroundColor:'rgba(106,27,154,.7)', borderRadius:4 }]
+    },
+    options: { indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{x:{grid:{color:'#222'}},y:{grid:{color:'#222'}}} }
+  });
+
+  // Job status
+  new Chart(document.getElementById('jobsChart'), {
+    type: 'doughnut',
+    data: {
+      labels: d.jobs_summary.labels,
+      datasets: [{ data: d.jobs_summary.data,
+        backgroundColor:['#ffc107','#42a5f5','#4caf50','#ef5350'], borderWidth:0 }]
+    },
+    options: { responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom'}} }
+  });
+}).catch(() => {});
 </script>
 {% endblock %}
