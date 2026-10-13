@@ -285,8 +285,53 @@ class BroadcastLog(db.Model):
     broadcast_at   = db.Column(db.DateTime, server_default=func.now())
 
 # ── DB init ──────────────────────────────────────────────────────────────────
-# NOTE: No import-time db.create_all(). Use `flask --app app init-db` for
-# bootstrap/dev, and migrate.sql / Alembic for schema changes in production.
+# Startup auto-migration for new columns/indexes (idempotent, IF NOT EXISTS).
+# Required because production DB predates these columns; migrate.sql is the
+# canonical manual equivalent. Failures are logged, not fatal (except table-missing).
+def _run_startup_migrations():
+    try:
+        from sqlalchemy import text as _text
+        stmts = [
+            "ALTER TABLE movie ADD COLUMN IF NOT EXISTS is_silent BOOLEAN DEFAULT FALSE",
+            "ALTER TABLE search_log ADD COLUMN IF NOT EXISTS source VARCHAR(20) DEFAULT 'home'",
+            "ALTER TABLE site_stat ADD COLUMN IF NOT EXISTS r2_size_bytes BIGINT DEFAULT 0",
+            "ALTER TABLE site_stat ADD COLUMN IF NOT EXISTS r2_file_count INTEGER DEFAULT 0",
+            "ALTER TABLE site_stat ADD COLUMN IF NOT EXISTS r2_checked_at TIMESTAMP NULL",
+            "CREATE INDEX IF NOT EXISTS ix_movie_title ON movie (title)",
+            "CREATE INDEX IF NOT EXISTS ix_movie_imdb_media ON movie (imdb_id, media_type)",
+            "CREATE INDEX IF NOT EXISTS ix_movie_media_created ON movie (media_type, created_at)",
+            "CREATE INDEX IF NOT EXISTS ix_job_status_priority_queued ON translation_job (status, priority, queued_at)",
+            "CREATE INDEX IF NOT EXISTS ix_job_movie_lang ON translation_job (movie_id, language)",
+            "CREATE INDEX IF NOT EXISTS ix_searchlog_searched ON search_log (searched_at)",
+            "CREATE INDEX IF NOT EXISTS ix_downloadlog_downloaded ON download_log (downloaded_at)",
+            "CREATE INDEX IF NOT EXISTS ix_uploadplan_status_date ON upload_plan (status, scheduled_date)",
+            "CREATE INDEX IF NOT EXISTS ix_rating_movie_lang ON subtitle_rating (movie_id, language)",
+        ]
+        with app.app_context():
+            # Ensure base tables exist (fresh DB bootstrap).
+            try:
+                db.create_all()
+            except Exception:
+                pass
+            for s in stmts:
+                try:
+                    db.session.execute(_text(s))
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
+                    continue
+            # Ensure SiteStat row exists.
+            try:
+                if not SiteStat.query.first():
+                    db.session.add(SiteStat(total_visitors=0))
+                    db.session.commit()
+            except Exception:
+                db.session.rollback()
+    except Exception:
+        pass
+
+_run_startup_migrations()
+# NOTE: Use `flask --app app init-db` for manual bootstrap/dev; migrate.sql is canonical manual equivalent.
 @app.cli.command('init-db')
 def init_db_cmd():
     db.create_all()
