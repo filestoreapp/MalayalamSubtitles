@@ -59,7 +59,7 @@
       <a href="/admin/series">📺 Series</a>
       <a href="/admin/upload_planner" class="active">📅 Planner</a>
       <a href="/admin/search_analytics">🔍 Analytics</a>
-      <a href="/logout">🚪 Logout</a>
+      <form action="/logout" method="post" style="display:inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" style="background:none;border:none;color:inherit;cursor:pointer;font:inherit">🚪 Logout</button></form>
     </nav>
   </div>
 
@@ -71,6 +71,7 @@
   <div class="add-card">
     <h2>➕ Add to Plan</h2>
     <form action="/admin/upload_plan/add" method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="fg">
         <div class="fg-full">
           <label class="fl">Title *</label>
@@ -143,7 +144,9 @@
         <a href="/admin?title={{ p.title|urlencode }}{% if p.imdb_id %}&imdb={{ p.imdb_id }}{% endif %}" class="pa start">➕ Upload</a>
         <button class="pa done" onclick="updateStatus({{ p.id }},'Done')">✅ Done</button>
         <button class="pa" onclick="updateStatus({{ p.id }},'InProgress')">⚙️ WIP</button>
+        <button class="pa" onclick="updateStatus({{ p.id }},'Cancelled')">🚫 Cancel</button>
         <form action="/admin/upload_plan/delete/{{ p.id }}" method="post" style="margin:0">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit" class="pa del" onclick="return confirm('Remove from plan?')">🗑</button>
         </form>
       </div>
@@ -165,6 +168,7 @@
       </div>
       <div class="plan-actions">
         <form action="/admin/upload_plan/delete/{{ p.id }}" method="post" style="margin:0">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit" class="pa del">🗑</button>
         </form>
       </div>
