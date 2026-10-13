@@ -242,7 +242,7 @@
       <a href="/admin/requests">🙋 Requests{% if pending_requests %} <span style="background:var(--accent);color:#fff;border-radius:10px;padding:.05rem .35rem;font-size:.65rem">{{ pending_requests }}</span>{% endif %}</a>
       <a href="/admin/bot-dashboard" class="bot-link">🤖 Bot{% if bot_users %} <span style="background:#0088cc;color:#fff;border-radius:10px;padding:.05rem .35rem;font-size:.65rem">{{ bot_users }}</span>{% endif %}</a>
       <a href="/admin/export_csv">📥 CSV</a>
-      <a href="/logout">🚪 Logout</a>
+      <form action="/logout" method="post" style="display:inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" style="background:none;border:none;color:inherit;cursor:pointer;font:inherit">🚪 Logout</button></form>
     </nav>
   </div>
 
@@ -417,7 +417,7 @@
   {% if failed_jobs_count > 0 %}
   <div class="failed-alert">
     <p>⚠️ <strong>{{ failed_jobs_count }} translation job{{ 's' if failed_jobs_count > 1 }} failed.</strong> Retry them to re-queue.</p>
-    <a href="/admin/retry_failed" class="fix-btn">🔁 Retry All Failed</a>
+    <form action="/admin/retry_failed" method="post" style="display:inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="fix-btn">🔁 Retry All Failed</button></form>
   </div>
   {% endif %}
 
@@ -426,9 +426,9 @@
     <a href="/admin" class="action-btn">➕ Upload Media</a>
     <a href="/admin/series" class="action-btn">📺 Series Manager</a>
     <a href="/admin/duplicates" class="action-btn">🔁 Find Duplicates</a>
-    <a href="/admin/reset_jobs" class="action-btn">🔄 Reset Stuck Jobs</a>
-    <a href="/admin/retry_failed" class="action-btn">🔁 Retry Failed</a>
-    <a href="/admin/queue_all_missing" class="action-btn">📤 Queue Missing</a>
+    <form action="/admin/reset_jobs" method="post" style="display:inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="action-btn">🔄 Reset Stuck Jobs</button></form>
+    <form action="/admin/retry_failed" method="post" style="display:inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="action-btn">🔁 Retry Failed</button></form>
+    <form action="/admin/queue_all_missing" method="post" style="display:inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="action-btn">📤 Queue Missing</button></form>
     <a href="/admin/export_csv" class="action-btn">📥 Export CSV</a>
     <a href="/admin/requests" class="action-btn">🙋 Manage Requests</a>
     <a href="/admin/bot-dashboard" class="action-btn bot">🤖 Bot Dashboard</a>
@@ -547,13 +547,13 @@
       <div>
         <div class="row-actions">
           <a href="/admin/edit/{{ m.id }}">✏️</a>
-          <a href="/admin/queue_translations/{{ m.id }}">🔄</a>
+          <form action="/admin/queue_translations/{{ m.id }}" method="post" style="display:inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" style="background:none;border:none;cursor:pointer">🔄</button></form>
           {% if m.media_type == 'movie' %}
           <a href="/movie/{{ m.slug or m.id }}" target="_blank">🔗</a>
           {% else %}
           <a href="/series/{{ m.title | urlencode }}/{{ m.season or 1 }}" target="_blank">🔗</a>
           {% endif %}
-          <a href="/delete/{{ m.id }}" class="del" onclick="return confirm('Delete {{ m.title }}?')">🗑</a>
+          <form action="/delete/{{ m.id }}" method="post" style="display:inline" onsubmit="return confirm('Delete {{ m.title }}?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="del" style="background:none;border:none;cursor:pointer">🗑</button></form>
         </div>
       </div>
     </div>
@@ -602,7 +602,7 @@
           <div style="width:{{ job.progress }}%;height:100%;background:#4caf50;border-radius:2px"></div>
         </div>
         {% endif %}
-        <a href="/admin/delete_job/{{ job.id }}" style="font-size:.65rem;color:#555;text-decoration:none" onclick="return confirm('Remove job?')">✕ Remove</a>
+        <form action="/admin/delete_job/{{ job.id }}" method="post" style="display:inline" onsubmit="return confirm('Remove job?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" style="background:none;border:none;color:#555;cursor:pointer;font-size:.65rem">✕ Remove</button></form>
       </div>
     </div>
     {% endfor %}
