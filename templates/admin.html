@@ -99,11 +99,12 @@ textarea.form-input{resize:vertical;min-height:80px}
       <a href="/admin" class="active">➕ Upload</a>
       <a href="/admin/requests">🙋 Requests</a>
       <a href="/admin/export_csv">📥 CSV</a>
-      <a href="/logout">🚪 Logout</a>
+      <form action="/logout" method="post" style="display:inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" style="background:none;border:none;color:inherit;cursor:pointer;font:inherit">🚪 Logout</button></form>
     </nav>
   </div>
 
   <form action="/admin" method="post" enctype="multipart/form-data" id="upload-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
     <!-- ── Type ── -->
     <div class="form-card">
@@ -186,7 +187,7 @@ textarea.form-input{resize:vertical;min-height:80px}
       <div style="display:flex;gap:.6rem;flex-wrap:wrap;align-items:flex-end">
         <div style="flex:1;min-width:150px">
           <label class="form-label">IMDb ID</label>
-          <input class="form-input" type="text" id="imdb-id-input" placeholder="tt1375666 (auto-filled by TMDB)">
+          <input class="form-input" type="text" id="imdb-id-input" name="imdb_id" placeholder="tt1375666 (auto-filled by TMDB)">
         </div>
         <div id="ep-inputs" style="display:none;gap:.5rem;align-items:flex-end;flex-wrap:wrap">
           <div>
