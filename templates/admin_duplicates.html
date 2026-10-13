@@ -69,7 +69,7 @@
       <a href="/admin/duplicates" class="active">🔁 Duplicates</a>
       <a href="/admin/requests">🙋 Requests</a>
       <a href="/admin/export_csv">📥 CSV</a>
-      <a href="/logout">🚪 Logout</a>
+      <form action="/logout" method="post" style="display:inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" style="background:none;border:none;color:inherit;cursor:pointer;font:inherit">🚪 Logout</button></form>
     </nav>
   </div>
 
@@ -229,21 +229,18 @@ function confirmDelete(id, title){
 
 async function doDelete(id){
   document.getElementById('confirm-modal').style.display='none';
-  const r = await fetch('/delete/'+id);
+  const r = await fetch('/delete/'+id, {method:'POST'});
   if(r.ok || r.redirected){ showToast('✅ Deleted'); setTimeout(()=>location.reload(),1200); }
   else showToast('❌ Error deleting');
 }
 
 // Auto-keep: keep entry with most translations, delete others
 async function keepBest(ids){
-  // Fetch translation counts for each id
-  const counts = await Promise.all(ids.map(async id=>{
-    const r = await fetch('/api/movie_info/'+id);
-    return {id};
-  }));
-  // We'll just delete all except the first (lowest id = original)
-  // Better logic: user can manually choose via individual Delete buttons
-  alert('💡 Tip: Use the individual Delete buttons to keep the entry with more translations (check the ML/TA/HI badges above each entry).\n\nKeep the one with ✓ on most languages, delete the rest.');
+  if(!ids||ids.length<2){alert('Need at least 2 ids');return;}
+  if(!confirm('Keep best and delete the rest?')) return;
+  const r = await fetch('/admin/duplicates/keep_best',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:ids})});
+  const j = await r.json();
+  if(r.ok){alert('Kept '+j.kept+', deleted '+j.deleted.join(', ')); location.reload();} else {alert('Error: '+(j.error||r.status));}
 }
 </script>
 {% endblock %}
