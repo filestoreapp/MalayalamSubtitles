@@ -58,11 +58,12 @@
       <a href="/dashboard">📊 Dashboard</a>
       <a href="/admin">➕ Upload</a>
       <a href="/admin/requests">🙋 Requests</a>
-      <a href="/logout">🚪 Logout</a>
+      <form action="/logout" method="post" style="display:inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" style="background:none;border:none;color:inherit;cursor:pointer;font:inherit">🚪 Logout</button></form>
     </nav>
   </div>
 
   <form action="/admin/edit/{{ media.id }}" method="post" enctype="multipart/form-data">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
     <!-- Poster preview + details -->
     <div class="form-card">
@@ -168,9 +169,7 @@
     <div class="submit-bar">
       <button type="submit" class="btn-accent" style="padding:.65rem 2rem;font-size:1rem">💾 Save Changes</button>
       <a href="/dashboard" class="btn-ghost">Cancel</a>
-      <a href="/delete/{{ media.id }}" class="btn-ghost"
-         style="border-color:#3a1010;color:#ff6b6b;margin-left:auto"
-         onclick="return confirm('Permanently delete {{ media.title }}?')">🗑 Delete</a>
+      <form action="/delete/{{ media.id }}" method="post" style="display:inline" onsubmit="return confirm('Delete?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="btn-ghost" style="cursor:pointer">Delete</button></form>
     </div>
 
   </form>
