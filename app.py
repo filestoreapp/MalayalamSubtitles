@@ -47,10 +47,14 @@ def _required_env(name):
         raise RuntimeError(f"Missing required env var: {name}")
     return v
 
-# SECRET_KEY is required; no hard-coded fallback. Render already sets it.
+# SECRET_KEY is required; no hard-coded fallback.
+# Length >=32 is recommended; warn (do not fail) if shorter, to avoid
+# breaking existing deploys whose key predates this check. Rotate to >=32 in Render.
 _SECRET_KEY = os.environ.get('SECRET_KEY', '')
-if not _SECRET_KEY or len(_SECRET_KEY) < 32:
-    raise RuntimeError("SECRET_KEY must be set and at least 32 chars")
+if not _SECRET_KEY:
+    raise RuntimeError("Missing required env var: SECRET_KEY")
+if len(_SECRET_KEY) < 32:
+    print("WARNING: SECRET_KEY is shorter than 32 chars; rotate to a longer value in Render.")
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'pool_pre_ping': True, 'pool_recycle': 300}
