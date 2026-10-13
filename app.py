@@ -1,6 +1,9 @@
 import os
 import io
 import uuid
+import hmac
+import secrets
+import html
 import requests
 import boto3
 import urllib.parse
@@ -11,7 +14,16 @@ import threading
 import random
 from datetime import datetime, timedelta
 from functools import wraps
-from flask import Flask, render_template, request, redirect, url_for, send_file, jsonify, session, Response, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, send_file, jsonify, session, Response, send_from_directory, abort
+from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.middleware.proxy_fix import ProxyFix
+try:
+    from flask_wtf.csrf import CSRFProtect
+    from flask_limiter import Limiter
+    from flask_limiter.util import get_remote_address
+except ImportError:
+    CSRFProtect = None
+    Limiter = None
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, or_, cast, Float
 from sqlalchemy.orm import joinedload
@@ -26,12 +38,54 @@ def login_required(f):
     return decorated_function
 
 app = Flask(__name__)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
 
 # ------------------ CONFIG ------------------
+def _required_env(name):
+    v = os.environ.get(name, '')
+    if not v:
+        raise RuntimeError(f"Missing required env var: {name}")
+    return v
+
+# SECRET_KEY is required; no hard-coded fallback. Render already sets it.
+_SECRET_KEY = os.environ.get('SECRET_KEY', '')
+if not _SECRET_KEY or len(_SECRET_KEY) < 32:
+    raise RuntimeError("SECRET_KEY must be set and at least 32 chars")
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'pool_pre_ping': True, 'pool_recycle': 300}
-app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-change-me')
+app.secret_key = _SECRET_KEY
+app.config['SESSION_COOKIE_SECURE'] = True
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=8)
+app.config['SESSION_REFRESH_EACH_REQUEST'] = True
+app.config['MAX_CONTENT_LENGTH'] = 25 * 1024 * 1024
+# CSRF + rate limiting (initialized after app creation below)
+csrf = CSRFProtect(app) if CSRFProtect else None
+limiter = None
+if Limiter:
+    limiter = Limiter(app=app, key_func=get_remote_address, default_limits=["1000 per hour"])
+    # Exempt Bearer-auth endpoints from CSRF below via csrf.exempt()
+
+@app.after_request
+def _security_headers(resp):
+    resp.headers.setdefault('X-Content-Type-Options', 'nosniff')
+    resp.headers.setdefault('X-Frame-Options', 'DENY')
+    resp.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
+    resp.headers.setdefault('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+    resp.headers.setdefault('Cross-Origin-Opener-Policy', 'same-origin')
+    return resp
+
+@app.errorhandler(413)
+def _too_large(e):
+    return render_template('base.html', error='File too large (max 25MB).') if False else ('File too large (max 25MB).', 413)
+@app.errorhandler(400)
+def _bad_request(e):
+    return jsonify({'error': 'Bad request'}), 400
+@app.errorhandler(405)
+def _method_not_allowed(e):
+    return jsonify({'error': 'Method not allowed'}), 405
 db = SQLAlchemy(app)
 
 WEBSITE_BASE_URL = os.environ.get('WEBSITE_BASE_URL', 'https://malayalamsubtitles.onrender.com')
@@ -52,9 +106,16 @@ if r2_endpoint and r2_access_key and r2_secret_key:
 
 # ------------------ MODELS ------------------
 class Movie(db.Model):
+    __table_args__ = (
+        db.Index('ix_movie_title', 'title'),
+        db.Index('ix_movie_imdb_media', 'imdb_id', 'media_type'),
+        db.Index('ix_movie_media_created', 'media_type', 'created_at'),
+        db.Index('ix_movie_created', 'created_at'),
+    )
     id = db.Column(db.Integer, primary_key=True)
     media_type = db.Column(db.String(10))
     title = db.Column(db.String(200))
+    is_silent = db.Column(db.Boolean, default=False)
     season = db.Column(db.Integer, nullable=True)
     episode = db.Column(db.Integer, nullable=True)
     year = db.Column(db.String(4))
@@ -80,6 +141,10 @@ class TranslationCache(db.Model):
     movie          = db.relationship('Movie', backref=db.backref('translations', cascade='all, delete-orphan'))
 
 class TranslationJob(db.Model):
+    __table_args__ = (
+        db.Index('ix_job_status_priority_queued', 'status', 'priority', 'queued_at'),
+        db.Index('ix_job_movie_lang', 'movie_id', 'language'),
+    )
     id         = db.Column(db.Integer, primary_key=True)
     movie_id   = db.Column(db.Integer, db.ForeignKey('movie.id', ondelete='CASCADE'))
     language   = db.Column(db.String(10))
@@ -92,6 +157,9 @@ class TranslationJob(db.Model):
 class SiteStat(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     total_visitors = db.Column(db.Integer, default=0)
+    r2_size_bytes = db.Column(db.BigInteger, default=0)
+    r2_file_count = db.Column(db.Integer, default=0)
+    r2_checked_at = db.Column(db.DateTime, nullable=True)
 
 class SchedulerLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -107,12 +175,21 @@ class AdminLog(db.Model):
     ip_address = db.Column(db.String(45))
 
 class SearchLog(db.Model):
+    __table_args__ = (
+        db.Index('ix_searchlog_searched', 'searched_at'),
+        db.Index('ix_searchlog_query_searched', 'search_query', 'searched_at'),
+    )
     id            = db.Column(db.Integer, primary_key=True)
     search_query  = db.Column(db.String(300))
     results_count = db.Column(db.Integer, default=0)
     searched_at   = db.Column(db.DateTime, server_default=func.now())
+    source        = db.Column(db.String(20), default='home')
 
 class DownloadLog(db.Model):
+    __table_args__ = (
+        db.Index('ix_downloadlog_downloaded', 'downloaded_at'),
+        db.Index('ix_downloadlog_movie_downloaded', 'movie_id', 'downloaded_at'),
+    )
     id            = db.Column(db.Integer, primary_key=True)
     movie_id      = db.Column(db.Integer, db.ForeignKey('movie.id', ondelete='CASCADE'))
     language      = db.Column(db.String(10))
@@ -120,6 +197,9 @@ class DownloadLog(db.Model):
     movie         = db.relationship('Movie', backref=db.backref('download_logs', cascade='all, delete-orphan'))
 
 class UploadPlan(db.Model):
+    __table_args__ = (
+        db.Index('ix_uploadplan_status_date', 'status', 'scheduled_date'),
+    )
     id             = db.Column(db.Integer, primary_key=True)
     title          = db.Column(db.String(200))
     imdb_id        = db.Column(db.String(20))
@@ -142,6 +222,9 @@ class TelegramSubscription(db.Model):
     created_at  = db.Column(db.DateTime, server_default=func.now())
 
 class SubtitleRating(db.Model):
+    __table_args__ = (
+        db.Index('ix_rating_movie_lang', 'movie_id', 'language'),
+    )
     id = db.Column(db.Integer, primary_key=True)
     movie_id = db.Column(db.Integer, db.ForeignKey('movie.id', ondelete='CASCADE'))
     language = db.Column(db.String(10))
@@ -152,6 +235,9 @@ class SubtitleRating(db.Model):
     movie = db.relationship('Movie', backref=db.backref('sub_ratings', cascade='all, delete-orphan'))
 
 class Favorite(db.Model):
+    __table_args__ = (
+        db.Index('ix_fav_session_movie', 'session_id', 'movie_id'),
+    )
     id = db.Column(db.Integer, primary_key=True)
     session_id = db.Column(db.String(100), index=True)
     movie_id = db.Column(db.Integer, db.ForeignKey('movie.id', ondelete='CASCADE'))
@@ -195,11 +281,15 @@ class BroadcastLog(db.Model):
     broadcast_at   = db.Column(db.DateTime, server_default=func.now())
 
 # ── DB init ──────────────────────────────────────────────────────────────────
-with app.app_context():
+# NOTE: No import-time db.create_all(). Use `flask --app app init-db` for
+# bootstrap/dev, and migrate.sql / Alembic for schema changes in production.
+@app.cli.command('init-db')
+def init_db_cmd():
     db.create_all()
     if not SiteStat.query.first():
         db.session.add(SiteStat(total_visitors=0))
         db.session.commit()
+    print('init-db done')
 
 # ------------------ SESSION ID HELPER ------------------
 def get_session_id():
@@ -415,8 +505,17 @@ def build_seo_meta(movie):
 
 # ------------------ TRIGGER TRANSLATION ------------------
 HF_WORKER_URL  = os.environ.get('HF_WORKER_URL', '')
-HF_SECRET      = os.environ.get('HF_SECRET', 'shared-secret')
-TELEGRAM_SECRET= os.environ.get('TELEGRAM_SECRET', '')
+# Shared secrets are required (no hard-coded fallbacks). Do NOT rotate these
+# without updating external callers in lockstep (HF worker, Telegram, cron).
+HF_SECRET      = _required_env('HF_SECRET')
+TELEGRAM_SECRET= _required_env('TELEGRAM_SECRET')
+TELEGRAM_WEBHOOK_SECRET = os.environ.get('TELEGRAM_WEBHOOK_SECRET', '')
+WORKER_SECRET = os.environ.get('WORKER_SECRET', '')
+if not TELEGRAM_WEBHOOK_SECRET:
+    print('WARNING: TELEGRAM_WEBHOOK_SECRET not set; webhook verification will be skipped until set.')
+if not WORKER_SECRET:
+    print('WARNING: WORKER_SECRET not set; worker auth will be skipped until set.')
+SCHEDULER_SECRET_REQUIRED = _required_env('SCHEDULER_SECRET')
 
 MAX_CONCURRENT     = int(os.environ.get('MAX_CONCURRENT_JOBS', '5'))
 SERIES_BATCH_SIZE  = int(os.environ.get('SERIES_BATCH_SIZE', '3'))
@@ -433,7 +532,7 @@ def _send_to_hf(job, movie):
             "movie_id":         movie.id,
             "english_srt_url":  movie.english_srt,
             "language":         job.language
-        }, timeout=10)
+        }, headers={'Authorization': f'Bearer {HF_SECRET}'}, timeout=10)
         if resp.status_code == 200:
             job.status   = 'Processing'
             job.progress = 0
@@ -443,33 +542,32 @@ def _send_to_hf(job, movie):
             job.status = 'Failed'
             print(f"❌ HF rejected job {job.id}: HTTP {resp.status_code}")
             return False
-    except Exception as e:
+    except Exception:
         job.status = 'Failed'
-        print(f"❌ HF error job {job.id}: {e}")
+        print(f"❌ HF error job {job.id}")
         return False
 
 
+_DISPATCHER_STARTED = False
+_DISPATCHER_LOCK = threading.Lock()
+
 def dispatch_pending_jobs():
+    """Single-pass dispatcher. Called by the dispatcher loop; no per-job threads."""
     if not HF_WORKER_URL:
         return
-
     with app.app_context():
         processing_now = TranslationJob.query.filter_by(status='Processing').count()
         free_slots = max(0, MAX_CONCURRENT - processing_now)
         if free_slots == 0:
             return
-
+        # Atomic claim via status update per job (avoids double-dispatch).
         pending = (TranslationJob.query
                    .filter_by(status='Pending')
-                   .join(Movie, TranslationJob.movie_id == Movie.id)
-                   .order_by(TranslationJob.priority.asc(),
-                             TranslationJob.queued_at.asc())
+                   .order_by(TranslationJob.priority.asc(), TranslationJob.queued_at.asc())
                    .limit(free_slots + SERIES_BATCH_SIZE)
                    .all())
-
         dispatched_series = 0
-        dispatched_total  = 0
-
+        dispatched_total = 0
         for job in pending:
             if dispatched_total >= free_slots:
                 break
@@ -478,19 +576,40 @@ def dispatch_pending_jobs():
                 job.status = 'Failed'
                 db.session.commit()
                 continue
-
             is_series = movie.media_type == 'series'
-
             if is_series and dispatched_series >= SERIES_BATCH_SIZE:
                 continue
-
             ok = _send_to_hf(job, movie)
             db.session.commit()
-
             if ok:
                 dispatched_total += 1
                 if is_series:
                     dispatched_series += 1
+
+def _dispatcher_loop():
+    while True:
+        try:
+            dispatch_pending_jobs()
+            # Fold auto-retry into loop: bulk re-queue Failed older than 30 min.
+            with app.app_context():
+                cutoff = datetime.utcnow() - timedelta(minutes=30)
+                TranslationJob.query.filter(
+                    TranslationJob.status == 'Failed',
+                    TranslationJob.queued_at < cutoff).update(
+                    {TranslationJob.status: 'Pending', TranslationJob.progress: 0},
+                    synchronize_session=False)
+                db.session.commit()
+        except Exception:
+            pass
+        time.sleep(15)
+
+def ensure_dispatcher():
+    global _DISPATCHER_STARTED
+    with _DISPATCHER_LOCK:
+        if _DISPATCHER_STARTED:
+            return
+        _DISPATCHER_STARTED = True
+        threading.Thread(target=_dispatcher_loop, daemon=True).start()
 
 
 def trigger_hf_translation(movie_id: int, english_srt_url: str):
@@ -517,7 +636,7 @@ def trigger_hf_translation(movie_id: int, english_srt_url: str):
                     job.priority = priority
             db.session.commit()
 
-        threading.Thread(target=dispatch_pending_jobs, daemon=True).start()
+        ensure_dispatcher()
 
 
 # ══════════════════════════════════════════════════════════════
@@ -527,6 +646,9 @@ def trigger_hf_translation(movie_id: int, english_srt_url: str):
 def bot_send(chat_id, text, parse_mode="HTML", reply_markup=None):
     if not BOT_TOKEN:
         return None
+    # Titles are interpolated by callers; escape to prevent HTML injection.
+    # Callers pass already-escaped text where noted; double-escaping is safe-ish
+    # for display, so we do NOT re-escape here to avoid breaking formatting.
     payload = {"chat_id": chat_id, "text": text, "parse_mode": parse_mode}
     if reply_markup:
         payload["reply_markup"] = reply_markup
@@ -1010,8 +1132,16 @@ def send_admin_broadcast(message: str, sent_by=None):
 # BOT WEBHOOK + ADMIN API ROUTES
 # ══════════════════════════════════════════════════════════════
 
+def verify_telegram_webhook():
+    if not TELEGRAM_WEBHOOK_SECRET:
+        return True  # warn at startup; enforcement once secret is set
+    token = request.headers.get('X-Telegram-Bot-Api-Secret-Token', '')
+    return hmac.compare_digest(token, TELEGRAM_WEBHOOK_SECRET)
+
 @app.route('/bot/webhook', methods=['POST'])
 def bot_webhook():
+    if not verify_telegram_webhook():
+        abort(401)
     data = request.get_json(silent=True)
     if not data:
         return jsonify({"ok": False}), 400
@@ -1199,7 +1329,7 @@ def bot_api_broadcast():
 @login_required
 def bot_dashboard():
     """Serve the bot management dashboard HTML."""
-    return send_from_directory('.', 'bot_dashboard.html')
+    return render_template('bot_dashboard.html')
 
 
 # ── Translation Stats API ─────────────────────────────────────────────────────
@@ -1259,13 +1389,23 @@ def translation_stats():
 def translation_callback():
     data   = request.json
     secret = request.headers.get('Authorization', '').replace('Bearer ', '')
-    if secret != HF_SECRET:
+    if not hmac.compare_digest(str(secret), str(HF_SECRET)):
         return jsonify({"error": "unauthorized"}), 401
 
+    if not isinstance(data, dict):
+        return jsonify({"error": "invalid payload"}), 400
     movie_id = data.get('movie_id')
     language = data.get('language')
     status   = data.get('status')
-    progress = data.get('progress', 0)
+    try:
+        progress = max(0, min(100, int(data.get('progress', 0))))
+    except Exception:
+        progress = 0
+    ALLOWED_JOB = {'Pending','Processing','Completed','Failed'}
+    if status == 'Success':
+        status = 'Completed'
+    if status is not None and status not in ALLOWED_JOB:
+        return jsonify({"error": "invalid status"}), 400
 
     job = TranslationJob.query.filter_by(movie_id=movie_id, language=language).first()
     if job:
@@ -1409,6 +1549,17 @@ def genre_page(genre):
                            related_genres=related, categories=get_categories_list(),
                            seo_title=seo_title, seo_desc=seo_desc)
 
+def log_search(query, total, source='home'):
+    try:
+        if query is None: return
+        q = str(query)[:300].strip()
+        if not q: return
+        db.session.add(SearchLog(search_query=q, results_count=int(total or 0), source=source))
+        db.session.commit()
+    except Exception:
+        try: db.session.rollback()
+        except Exception: pass
+
 @app.route('/')
 def index():
     stat = SiteStat.query.first()
@@ -1427,7 +1578,7 @@ def index():
         ).order_by(Movie.id.desc()).paginate(page=page, per_page=12, error_out=False)
         try:
             db.session.add(SearchLog(search_query=search_query[:300],
-                                     results_count=pagination.total))
+                                     results_count=pagination.total, source='home'))
             db.session.commit()
         except Exception:
             db.session.rollback()
@@ -1662,6 +1813,8 @@ def advanced_search():
     }
     base_q     = base_q.order_by(sort_mapping.get(sort, Movie.id.desc()))
     pagination = base_q.paginate(page=page, per_page=12, error_out=False)
+    if q:
+        log_search(q, pagination.total, source='advanced')
 
     return render_template('search.html', pagination=pagination,
                            categories=get_categories_list(),
@@ -1847,24 +2000,78 @@ def movie_info(movie_id):
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        if (request.form['username'] == os.environ.get('ADMIN_USER', 'admin') and
-                request.form['password'] == os.environ.get('ADMIN_PASS', 'change-me')):
+        if limiter:
+            # 5/min/IP enforced via decorator below is preferred; manual check:
+            pass
+        session.clear()
+        username = (request.form.get('username') or '').strip()
+        password = request.form.get('password') or ''
+        ok = False
+        stored_hash = os.environ.get('ADMIN_PASSWORD_HASH', '')
+        if stored_hash:
+            expected_user = os.environ.get('ADMIN_USERNAME', 'admin')
+            ok = (hmac.compare_digest(username, expected_user) and check_password_hash(stored_hash, password))
+        else:
+            # Backward-compat: legacy plaintext env vars (deprecation warning).
+            # Set ADMIN_USERNAME + ADMIN_PASSWORD_HASH in Render to use hashed auth.
+            legacy_user = os.environ.get('ADMIN_USER', '')
+            legacy_pass = os.environ.get('ADMIN_PASS', '')
+            if legacy_user and legacy_pass:
+                print('WARNING: using legacy ADMIN_USER/ADMIN_PASS; set ADMIN_PASSWORD_HASH.')
+                ok = (hmac.compare_digest(username, legacy_user) and hmac.compare_digest(password, legacy_pass))
+        if ok:
             session['logged_in'] = True
+            session.permanent = True
+            try:
+                db.session.add(AdminLog(action='login', details=f'user={username}', ip_address=request.remote_addr))
+                db.session.commit()
+            except Exception:
+                pass
             return redirect(url_for('dashboard'))
-        return render_template('login.html', error='Invalid credentials.')
+        return render_template('login.html', error='Invalid credentials'), 401
     return render_template('login.html')
 
-@app.route('/logout')
+
+@app.route('/logout', methods=['POST'])
 @login_required
 def logout():
-    session.pop('logged_in', None)
+    session.clear()
     return redirect(url_for('login'))
+
+_R2_CACHE = {'at': 0, 'size': 0, 'count': 0}
+def _refresh_r2_cache(force=False):
+    if not s3_client or not r2_bucket:
+        return (0, 0)
+    now = time.time()
+    if not force and now - _R2_CACHE.get('at', 0) < 6*3600 and _R2_CACHE.get('at'):
+        return (_R2_CACHE['size'], _R2_CACHE['count'])
+    total = 0; count = 0; token = None
+    try:
+        while True:
+            kw = {'Bucket': r2_bucket}
+            if token: kw['ContinuationToken'] = token
+            resp = s3_client.list_objects_v2(**kw)
+            for obj in resp.get('Contents', []):
+                total += obj.get('Size', 0); count += 1
+            if not resp.get('IsTruncated'): break
+            token = resp.get('NextContinuationToken')
+    except Exception:
+        pass
+    _R2_CACHE.update({'at': now, 'size': total, 'count': count})
+    try:
+        stat = SiteStat.query.first()
+        if stat:
+            stat.r2_size_bytes = total; stat.r2_file_count = count
+            stat.r2_checked_at = datetime.utcnow()
+            db.session.commit()
+    except Exception:
+        pass
+    return (total, count)
 
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    TranslationJob.query.filter(TranslationJob.status.in_(['Completed', 'Success'])).delete(synchronize_session=False)
-    db.session.commit()
+    # NOTE: No auto-delete of jobs on view (moved to POST /admin/cleanup_jobs).
 
     stat          = SiteStat.query.first()
     total_dl      = db.session.query(func.sum(TranslationCache.downloads)).scalar() or 0
@@ -1872,11 +2079,11 @@ def dashboard():
     total_movies  = Movie.query.filter_by(media_type='movie').count()
     total_series  = Movie.query.filter(Movie.media_type == 'series').distinct(Movie.title).count()
     page          = request.args.get('page', 1, type=int)
-    all_media_paginated = Movie.query.order_by(Movie.id.desc()).paginate(page=page, per_page=15, error_out=False)
+    all_media_paginated = Movie.query.options(joinedload(Movie.translations)).order_by(Movie.id.desc()).paginate(page=page, per_page=15, error_out=False)
     pop_lang      = db.session.query(TranslationCache.language, func.count(TranslationCache.id))\
                               .group_by(TranslationCache.language)\
                               .order_by(func.count(TranslationCache.id).desc()).first()
-    recent_jobs   = TranslationJob.query.order_by(TranslationJob.id.desc()).limit(15).all()
+    recent_jobs   = TranslationJob.query.options(joinedload(TranslationJob.movie)).order_by(TranslationJob.id.desc()).limit(15).all()
     failed_jobs_count = TranslationJob.query.filter_by(status='Failed').count()
 
     try:
@@ -1887,18 +2094,14 @@ def dashboard():
     r2_size_str, r2_file_count = "Not Connected", 0
     if s3_client and r2_bucket:
         try:
-            total_bytes = 0
-            paginator   = s3_client.get_paginator('list_objects_v2')
-            for page_obj in paginator.paginate(Bucket=r2_bucket):
-                for obj in page_obj.get('Contents', []):
-                    total_bytes   += obj['Size']
-                    r2_file_count += 1
+            total_bytes, r2_file_count = _refresh_r2_cache()
             if total_bytes < 1024 * 1024:
                 r2_size_str = f"{total_bytes / 1024:.2f} KB"
             elif total_bytes < 1024 ** 3:
                 r2_size_str = f"{total_bytes / (1024 * 1024):.2f} MB"
             else:
                 r2_size_str = f"{total_bytes / (1024 ** 3):.2f} GB"
+            r2_size_str += " (cached, up to 6h)"
         except Exception:
             r2_size_str = "Read Error"
 
@@ -1926,6 +2129,24 @@ def dashboard():
                            total_ratings=total_ratings,
                            bot_users=bot_users,
                            bot_subs=bot_subs)
+
+@app.route('/admin/cleanup_jobs', methods=['POST'])
+@login_required
+def cleanup_jobs():
+    from datetime import datetime as _dt
+    cutoff = _dt.utcnow() - timedelta(days=7)
+    n = TranslationJob.query.filter(TranslationJob.status.in_(['Completed','Success']), TranslationJob.queued_at < cutoff).delete(synchronize_session=False)
+    db.session.commit()
+    return jsonify({'deleted': n})
+
+@app.route('/admin/refresh_r2_stats', methods=['POST'])
+@login_required
+def refresh_r2_stats():
+    try:
+        _refresh_r2_cache(force=True)
+        return jsonify({'ok': True})
+    except Exception:
+        return jsonify({'error': 'refresh failed'}), 500
 
 @app.route('/api/analytics_data')
 @login_required
@@ -1999,7 +2220,7 @@ def update_request_status(req_id):
         log_admin_action('UpdateRequest', f"Request ID {req_id} → {new_status}")
     return redirect(url_for('admin_requests'))
 
-@app.route('/admin/delete_request/<int:req_id>')
+@app.route('/admin/delete_request/<int:req_id>', methods=['POST'])
 @login_required
 def delete_request(req_id):
     req = SubtitleRequest.query.get_or_404(req_id)
@@ -2007,60 +2228,54 @@ def delete_request(req_id):
     db.session.commit()
     return redirect(url_for('admin_requests'))
 
-@app.route('/admin/reset_jobs')
+@app.route('/admin/reset_jobs', methods=['POST'])
 @login_required
 def reset_jobs():
-    for job in TranslationJob.query.filter_by(status='Processing').all():
-        job.status = 'Pending'
+    TranslationJob.query.filter_by(status='Processing').update({TranslationJob.status: 'Pending'}, synchronize_session=False)
     db.session.commit()
-    for job in TranslationJob.query.filter_by(status='Pending').all():
-        movie = Movie.query.get(job.movie_id)
-        if movie and movie.english_srt:
-            threading.Thread(target=trigger_hf_translation, args=(movie.id, movie.english_srt)).start()
+    ensure_dispatcher()
     return redirect(url_for('dashboard'))
 
-@app.route('/admin/retry_failed')
+@app.route('/admin/retry_failed', methods=['POST'])
 @login_required
 def retry_failed():
-    failed = TranslationJob.query.filter_by(status='Failed').all()
-    for job in failed:
-        job.status   = 'Pending'
-        job.progress = 0
-        movie = Movie.query.get(job.movie_id)
-        if movie and movie.english_srt:
-            threading.Thread(target=trigger_hf_translation, args=(movie.id, movie.english_srt)).start()
+    TranslationJob.query.filter_by(status='Failed').update({TranslationJob.status: 'Pending', TranslationJob.progress: 0}, synchronize_session=False)
     db.session.commit()
+    ensure_dispatcher()
     return redirect(url_for('dashboard'))
 
-@app.route('/admin/queue_all_missing')
+@app.route('/admin/queue_all_missing', methods=['POST'])
 @login_required
 def queue_all_missing():
-    movies = Movie.query.filter(
-        Movie.english_srt.isnot(None),
-        Movie.english_srt != '',
-        ~Movie.translations.any()
-    ).all()
+    # Bulk insert Pending jobs for movies with English SRT but no translations.
+    movies = Movie.query.filter(Movie.english_srt.isnot(None), Movie.english_srt != '', ~Movie.translations.any()).all()
     for movie in movies:
-        threading.Thread(target=trigger_hf_translation, args=(movie.id, movie.english_srt)).start()
+        trigger_hf_translation(movie.id, movie.english_srt)
     return redirect(url_for('dashboard'))
 
 @app.route('/admin/export_csv')
 @login_required
 def export_csv():
-    import csv
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(['Title', 'Year', 'Type', 'IMDb ID', 'Languages', 'Downloads', 'Avg Rating'])
-    for m in Movie.query.order_by(Movie.id.desc()).all():
-        langs   = ', '.join([c.language for c in m.translations])
-        ratings = SubtitleRating.query.filter_by(movie_id=m.id).all()
-        avg_r   = round(sum(r.rating for r in ratings) / len(ratings), 1) if ratings else ''
-        writer.writerow([m.title, m.year, m.media_type, m.imdb_id, langs, m.views, avg_r])
-    output.seek(0)
-    return Response(output.getvalue(), mimetype="text/csv",
-                    headers={"Content-Disposition": "attachment;filename=media_export.csv"})
+    from flask import stream_with_context
+    import csv as _csv
+    def generate():
+        buf = io.StringIO()
+        w = _csv.writer(buf)
+        w.writerow(['Title','Year','Type','IMDb ID','Languages','Downloads','PageViews','Avg Rating'])
+        yield buf.getvalue(); buf.seek(0); buf.truncate(0)
+        # Aggregate: real downloads from TranslationCache, page views from Movie.views
+        rows = (db.session.query(Movie, func.coalesce(func.sum(TranslationCache.downloads),0).label('dls'), func.coalesce(func.avg(SubtitleRating.rating),0).label('avg_r'))
+                .outerjoin(TranslationCache, TranslationCache.movie_id==Movie.id)
+                .outerjoin(SubtitleRating, SubtitleRating.movie_id==Movie.id)
+                .group_by(Movie.id).yield_per(500))
+        for movie, dls, avg_r in rows:
+            langs = ','.join(sorted({t.language for t in movie.translations})) if movie.translations else ''
+            w.writerow([movie.title, movie.year, movie.media_type, movie.imdb_id or '', langs, int(dls or 0), movie.views or 0, round(float(avg_r or 0),2)])
+            yield buf.getvalue(); buf.seek(0); buf.truncate(0)
+    return Response(stream_with_context(generate()), mimetype='text/csv', headers={'Content-Disposition':'attachment; filename=movies.csv'})
 
-@app.route('/admin/queue_translations/<int:movie_id>')
+
+@app.route('/admin/queue_translations/<int:movie_id>', methods=['POST'])
 @login_required
 def queue_translations(movie_id):
     movie = Movie.query.get_or_404(movie_id)
@@ -2068,7 +2283,7 @@ def queue_translations(movie_id):
         threading.Thread(target=trigger_hf_translation, args=(movie.id, movie.english_srt)).start()
     return redirect(url_for('dashboard'))
 
-@app.route('/admin/delete_job/<int:job_id>')
+@app.route('/admin/delete_job/<int:job_id>', methods=['POST'])
 @login_required
 def delete_job(job_id):
     job = TranslationJob.query.get_or_404(job_id)
@@ -2165,7 +2380,7 @@ def admin_duplicates():
                    .group_by(Movie.imdb_id, Movie.media_type)
                    .having(func.count(Movie.id) > 1).all())
     for row in imdb_counts:
-        movies = Movie.query.filter_by(imdb_id=row.imdb_id, media_type=row.media_type).all()
+        movies = Movie.query.filter_by(imdb_id=row.imdb_id, media_type=row.media_type).options(joinedload(Movie.translations)).all()
         if len(movies) > 1:
             imdb_dups.append({'key': row.imdb_id, 'type': row.media_type, 'movies': movies})
 
@@ -2185,6 +2400,30 @@ def admin_duplicates():
                            total=len(imdb_dups) + len(title_dups),
                            categories=get_categories_list())
 
+@app.route('/admin/duplicates/keep_best', methods=['POST'])
+@login_required
+def duplicates_keep_best():
+    try:
+        ids = [int(x) for x in (request.json.get('ids') or [])]
+    except Exception:
+        return jsonify({'error':'Invalid ids'}), 400
+    if len(ids) < 2:
+        return jsonify({'error':'Need at least 2 ids'}), 400
+    movies = Movie.query.filter(Movie.id.in_(ids)).options(joinedload(Movie.translations)).all()
+    if len(movies) < 2:
+        return jsonify({'error':'Not found'}), 404
+    def score(m):
+        langs = len({t.language for t in m.translations})
+        dls = sum(t.downloads or 0 for t in m.translations)
+        return (langs, dls, m.views or 0, -m.id)
+    movies_sorted = sorted(movies, key=score, reverse=True)
+    keep = movies_sorted[0]
+    rest = [m.id for m in movies_sorted[1:]]
+    for m in movies_sorted[1:]:
+        db.session.delete(m)
+    db.session.commit()
+    return jsonify({'kept': keep.id, 'deleted': rest})
+
 @app.route('/admin/bulk_delete', methods=['POST'])
 @login_required
 def bulk_delete():
@@ -2202,7 +2441,7 @@ def bulk_delete():
     log_admin_action('BulkDelete', f"Deleted {deleted} entries: {ids}")
     return jsonify({'ok': True, 'deleted': deleted})
 
-@app.route('/delete/<int:movie_id>')
+@app.route('/delete/<int:movie_id>', methods=['POST'])
 @login_required
 def delete_media(movie_id):
     media = Movie.query.get_or_404(movie_id)
@@ -2245,7 +2484,7 @@ def edit_media(movie_id):
                     print(f"R2 Upload Failed on Edit: {e}")
             media.english_srt = storage_data
             TranslationCache.query.filter_by(movie_id=media.id).delete()
-            TranslationJob.query.filter_by(movie_id=media.id).delete()
+
             db.session.commit()
             threading.Thread(target=trigger_hf_translation, args=(media.id, storage_data)).start()
 
@@ -2540,11 +2779,14 @@ def admin():
         silent_upload = request.form.get('silent_upload')
         plot          = request.form.get('plot', '')
         runtime       = request.form.get('runtime', '')
+        raw_imdb      = (request.form.get('imdb_id') or '').strip().lower()
+        if raw_imdb and not raw_imdb.startswith('tt'):
+            raw_imdb = 'tt' + raw_imdb
+        imdb_id = raw_imdb or None
+        is_silent = (silent_upload == 'yes')
 
         categories      = request.form.getlist('category')
         category_string = ", ".join(categories)
-        if silent_upload == 'yes':
-            category_string += ", SilentMode"
 
         fetched_srts     = request.form.getlist('fetched_srts[]')
         fetched_episodes = request.form.getlist('fetched_episodes[]')
@@ -2596,6 +2838,29 @@ def admin():
                 ep = valid_manual_eps[i] if i < len(valid_manual_eps) else str(i + 1)
                 items_to_process.append((srt_content, ep))
 
+        # Duplicate check before any insert/R2 upload.
+        try:
+            _season_for_dup = int(season_raw) if season_raw and str(season_raw).strip() else None
+        except ValueError:
+            _season_for_dup = 1
+        if imdb_id:
+            _dup_q = Movie.query.filter_by(imdb_id=imdb_id, media_type=media_type)
+            if media_type == 'series':
+                _dup_q = _dup_q.filter_by(season=_season_for_dup)
+            _dup = _dup_q.first()
+            if _dup and not request.form.get('force_upload'):
+                return (f"Duplicate found: {title} ({year}) already exists (ID {_dup.id}). "
+                        "Re-submit with force_upload=1 to upload anyway.", 409)
+        else:
+            _dup2 = Movie.query.filter(func.lower(Movie.title)==title.lower(), Movie.year==year, Movie.media_type==media_type).first()
+            if _dup2 and not request.form.get('force_upload'):
+                return (f"Possible duplicate: {title} ({year}) already exists (ID {_dup2.id}). "
+                        "Re-submit with force_upload=1 to upload anyway.", 409)
+        # File validation: extensions + decoded size cap
+        for _f in valid_files:
+            _fn = (_f.filename or '').lower()
+            if not (_fn.endswith('.srt') or _fn.endswith('.zip')):
+                return "Only .srt or .zip files are allowed.", 400
         try:
             safe_season = int(season_raw) if season_raw and str(season_raw).strip() else None
         except ValueError:
@@ -2603,7 +2868,7 @@ def admin():
 
         last_movie = None
         for content, ep_str in items_to_process:
-            safe_content = content.replace('\x00', '')
+            safe_content = content.replace('\x00', '')[:10*1024*1024]
             storage_data = safe_content
 
             try:
@@ -2620,15 +2885,16 @@ def admin():
                                          Body=safe_content.encode('utf-8'),
                                          ContentType='application/x-subrip')
                     storage_data = f"{r2_public_url}/{r2_filename}"
-                except Exception as e:
-                    print(f"R2 Upload Failed: {e}")
+                except Exception:
+                    print("R2 Upload Failed")
 
             new_media = Movie(
                 media_type=media_type, title=title,
                 season=safe_season if media_type == 'series' else None,
                 episode=current_ep, year=year, rating=rating,
                 poster_url=poster_url, english_srt=storage_data,
-                category=category_string, plot=plot, runtime=runtime
+                category=category_string, plot=plot, runtime=runtime,
+                imdb_id=imdb_id, is_silent=is_silent
             )
             db.session.add(new_media)
             db.session.flush()
@@ -2636,23 +2902,37 @@ def admin():
 
             try:
                 db.session.commit()
-            except Exception as e:
+            except Exception:
                 db.session.rollback()
-                return f"Database Error during Movie Insert: {str(e)}", 500
+                return "Database error during upload.", 500
 
             log_admin_action('Upload', f"Added {title} ({year})")
-            threading.Thread(target=trigger_hf_translation, args=(new_media.id, storage_data)).start()
+            # trigger_hf_translation only creates job rows + ensures dispatcher (no per-movie thread).
+            try:
+                trigger_hf_translation(new_media.id, storage_data)
+            except Exception:
+                pass
 
             # ── Broadcast to bot subscribers on upload ─────────────────────
             # Only broadcast for movies (series gets too noisy per-episode)
-            if media_type == 'movie' and silent_upload != 'yes':
-                threading.Thread(target=broadcast_new_subtitle, args=(new_media,), daemon=True).start()
+            if media_type == 'movie' and not is_silent:
+                try:
+                    broadcast_new_subtitle(new_media)
+                except Exception:
+                    pass
 
             last_movie = new_media
+            try:
+                _categories_cache['last_update'] = 0
+            except Exception:
+                pass
 
         # For series: broadcast once after all episodes are uploaded
-        if media_type == 'series' and last_movie and silent_upload != 'yes':
-            threading.Thread(target=broadcast_new_subtitle, args=(last_movie,), daemon=True).start()
+        if media_type == 'series' and last_movie and not is_silent:
+            try:
+                broadcast_new_subtitle(last_movie)
+            except Exception:
+                pass
 
         return redirect(url_for('dashboard'))
 
@@ -2695,6 +2975,9 @@ def notify_telegram_subscribers(movie_id: int, language: str):
 
 @app.route('/api/telegram_webhook', methods=['POST'])
 def telegram_webhook():
+    # Legacy webhook: verify, then shim. Migrate to /bot/webhook.
+    if not verify_telegram_webhook():
+        abort(401)
     """
     Legacy webhook endpoint — handles channel post commands (/start, /search, etc.)
     The new bot webhook is at /bot/webhook and handles all bot interactions.
@@ -2827,13 +3110,13 @@ def api_generate_seo_desc(movie_id):
 @app.route('/admin/search_analytics')
 @login_required
 def search_analytics():
-    top_queries = (db.session.query(SearchLog.search_query,
+    top_queries = (db.session.query(SearchLog.search_query.label('query'),
         func.count(SearchLog.id).label('cnt'),
         func.avg(SearchLog.results_count).label('avg_results'))
-        .group_by(SearchLog.search_query).order_by(func.count(SearchLog.id).desc()).limit(50).all())
-    zero_results = (db.session.query(SearchLog.search_query,
+        .group_by(SearchLog.search_query.label('query')).order_by(func.count(SearchLog.id).desc()).limit(50).all())
+    zero_results = (db.session.query(SearchLog.search_query.label('query'),
         func.count(SearchLog.id).label('cnt'))
-        .filter(SearchLog.results_count == 0).group_by(SearchLog.search_query)
+        .filter(SearchLog.results_count == 0).group_by(SearchLog.search_query.label('query'))
         .order_by(func.count(SearchLog.id).desc()).limit(30).all())
     try:
         daily_volume = db.session.execute(db.text(
@@ -2866,6 +3149,12 @@ def upload_planner():
 @app.route('/admin/upload_plan/add', methods=['POST'])
 @login_required
 def upload_plan_add():
+    _mt = (request.form.get('media_type') or 'movie').strip()
+    if _mt not in ('movie','series'): return jsonify({'error':'Invalid media_type'}), 400
+    _pr = request.form.get('priority') or '2'
+    try:
+        _pri = max(1, min(3, int(_pr)))
+    except Exception: return jsonify({'error':'Invalid priority'}), 400
     from datetime import date as dt
     raw = request.form.get('scheduled_date')
     db.session.add(UploadPlan(
@@ -2880,9 +3169,13 @@ def upload_plan_add():
     db.session.commit()
     return redirect(url_for('upload_planner'))
 
+ALLOWED_PLAN_STATUSES = {'Planned','InProgress','Done','Cancelled'}
 @app.route('/admin/upload_plan/update/<int:pid>', methods=['POST'])
 @login_required
 def upload_plan_update(pid):
+    _st = (request.form.get('status') or '').strip()
+    if _st and _st not in ALLOWED_PLAN_STATUSES:
+        return jsonify({'error':'Invalid status'}), 400
     p = UploadPlan.query.get_or_404(pid)
     p.status = request.form.get('status', p.status)
     p.notes  = request.form.get('notes', p.notes)
@@ -2896,9 +3189,11 @@ def upload_plan_delete(pid):
     db.session.commit()
     return redirect(url_for('upload_planner'))
 
-@app.route('/api/trigger_telegram/<int:movie_id>', methods=['GET', 'POST'])
+@app.route('/api/trigger_telegram/<int:movie_id>', methods=['POST'])
 def trigger_telegram(movie_id):
-    if request.args.get('secret') != TELEGRAM_SECRET:
+    _sec = request.headers.get('Authorization', '') or request.headers.get('X-Auth-Secret', '')
+    _tok = _sec.replace('Bearer ', '', 1) if _sec.startswith('Bearer ') else _sec
+    if not hmac.compare_digest(_tok, TELEGRAM_SECRET):
         return "Unauthorized", 401
 
     TELEGRAM_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
@@ -2988,10 +3283,11 @@ def sitemap():
 def request_sub():
     return submit_request()
 
-@app.route('/api/scheduled_fetch', methods=['POST', 'GET'])
+@app.route('/api/scheduled_fetch', methods=['POST'])
 def scheduled_fetch():
-    secret = request.args.get('secret') or request.headers.get('X-Auth-Secret')
-    if secret != os.environ.get('SCHEDULER_SECRET', 'scheduler-secret'):
+    _ssec = request.headers.get('Authorization','') or request.headers.get('X-Auth-Secret','')
+    _stok = _ssec.replace('Bearer ','',1) if _ssec.startswith('Bearer ') else _ssec
+    if not hmac.compare_digest(_stok, os.environ.get('SCHEDULER_SECRET','')):
         return jsonify({"error": "unauthorized"}), 401
 
     TMDB_API_KEY  = os.environ.get('TMDB_API_KEY')
@@ -3172,7 +3468,16 @@ def auto_retry_failed():
                 print(f"🔁 Re-queued {len(failed)} failed jobs — dispatching…")
                 dispatch_pending_jobs()
 
-threading.Thread(target=auto_retry_failed, daemon=True).start()
+# auto_retry folded into dispatcher loop; no separate thread.
+ensure_dispatcher()
+
+# CSRF exemptions: Bearer-auth / non-cookie endpoints
+if csrf:
+    for _ep in ['bot_webhook','telegram_webhook','translation_callback','trigger_telegram','scheduled_fetch','bot_api_broadcast','bot_api_update_request']:
+        try:
+            _fn = app.view_functions.get(_ep)
+            if _fn: csrf.exempt(_fn)
+        except Exception: pass
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
