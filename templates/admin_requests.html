@@ -87,7 +87,7 @@
       <a href="/admin">➕ Upload</a>
       <a href="/admin/requests" class="active">🙋 Requests</a>
       <a href="/admin/export_csv">📥 Export CSV</a>
-      <a href="/logout">🚪 Logout</a>
+      <form action="/logout" method="post" style="display:inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" style="background:none;border:none;color:inherit;cursor:pointer;font:inherit">🚪 Logout</button></form>
     </nav>
   </div>
 
@@ -138,6 +138,7 @@
       <!-- Actions -->
       <div style="display:flex;gap:.35rem;flex-wrap:wrap;align-items:center">
         <form action="/admin/update_request/{{ req.id }}" method="post" class="status-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <select name="status" class="status-select">
             <option value="Pending"    {{ 'selected' if req.status == 'Pending' }}>Pending</option>
             <option value="InProgress" {{ 'selected' if req.status == 'InProgress' }}>In Progress</option>
@@ -145,8 +146,7 @@
           </select>
           <button type="submit" class="status-btn">Save</button>
         </form>
-        <a href="/admin/delete_request/{{ req.id }}" class="del-btn"
-           onclick="return confirm('Delete request: {{ req.title }}?')">🗑</a>
+        <form action="/admin/delete_request/{{ req.id }}" method="post" style="display:inline" onsubmit="return confirm('Delete request?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="del-btn" style="background:none;border:none;cursor:pointer">Delete</button></form>
       </div>
     </div>
     {% endfor %}
