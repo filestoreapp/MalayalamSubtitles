@@ -1,0 +1,58 @@
+services:
+  - type: web
+    name: MalayalamSubtitles
+    env: python
+    branch: Claude-3
+    plan: free
+    region: singapore
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 120
+    healthCheckPath: /keep-alive
+    autoDeploy: false
+    envVars:
+      - key: SECRET_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: ADMIN_USERNAME
+        sync: false
+      - key: ADMIN_PASSWORD_HASH
+        sync: false
+      - key: HF_SECRET
+        sync: false
+      - key: HF_WORKER_URL
+        sync: false
+      - key: TELEGRAM_SECRET
+        sync: false
+      - key: TELEGRAM_WEBHOOK_SECRET
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_ADMIN_IDS
+        sync: false
+      - key: TELEGRAM_CHANNEL_ID
+        sync: false
+      - key: SCHEDULER_SECRET
+        sync: false
+      - key: WORKER_SECRET
+        sync: false
+      - key: TMDB_API_KEY
+        sync: false
+      - key: SUBDL_API_KEY
+        sync: false
+      - key: OS_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: R2_ENDPOINT_URL
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET_NAME
+        sync: false
+      - key: R2_PUBLIC_URL
+        sync: false
+      - key: WEBSITE_BASE_URL
+        value: https://malayalamsubtitles.onrender.com
