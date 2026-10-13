@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
 
   {% if seo %}
     <title>{{ seo.title }}</title>
@@ -244,6 +245,9 @@
   </style>
 
   {% block extra_head %}{% endblock %}
+<script>
+(function(){var _f=window.fetch;window.fetch=function(u,o){o=o||{};var m=(o.method||'GET').toUpperCase();if(m!=='GET'&&m!=='HEAD'){try{var same=typeof u==='string'?(u.startsWith('/')||u.startsWith(window.location.origin)):true;if(same){o.headers=o.headers||{};var mt=document.querySelector('meta[name="csrf-token"]');if(mt&&!o.headers['X-CSRFToken']&&!o.headers['X-CSRFtoken']){o.headers['X-CSRFToken']=mt.content;}}}catch(e){}}return _f(u,o);};})();
+</script>
 </head>
 <body>
 
