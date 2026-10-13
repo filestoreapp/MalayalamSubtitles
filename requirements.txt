@@ -6,6 +6,7 @@ Flask-Migrate==4.1.0
 deep-translator==1.11.4
 gunicorn==23.0.0
 psycopg2-binary==2.9.10
+psycopg[binary]==3.2.0
 requests==2.32.3
 boto3==1.35.0
 pysrt==1.1.2
