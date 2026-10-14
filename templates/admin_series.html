@@ -150,6 +150,8 @@
     <button class="act-btn" onclick="clearAll()">✕ Clear</button>
   </div>
 
+  <div id="fetch-status" style="display:none;margin-bottom:1rem;padding:.6rem 1rem;background:var(--card);border:1px solid var(--border);border-radius:10px;font-size:.85rem"></div>
+
   <!-- Series grid -->
   <div class="series-grid" id="series-grid">
     {% for s in series_list %}
@@ -301,9 +303,23 @@ function toggleDetail(idx){
 
 // ── Fetch missing translations ───────────────────────────────────────────────
 function fetchMissing(title){
-  fetch('/admin/series/fetch_missing/'+encodeURIComponent(title),{method:'POST'})
+  const st = document.getElementById('fetch-status');
+  if(st){ st.style.display='block'; st.textContent = '⏳ Fetching missing for ' + title + '…'; }
+  fetch('/admin/series/fetch_missing/'+encodeURIComponent(title),{method:'POST', headers:{'X-CSRFToken': '{{ csrf_token() }}'}})
   .then(r=>r.json())
-  .then(d=>{ alert(d.ok ? `✅ Queued ${d.queued} translation job(s).` : '❌ Error'); });
+  .then(d=>{
+    if(!st) return;
+    if(d.ok){
+      let msg = `✅ Queued ${d.queued} translation job(s).`;
+      if(d.fetching_gaps && d.fetching_gaps.length) msg += ` Fetching missing episodes: ${d.fetching_gaps.join(', ')} (English subtitles are being fetched in the background — check back in a minute.)`;
+      if(d.gaps_without_imdb && d.gaps_without_imdb.length) msg += ` Cannot auto-fetch ${d.gaps_without_imdb.join(', ')} — no IMDb ID; add via Upload.`;
+      if(d.episodes_without_srt && d.episodes_without_srt.length) msg += ` Episodes without English SRT: ${d.episodes_without_srt.join(', ')}.`;
+      st.textContent = msg;
+    } else {
+      st.textContent = '❌ ' + (d.error || 'Error');
+    }
+  })
+  .catch(e=>{ if(st) st.textContent = '❌ Network error: ' + e.message; });
 }
 
 // ── Delete series confirmation ───────────────────────────────────────────────
@@ -318,7 +334,7 @@ function confirmDeleteSeries(title){
 }
 function doDeleteSeries(){
   if(!pendingDeleteTitle) return;
-  fetch('/admin/series/delete_all/'+encodeURIComponent(pendingDeleteTitle),{method:'POST'})
+  fetch('/admin/series/delete_all/'+encodeURIComponent(pendingDeleteTitle),{method:'POST', headers:{'X-CSRFToken': '{{ csrf_token() }}'}})
   .then(r=>r.json())
   .then(d=>{
     if(d.ok){ closeConfirm(); location.reload(); }
@@ -355,7 +371,7 @@ function bulkDeleteSeries(){
     `This will permanently delete ALL episodes for: ${titles.slice(0,3).join(', ')}${titles.length>3?' and more...':''}`;
   document.getElementById('confirm-yes').onclick = async ()=>{
     for(const t of titles){
-      await fetch('/admin/series/delete_all/'+encodeURIComponent(t),{method:'POST'});
+      await fetch('/admin/series/delete_all/'+encodeURIComponent(t),{method:'POST', headers:{'X-CSRFToken': '{{ csrf_token() }}'}});
     }
     closeConfirm(); location.reload();
   };
