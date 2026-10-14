@@ -14,7 +14,7 @@ import threading
 import random
 from datetime import datetime, timedelta
 from functools import wraps
-from flask import Flask, render_template, request, redirect, url_for, send_file, jsonify, session, Response, send_from_directory, abort
+from flask import Flask, render_template, request, redirect, url_for, send_file, jsonify, session, Response, send_from_directory, abort, flash
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.middleware.proxy_fix import ProxyFix
 try:
@@ -3236,6 +3236,38 @@ def upload_plan_update(pid):
 def upload_plan_delete(pid):
     db.session.delete(UploadPlan.query.get_or_404(pid))
     db.session.commit()
+    return redirect(url_for('upload_planner'))
+
+@app.route('/admin/upload_plan/edit/<int:pid>', methods=['POST'])
+@login_required
+def upload_plan_edit(pid):
+    """Rename a plan and/or change its target date.
+
+    Title must be non-empty. A past target date is accepted but flashes a
+    warning (the plan shows as overdue); an unparseable date rejects the
+    whole edit so no partial change is saved. CSRF-protected via the
+    global CSRFProtect on POST forms."""
+    from datetime import date as _date
+    p = UploadPlan.query.get_or_404(pid)
+    title = (request.form.get('title') or '').strip()
+    if not title:
+        flash('Title cannot be empty \u2014 no changes saved.', 'error')
+        return redirect(url_for('upload_planner'))
+    raw = (request.form.get('scheduled_date') or '').strip()
+    new_date = None
+    if raw:
+        try:
+            new_date = _date.fromisoformat(raw)
+        except ValueError:
+            flash('Invalid target date \u2014 no changes saved.', 'error')
+            return redirect(url_for('upload_planner'))
+    p.title = title[:200]
+    p.scheduled_date = new_date
+    db.session.commit()
+    if new_date and new_date < _date.today():
+        flash(f'"{p.title}" saved with a past target date \u2014 it will show as overdue.', 'warning')
+    else:
+        flash(f'Plan "{p.title}" updated.', 'success')
     return redirect(url_for('upload_planner'))
 
 @app.route('/api/trigger_telegram/<int:movie_id>', methods=['POST'])
