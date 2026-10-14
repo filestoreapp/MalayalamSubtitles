@@ -167,9 +167,9 @@
         <button class="pa done" onclick="updateStatus({{ p.id }},'Done')">✅ Done</button>
         <button class="pa" onclick="updateStatus({{ p.id }},'InProgress')">⚙️ WIP</button>
         <button class="pa" onclick="updateStatus({{ p.id }},'Cancelled')">🚫 Cancel</button>
-        <form action="/admin/upload_plan/delete/{{ p.id }}" method="post" style="margin:0">
+        <form id="plan-form-{{ p.id }}" action="/admin/upload_plan/delete/{{ p.id }}" method="post" style="margin:0">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button type="submit" class="pa del" onclick="return confirm('Remove from plan?')">🗑</button>
+          <button type="button" class="pa del" onclick="openConfirmModal('plan-form-{{ p.id }}', 'Remove this plan?')">🗑</button>
         </form>
       </div>
     </div>
@@ -207,6 +207,17 @@
   {% endif %}
 </div>
 {% endblock %}
+<div id="confirm-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2000;align-items:center;justify-content:center;padding:1rem" onclick="if(event.target===this)closeConfirmModal()">
+  <div style="background:#1a1a1a;border:1px solid var(--border);border-radius:14px;padding:1.5rem;width:min(360px,95vw);text-align:center">
+    <div style="font-size:2rem;margin-bottom:.75rem">🗑</div>
+    <h3 style="margin-bottom:.5rem">Are you sure?</h3>
+    <p id="confirm-modal-msg" style="color:var(--text-muted);font-size:.85rem;margin-bottom:1.25rem">This cannot be undone.</p>
+    <div style="display:flex;gap:.65rem;justify-content:center">
+      <button type="button" id="confirm-modal-yes" style="background:#e53935;color:#fff;border:none;border-radius:8px;padding:.52rem 1.5rem;cursor:pointer">Delete</button>
+      <button type="button" style="background:#1a1a1a;color:var(--text-muted);border:1px solid var(--border);border-radius:8px;padding:.52rem 1.5rem;cursor:pointer" onclick="closeConfirmModal()">Cancel</button>
+    </div>
+  </div>
+</div>
 {% block extra_scripts %}
 <script>
 function updateStatus(id, status){
@@ -215,5 +226,19 @@ function updateStatus(id, status){
   fetch('/admin/upload_plan/update/'+id, {method:'POST', body:fd})
     .then(r=>r.json()).then(d=>{ if(d.ok) location.reload(); });
 }
-</script>
+<script>
+let pendingConfirmForm = null;
+function openConfirmModal(formId, msg){
+  pendingConfirmForm = document.getElementById(formId);
+  document.getElementById('confirm-modal-msg').textContent = msg;
+  document.getElementById('confirm-modal').style.display = 'flex';
+}
+function closeConfirmModal(){
+  pendingConfirmForm = null;
+  document.getElementById('confirm-modal').style.display = 'none';
+}
+document.getElementById('confirm-modal-yes').addEventListener('click', function(){
+  if (pendingConfirmForm) { const f = pendingConfirmForm; closeConfirmModal(); f.submit(); }
+});
+</script></script>
 {% endblock %}
