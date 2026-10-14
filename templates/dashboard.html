@@ -232,18 +232,7 @@
   <!-- Top bar -->
   <div class="dash-topbar">
     <h1>📊 Dashboard</h1>
-    <nav class="admin-nav">
-      <a href="/dashboard" class="active">📊 Dashboard</a>
-      <a href="/admin">➕ Upload</a>
-      <a href="/admin/series">📺 Series</a>
-      <a href="/admin/duplicates">🔁 Duplicates</a>
-      <a href="/admin/upload_planner">📅 Planner</a>
-      <a href="/admin/search_analytics">🔍 Analytics</a>
-      <a href="/admin/requests">🙋 Requests{% if pending_requests %} <span style="background:var(--accent);color:#fff;border-radius:10px;padding:.05rem .35rem;font-size:.65rem">{{ pending_requests }}</span>{% endif %}</a>
-      <a href="/admin/bot-dashboard" class="bot-link">🤖 Bot{% if bot_users %} <span style="background:#0088cc;color:#fff;border-radius:10px;padding:.05rem .35rem;font-size:.65rem">{{ bot_users }}</span>{% endif %}</a>
-      <a href="/admin/export_csv">📥 CSV</a>
-      <form action="/logout" method="post" style="display:inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" style="background:none;border:none;color:inherit;cursor:pointer;font:inherit">🚪 Logout</button></form>
-    </nav>
+    {% set active_page = 'dashboard' %}{% include "admin_nav.html" %}
   </div>
 
   <!-- ── HF Worker Health Monitor ── -->
