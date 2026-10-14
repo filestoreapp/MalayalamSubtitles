@@ -2616,8 +2616,25 @@ def bulk_delete():
 @login_required
 def delete_media(movie_id):
     media = Movie.query.get_or_404(movie_id)
-    db.session.delete(media)
-    db.session.commit()
+    try:
+        # Explicitly remove dependents first. DB FKs are ON DELETE CASCADE,
+        # but explicit deletes make the outcome deterministic even if a
+        # constraint was created without CASCADE.
+        TranslationCache.query.filter_by(movie_id=movie_id).delete(synchronize_session=False)
+        TranslationJob.query.filter_by(movie_id=movie_id).delete(synchronize_session=False)
+        DownloadLog.query.filter_by(movie_id=movie_id).delete(synchronize_session=False)
+        SubtitleRating.query.filter_by(movie_id=movie_id).delete(synchronize_session=False)
+        Favorite.query.filter_by(movie_id=movie_id).delete(synchronize_session=False)
+        BroadcastLog.query.filter_by(movie_id=movie_id).update({'movie_id': None}, synchronize_session=False)
+        db.session.delete(media)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        return f"Delete failed: {e}", 500
+    # Verify the record is really gone; fail loudly instead of silently.
+    if Movie.query.get(movie_id) is not None:
+        db.session.rollback()
+        return "Delete failed: record still exists after delete.", 500
     log_admin_action('Delete', f"Deleted ID {movie_id}")
     return redirect(url_for('dashboard'))
 
@@ -2626,6 +2643,7 @@ def delete_media(movie_id):
 def edit_media(movie_id):
     media = Movie.query.get_or_404(movie_id)
     if request.method == 'POST':
+        _old_title, _old_year = media.title, media.year
         media.title      = request.form.get('title')
         media.year       = request.form.get('year')
         media.rating     = request.form.get('rating')
@@ -2636,7 +2654,11 @@ def edit_media(movie_id):
         if media.media_type == 'series':
             media.season  = request.form.get('season')
             media.episode = request.form.get('episode')
-        media.slug = _unique_slug(media.title, media.year, exclude_id=media.id)
+        # Only re-slug when title/year actually changed. Slugs are
+        # title+year only (no season/episode), so regenerating on every
+        # save collides with sibling episodes and renames the record.
+        if (media.title or '') != (_old_title or '') or (media.year or '') != (_old_year or ''):
+            media.slug = _unique_slug(media.title, media.year, exclude_id=media.id)
 
         new_srt = request.files.get('new_srt')
         if new_srt and new_srt.filename:
@@ -3035,23 +3057,64 @@ def admin():
                 items_to_process.append((srt_content, ep))
 
         # Duplicate check before any insert/R2 upload.
+        # Series are keyed by (imdb_id|title+year, season, episode): a NEW
+        # episode of an existing series is NOT a duplicate. Only an exact
+        # same season+episode (or the same movie) blocks without force.
+        _force = ((request.form.get('force_upload') or request.args.get('force_upload') or '').strip().lower() in ('1', 'on', 'yes', 'true'))
         try:
             _season_for_dup = int(season_raw) if season_raw and str(season_raw).strip() else None
         except ValueError:
             _season_for_dup = 1
-        if imdb_id:
-            _dup_q = Movie.query.filter_by(imdb_id=imdb_id, media_type=media_type)
-            if media_type == 'series':
-                _dup_q = _dup_q.filter_by(season=_season_for_dup)
-            _dup = _dup_q.first()
-            if _dup and not request.form.get('force_upload'):
-                return (f"Duplicate found: {title} ({year}) already exists (ID {_dup.id}). "
-                        "Re-submit with force_upload=1 to upload anyway.", 409)
-        else:
-            _dup2 = Movie.query.filter(func.lower(Movie.title)==title.lower(), Movie.year==year, Movie.media_type==media_type).first()
-            if _dup2 and not request.form.get('force_upload'):
-                return (f"Possible duplicate: {title} ({year}) already exists (ID {_dup2.id}). "
-                        "Re-submit with force_upload=1 to upload anyway.", 409)
+        # Episodes in this upload (from fetched SRTs + uploaded files).
+        _eps_for_dup = []
+        if media_type == 'series':
+            for _txt, _ep_str in items_to_process:
+                try:
+                    _eps_for_dup.append(int(_ep_str))
+                except (TypeError, ValueError):
+                    continue
+        if not _force:
+            if imdb_id:
+                if media_type == 'series' and _eps_for_dup:
+                    _seen = set()
+                    for _ep in _eps_for_dup:
+                        if _ep in _seen:
+                            return (f"Duplicate found: {title} ({year}) S{_season_for_dup:02d}E{_ep:02d} "
+                                    "appears twice in this upload. Remove one copy or re-submit with force_upload=1.", 409)
+                        _seen.add(_ep)
+                    for _ep in _eps_for_dup:
+                        _dup = Movie.query.filter_by(imdb_id=imdb_id, media_type=media_type,
+                                                     season=_season_for_dup, episode=_ep).first()
+                        if _dup:
+                            return (f"Duplicate found: {title} ({year}) S{_season_for_dup:02d}E{_ep:02d} "
+                                    f"already exists (ID {_dup.id}). Re-submit with force_upload=1 to upload anyway.", 409)
+                elif media_type == 'series':
+                    # No episodes parsed: fall back to season-level check.
+                    _dup = Movie.query.filter_by(imdb_id=imdb_id, media_type=media_type,
+                                                 season=_season_for_dup).first()
+                    if _dup:
+                        return (f"Duplicate found: {title} ({year}) already exists (ID {_dup.id}). "
+                                "Re-submit with force_upload=1 to upload anyway.", 409)
+                else:
+                    _dup = Movie.query.filter_by(imdb_id=imdb_id, media_type=media_type).first()
+                    if _dup:
+                        return (f"Duplicate found: {title} ({year}) already exists (ID {_dup.id}). "
+                                "Re-submit with force_upload=1 to upload anyway.", 409)
+            else:
+                # No IMDb: match on title+year (+season+episode for series).
+                if media_type == 'series' and _eps_for_dup:
+                    for _ep in _eps_for_dup:
+                        _dup2 = Movie.query.filter(func.lower(Movie.title) == title.lower(), Movie.year == year,
+                                                   Movie.media_type == media_type,
+                                                   Movie.season == _season_for_dup, Movie.episode == _ep).first()
+                        if _dup2:
+                            return (f"Possible duplicate: {title} ({year}) S{_season_for_dup:02d}E{_ep:02d} "
+                                    f"already exists (ID {_dup2.id}). Re-submit with force_upload=1 to upload anyway.", 409)
+                else:
+                    _dup2 = Movie.query.filter(func.lower(Movie.title) == title.lower(), Movie.year == year, Movie.media_type == media_type).first()
+                    if _dup2:
+                        return (f"Possible duplicate: {title} ({year}) already exists (ID {_dup2.id}). "
+                                "Re-submit with force_upload=1 to upload anyway.", 409)
         # File validation: extensions + decoded size cap
         for _f in valid_files:
             _fn = (_f.filename or '').lower()
