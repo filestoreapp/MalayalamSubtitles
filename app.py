@@ -2636,6 +2636,12 @@ def delete_media(movie_id):
         db.session.rollback()
         return "Delete failed: record still exists after delete.", 500
     log_admin_action('Delete', f"Deleted ID {movie_id}")
+    # Fetch/XHR callers (e.g. Duplicates page) ask for JSON: return JSON
+    # instead of a 302 to /dashboard, so they don't have to follow a
+    # redirect to a full dashboard page to learn the outcome.
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or \
+            'application/json' in (request.headers.get('Accept') or ''):
+        return jsonify({'ok': True, 'deleted': movie_id})
     return redirect(url_for('dashboard'))
 
 @app.route('/admin/edit/<int:movie_id>', methods=['GET', 'POST'])
