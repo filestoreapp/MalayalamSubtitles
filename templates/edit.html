@@ -170,7 +170,22 @@
   </form>
   <!-- Delete is a SEPARATE form: nested forms are invalid HTML and browsers
        submit the outer edit form instead, so Delete never ran (the record
-       was re-saved and re-slugged instead of deleted). -->
-  <form action="/delete/{{ media.id }}" method="post" style="display:inline" onsubmit="return confirm('Delete this record and all its translations/jobs?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="btn-ghost" style="cursor:pointer;margin-top:.5rem">🗑 Delete</button></form>
+       was re-saved and re-slugged instead of deleted).
+       Delete confirmation uses a custom in-page modal, NOT native
+       confirm(): a native confirm() dialog blocks the renderer and froze
+       the browser twice on this button, so the form never submitted and
+       the record was never deleted. -->
+  <form id="delete-form" action="/delete/{{ media.id }}" method="post" style="display:inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="button" class="btn-ghost" style="cursor:pointer;margin-top:.5rem" onclick="document.getElementById('delete-modal').style.display='flex'">🗑 Delete</button></form>
+  <div id="delete-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2000;align-items:center;justify-content:center;padding:1rem" onclick="if(event.target===this)this.style.display='none'">
+    <div style="background:#1a1a1a;border:1px solid var(--border);border-radius:14px;padding:1.5rem;width:min(360px,95vw);text-align:center">
+      <div style="font-size:2rem;margin-bottom:.75rem">🗑</div>
+      <h3 style="margin-bottom:.5rem">Delete this record?</h3>
+      <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:1.25rem">ID {{ media.id }} and all its translations/jobs will be permanently deleted.</p>
+      <div style="display:flex;gap:.65rem;justify-content:center">
+        <button type="button" style="background:#e53935;color:#fff;border:none;border-radius:8px;padding:.52rem 1.5rem;cursor:pointer" onclick="document.getElementById('delete-form').submit()">Delete</button>
+        <button type="button" style="background:#1a1a1a;color:var(--text-muted);border:1px solid var(--border);border-radius:8px;padding:.52rem 1.5rem;cursor:pointer" onclick="document.getElementById('delete-modal').style.display='none'">Cancel</button>
+      </div>
+    </div>
+  </div>
 </div>
 {% endblock %}
