@@ -47,21 +47,34 @@
 .date-chip{display:inline-flex;align-items:center;gap:.25rem;font-size:.7rem;border-radius:4px;padding:.15rem .45rem;background:#1a1a1a;border:1px solid var(--border);color:var(--muted)}
 .date-chip.overdue{background:rgba(229,9,20,.1);border-color:rgba(229,9,20,.3);color:#ef9a9a}
 .date-chip.today{background:rgba(245,197,24,.1);border-color:rgba(245,197,24,.3);color:#ffd54f}
+.flash{border-radius:10px;padding:.7rem 1rem;margin-bottom:1rem;font-size:.85rem}
+.flash-error{background:rgba(229,9,20,.12);border:1px solid rgba(229,9,20,.35);color:#ef9a9a}
+.flash-warning{background:rgba(245,197,24,.1);border:1px solid rgba(245,197,24,.35);color:#ffd54f}
+.flash-success{background:rgba(46,125,50,.15);border:1px solid rgba(46,125,50,.4);color:#81c784}
+/* Inline per-plan edit form (title + target date) */
+.plan-edit{margin-top:.5rem}
+.plan-edit summary{font-size:.72rem;color:var(--muted);cursor:pointer;list-style:none}
+.plan-edit summary:hover{color:#fff}
+.plan-edit-form{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.45rem;align-items:center}
+.plan-edit-form .fi{width:auto;flex:1 1 140px}
+.plan-edit-form .fi.date{flex:0 1 150px}
+.plan-edit-save{background:var(--accent);color:#fff;border:none;border-radius:6px;padding:.42rem .8rem;font-size:.75rem;font-weight:600}
 </style>
 {% endblock %}
 {% block content %}
 <div class="uw">
   <div class="atb">
     <h1>📅 Upload Planner</h1>
-    <nav class="anav">
-      <a href="/dashboard">📊 Dashboard</a>
-      <a href="/admin">➕ Upload</a>
-      <a href="/admin/series">📺 Series</a>
-      <a href="/admin/upload_planner" class="active">📅 Planner</a>
-      <a href="/admin/search_analytics">🔍 Analytics</a>
-      <form action="/logout" method="post" style="display:inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" style="background:none;border:none;color:inherit;cursor:pointer;font:inherit">🚪 Logout</button></form>
-    </nav>
+    {% set active_page = 'planner' %}{% include "admin_nav.html" %}
   </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+    <div class="flash flash-{{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+  {% endwith %}
 
   {% if overdue %}
   <div class="overdue-alert">⚠️ <strong>{{ overdue|length }} overdue plan{{ 's' if overdue|length>1 }}</strong> — these were scheduled for a past date.</div>
@@ -139,6 +152,15 @@
           {% endif %}
         </div>
         {% if p.notes %}<div class="plan-notes">📝 {{ p.notes }}</div>{% endif %}
+        <details class="plan-edit">
+          <summary>✏️ Edit title / date</summary>
+          <form class="plan-edit-form" action="/admin/upload_plan/edit/{{ p.id }}" method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input class="fi" type="text" name="title" value="{{ p.title }}" maxlength="200" required aria-label="Plan title">
+            <input class="fi date" type="date" name="scheduled_date" value="{{ p.scheduled_date.isoformat() if p.scheduled_date else '' }}" aria-label="Target date">
+            <button type="submit" class="plan-edit-save">Save</button>
+          </form>
+        </details>
       </div>
       <div class="plan-actions">
         <a href="/admin?title={{ p.title|urlencode }}{% if p.imdb_id %}&imdb={{ p.imdb_id }}{% endif %}" class="pa start">➕ Upload</a>
