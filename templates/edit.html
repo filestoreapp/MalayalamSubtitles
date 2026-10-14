@@ -16,6 +16,7 @@
     border-radius: 8px; padding: .38rem .85rem; text-decoration: none; font-size: .8rem; transition: all .2s;
   }
   .admin-nav a:hover { color: #fff; border-color: #555; }
+  .admin-nav a.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 
   .form-card {
     background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
@@ -54,12 +55,7 @@
 
   <div class="admin-topbar">
     <h1>✏️ Edit Media</h1>
-    <nav class="admin-nav">
-      <a href="/dashboard">📊 Dashboard</a>
-      <a href="/admin">➕ Upload</a>
-      <a href="/admin/requests">🙋 Requests</a>
-      <form action="/logout" method="post" style="display:inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" style="background:none;border:none;color:inherit;cursor:pointer;font:inherit">🚪 Logout</button></form>
-    </nav>
+    {% set active_page = 'upload' %}{% include "admin_nav.html" %}
   </div>
 
   <form action="/admin/edit/{{ media.id }}" method="post" enctype="multipart/form-data">
