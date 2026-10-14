@@ -367,7 +367,7 @@ async function autoFetchSRT(){
 
   try {
     const d = await fetch('/api/auto_fetch_srt',{
-      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
+      method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':'{{ csrf_token() }}'}, body: JSON.stringify(body)
     }).then(r=>r.json());
 
     if(d.success){
@@ -440,7 +440,7 @@ async function fetchFullSeason(){
 
     try {
       const d = await fetch('/api/auto_fetch_srt',{
-        method:'POST', headers:{'Content-Type':'application/json'},
+        method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':'{{ csrf_token() }}'},
         body: JSON.stringify({ imdb_id: imdb, media_type:'series', season:+season, episode:num })
       }).then(r=>r.json());
 
