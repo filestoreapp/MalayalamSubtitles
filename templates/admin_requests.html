@@ -140,7 +140,7 @@
           </select>
           <button type="submit" class="status-btn">Save</button>
         </form>
-        <form action="/admin/delete_request/{{ req.id }}" method="post" style="display:inline" onsubmit="return confirm('Delete request?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="del-btn" style="background:none;border:none;cursor:pointer">Delete</button></form>
+        <form id="del-req-form-{{ req.id }}" action="/admin/delete_request/{{ req.id }}" method="post" style="display:inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="button" class="del-btn" style="background:none;border:none;cursor:pointer" onclick="openConfirmModal('del-req-form-{{ req.id }}', 'Delete this request? This cannot be undone.')">Delete</button></form>
       </div>
     </div>
     {% endfor %}
@@ -169,3 +169,30 @@
 
 </div>
 {% endblock %}
+<div id="confirm-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2000;align-items:center;justify-content:center;padding:1rem" onclick="if(event.target===this)closeConfirmModal()">
+  <div style="background:#1a1a1a;border:1px solid var(--border);border-radius:14px;padding:1.5rem;width:min(360px,95vw);text-align:center">
+    <div style="font-size:2rem;margin-bottom:.75rem">🗑</div>
+    <h3 style="margin-bottom:.5rem">Are you sure?</h3>
+    <p id="confirm-modal-msg" style="color:var(--text-muted);font-size:.85rem;margin-bottom:1.25rem">This cannot be undone.</p>
+    <div style="display:flex;gap:.65rem;justify-content:center">
+      <button type="button" id="confirm-modal-yes" style="background:#e53935;color:#fff;border:none;border-radius:8px;padding:.52rem 1.5rem;cursor:pointer">Delete</button>
+      <button type="button" style="background:#1a1a1a;color:var(--text-muted);border:1px solid var(--border);border-radius:8px;padding:.52rem 1.5rem;cursor:pointer" onclick="closeConfirmModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+{% block extra_scripts %}
+<script>
+let pendingConfirmForm = null;
+function openConfirmModal(formId, msg){
+  pendingConfirmForm = document.getElementById(formId);
+  document.getElementById('confirm-modal-msg').textContent = msg;
+  document.getElementById('confirm-modal').style.display = 'flex';
+}
+function closeConfirmModal(){
+  pendingConfirmForm = null;
+  document.getElementById('confirm-modal').style.display = 'none';
+}
+document.getElementById('confirm-modal-yes').addEventListener('click', function(){
+  if (pendingConfirmForm) { const f = pendingConfirmForm; closeConfirmModal(); f.submit(); }
+});
+</script>{% endblock %}
