@@ -224,7 +224,6 @@ textarea.form-input{resize:vertical;min-height:80px}
           <p id="drop-label">Click or drag &amp; drop English <strong>.srt</strong> or <strong>.zip</strong> here</p>
           <input type="file" id="srt-file-single" name="files[]" accept=".srt,.zip">
         </div>
-        <input type="hidden" name="episodes[]" value="1">
         <div class="fetched-preview" id="fetched-single-preview">
           <div class="fetched-preview-inner">
             <span>✅ Auto-fetched SRT ready</span>
@@ -297,6 +296,15 @@ textarea.form-input{resize:vertical;min-height:80px}
 let episodeCount = 0;
 
 // ── Type toggle ──────────────────────────────────────────────────────────────
+// Disabled inputs are NOT submitted. The inactive SRT section's inputs
+// must be disabled, otherwise the hidden movie-section inputs (e.g.
+// fetched_episodes[]="1") would be submitted alongside the series rows
+// and shift every episode pairing by one (the S02E05 → S02E02 bug:
+// display:none alone does NOT exclude inputs from submission).
+function setSectionEnabled(id, enabled){
+  document.querySelectorAll('#' + id + ' input, #' + id + ' select, #' + id + ' textarea, #' + id + ' button')
+    .forEach(el => { el.disabled = !enabled; });
+}
 function toggleType(){
   const isSeries = document.getElementById('type-series').checked;
   document.getElementById('season-group').style.display        = isSeries ? '' : 'none';
@@ -304,6 +312,8 @@ function toggleType(){
   document.getElementById('movie-srt-section').style.display   = isSeries ? 'none' : '';
   document.getElementById('series-srt-section').style.display  = isSeries ? '' : 'none';
   document.getElementById('fetch-all-btn').style.display       = isSeries ? '' : 'none';
+  setSectionEnabled('movie-srt-section', !isSeries);
+  setSectionEnabled('series-srt-section', isSeries);
   document.getElementById('lbl-movie').style.cssText  = isSeries
     ? 'font-weight:700;cursor:pointer;text-align:center'
     : 'background:rgba(229,9,20,.2);border-color:var(--accent);color:var(--accent);font-weight:700;cursor:pointer;text-align:center';
@@ -531,6 +541,19 @@ function addEpisode(ep, srtText){
   if(srtText) srtIn.value = srtText;   // ← safe DOM property assignment
   div.appendChild(srtIn);
 
+  // ②b Hidden episode-number input, parallel to fetched_srts[].
+  //    Without this, the server paired fetched SRTs by raw index
+  //    against the movie section's single fetched_episodes[]="1" and
+  //    fell back to str(i+1) — so every series auto-fetch became
+  //    episode 2 (ONE PIECE S02E05 → "Duplicate S02E02"). The submit
+  //    handler below re-syncs this value from the visible Ep # box in
+  //    case the user edited it after fetching.
+  const epIn = document.createElement('input');
+  epIn.type  = 'hidden';
+  epIn.name  = 'fetched_episodes[]';
+  epIn.value = n;
+  div.appendChild(epIn);
+
   // ③ Hidden file input
   const fileIn = document.createElement('input');
   fileIn.type   = 'file';
@@ -600,6 +623,26 @@ setupDrop('drop-zip','srt-zip-series','zip-label');
 document.getElementById('tmdb-query').addEventListener('keypress', e=>{
   if(e.key==='Enter'){ e.preventDefault(); searchTmdb(); }
 });
+
+// ── Submit: keep per-row episode numbers honest ──────────────────────────
+// Each series row carries its own fetched_episodes[] (parallel to its
+// fetched_srts[]). If the user edited the visible Ep # box after
+// fetching, copy it into the row's fetched_episodes[] before submit.
+// Rows with no file selected contribute no file, so exclude their
+// episodes[] from submission — otherwise the server would pair the
+// first uploaded file with the first row's episode instead of its own.
+document.getElementById('upload-form').addEventListener('submit', ()=>{
+  document.querySelectorAll('#ep-list .ep-row').forEach(row=>{
+    const num = row.querySelector('.ep-num');
+    const fe  = row.querySelector('input[name="fetched_episodes[]"]');
+    if(num && fe) fe.value = num.value;
+    const fileIn = row.querySelector('input[type="file"]');
+    if(num && fileIn && !fileIn.files.length) num.disabled = true;
+  });
+});
+
+// Initialise section enablement for the default (movie) selection.
+toggleType();
 
 function showSpinner(){ document.getElementById('spinner').style.display='inline-block'; }
 </script>
