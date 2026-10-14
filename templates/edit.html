@@ -165,9 +165,12 @@
     <div class="submit-bar">
       <button type="submit" class="btn-accent" style="padding:.65rem 2rem;font-size:1rem">💾 Save Changes</button>
       <a href="/dashboard" class="btn-ghost">Cancel</a>
-      <form action="/delete/{{ media.id }}" method="post" style="display:inline" onsubmit="return confirm('Delete?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="btn-ghost" style="cursor:pointer">Delete</button></form>
     </div>
 
   </form>
+  <!-- Delete is a SEPARATE form: nested forms are invalid HTML and browsers
+       submit the outer edit form instead, so Delete never ran (the record
+       was re-saved and re-slugged instead of deleted). -->
+  <form action="/delete/{{ media.id }}" method="post" style="display:inline" onsubmit="return confirm('Delete this record and all its translations/jobs?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="btn-ghost" style="cursor:pointer;margin-top:.5rem">🗑 Delete</button></form>
 </div>
 {% endblock %}
