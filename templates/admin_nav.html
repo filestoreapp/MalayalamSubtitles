@@ -1,0 +1,18 @@
+{# Shared admin navigation — single source of truth for the 9-item admin nav.
+   Set `active_page` before including: dashboard | upload | series | duplicates |
+   planner | analytics | requests | bot | csv. Carries both `admin-nav` and `anav`
+   classes so each page's existing stylesheet styles it (some pages define one,
+   some the other). Badge counts are guarded with `is defined` because only
+   the dashboard route passes them. #}
+<nav class="admin-nav anav">
+  <a href="/dashboard" class="{% if active_page == 'dashboard' %}active{% endif %}">📊 Dashboard</a>
+  <a href="/admin" class="{% if active_page == 'upload' %}active{% endif %}">➕ Upload</a>
+  <a href="/admin/series" class="{% if active_page == 'series' %}active{% endif %}">📺 Series</a>
+  <a href="/admin/duplicates" class="{% if active_page == 'duplicates' %}active{% endif %}">🔁 Duplicates</a>
+  <a href="/admin/upload_planner" class="{% if active_page == 'planner' %}active{% endif %}">📅 Planner</a>
+  <a href="/admin/search_analytics" class="{% if active_page == 'analytics' %}active{% endif %}">🔍 Analytics</a>
+  <a href="/admin/requests" class="{% if active_page == 'requests' %}active{% endif %}">🙋 Requests{% if pending_requests is defined and pending_requests %} <span style="background:var(--accent);color:#fff;border-radius:10px;padding:.05rem .35rem;font-size:.65rem">{{ pending_requests }}</span>{% endif %}</a>
+  <a href="/admin/bot-dashboard" class="{% if active_page == 'bot' %}active{% endif %}">🤖 Bot{% if bot_users is defined and bot_users %} <span style="background:#0088cc;color:#fff;border-radius:10px;padding:.05rem .35rem;font-size:.65rem">{{ bot_users }}</span>{% endif %}</a>
+  <a href="/admin/export_csv" class="{% if active_page == 'csv' %}active{% endif %}">📥 CSV</a>
+  <form action="/logout" method="post" style="display:inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" style="background:none;border:none;color:inherit;cursor:pointer;font:inherit">🚪 Logout</button></form>
+</nav>
