@@ -3031,10 +3031,43 @@ def admin():
 
         items_to_process = []
 
-        for i, text in enumerate(fetched_srts):
-            if text.strip():
-                ep = fetched_episodes[i] if i < len(fetched_episodes) else str(i + 1)
-                items_to_process.append((text, ep))
+        # ── Pair fetched SRTs with their episode numbers ──────────────
+        # ROOT CAUSE (ONE PIECE S02E05 bug): the old code paired by raw
+        # index — `fetched_episodes[i]` — and fell back to `str(i + 1)`.
+        # The upload form's movie section always submitted a leading
+        # `fetched_srts[]=""` (empty) + `fetched_episodes[]="1"`, because
+        # display:none does NOT exclude inputs from submission, while a
+        # series row contributed ONLY `fetched_srts[]` (no
+        # `fetched_episodes[]`). So for a single auto-fetch of Ep5 the
+        # POST was fetched_srts=["", SRT5], fetched_episodes=["1"]:
+        # index 0 was skipped (empty), index 1 missed the 1-long list and
+        # fell back to str(1+1)="2" — every series auto-fetch became
+        # episode 2, and S02E05 hit "Duplicate found: ... S02E02".
+        # Fixed form (see templates/admin.html) sends one
+        # `fetched_episodes[]` per row, parallel to `fetched_srts[]`.
+        # The server still accepts old cached forms: when the two lists
+        # are NOT parallel, series rows are the LAST N entries of
+        # `episodes[]` (the leading entry is the movie-section "1").
+        if len(fetched_episodes) == len(fetched_srts):
+            for text, ep in zip(fetched_srts, fetched_episodes):
+                if text.strip():
+                    items_to_process.append((text, ep))
+        elif media_type == 'series' and fetched_srts:
+            _nonempty = [t for t in fetched_srts if t.strip()]
+            _n = len(_nonempty)
+            if _n and len(manual_episodes) >= _n:
+                _series_eps = manual_episodes[len(manual_episodes) - _n:]
+                items_to_process.extend(zip(_nonempty, _series_eps))
+            else:
+                for i, text in enumerate(fetched_srts):
+                    if text.strip():
+                        ep = fetched_episodes[i] if i < len(fetched_episodes) else str(i + 1)
+                        items_to_process.append((text, ep))
+        else:
+            for i, text in enumerate(fetched_srts):
+                if text.strip():
+                    ep = fetched_episodes[i] if i < len(fetched_episodes) else str(i + 1)
+                    items_to_process.append((text, ep))
 
         ep_counter = len(items_to_process) + 1
         for i, srt_file in enumerate(valid_files):
@@ -3059,7 +3092,21 @@ def admin():
                     print(f"ZIP extract error: {ze}")
             else:
                 srt_content = raw.decode('utf-8', errors='ignore')
-                ep = valid_manual_eps[i] if i < len(valid_manual_eps) else str(i + 1)
+                # Pair uploaded files with episode numbers. The form's
+                # submit handler (templates/admin.html) disables the
+                # episodes[] input of rows with no file, so for new-form
+                # posts manual_episodes[] holds exactly the file rows'
+                # episodes, in order — pair by index. Old cached forms
+                # instead submit a leading movie-section episodes[]="1"
+                # plus every row, so when there are MORE manual episodes
+                # than files, align from the END (drop the leading "1"
+                # and the fetched-only rows).
+                if (media_type == 'series' and valid_manual_eps
+                        and len(valid_manual_eps) > len(valid_files)):
+                    _file_eps = valid_manual_eps[len(valid_manual_eps) - len(valid_files):]
+                    ep = _file_eps[i] if i < len(_file_eps) else str(i + 1)
+                else:
+                    ep = valid_manual_eps[i] if i < len(valid_manual_eps) else str(i + 1)
                 items_to_process.append((srt_content, ep))
 
         # Duplicate check before any insert/R2 upload.
