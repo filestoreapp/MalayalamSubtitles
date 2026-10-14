@@ -1251,10 +1251,35 @@ def bot_webhook():
 @app.route('/bot/set-webhook', methods=['POST'])
 @login_required
 def bot_set_webhook():
-    webhook_url = (request.json or {}).get("url") or f"{WEBSITE_BASE_URL}/bot/webhook"
-    r = requests.post(f"{TELEGRAM_API}/setWebhook",
-                      json={"url": webhook_url}, timeout=10)
-    return jsonify(r.json())
+    # Root causes fixed 2026-10-14: (1) this endpoint was NOT CSRF-exempt, so
+    # the dashboard's JSON fetch (no CSRF token) got a 400 whose error body
+    # has no `description`, and the dashboard showed a bare "Failed".
+    # (2) setWebhook was called WITHOUT secret_token, so Telegram would
+    # register the webhook with no secret and every later update would fail
+    # webhook verification (401). Always pass secret_token when configured.
+    try:
+        if not BOT_TOKEN:
+            return jsonify({"ok": False, "description": "TELEGRAM_BOT_TOKEN is not configured on the server."}), 500
+        webhook_url = (request.get_json(silent=True) or {}).get("url") or f"{WEBSITE_BASE_URL}/bot/webhook"
+        if not webhook_url.startswith("https://"):
+            return jsonify({"ok": False, "description": "Webhook URL must start with https://"}), 400
+        payload = {"url": webhook_url}
+        if TELEGRAM_WEBHOOK_SECRET:
+            payload["secret_token"] = TELEGRAM_WEBHOOK_SECRET
+        r = requests.post(f"{TELEGRAM_API}/setWebhook", json=payload, timeout=15)
+        try:
+            data = r.json()
+        except ValueError:
+            return jsonify({"ok": False, "description": f"Telegram returned a non-JSON response (HTTP {r.status_code})."}), 502
+        if not data.get("ok"):
+            # Pass Telegram's real error description through instead of a bare "Failed".
+            return jsonify({"ok": False, "description": data.get("description") or f"Telegram error (HTTP {r.status_code})."}), 502
+        return jsonify(data)
+    except requests.RequestException as e:
+        return jsonify({"ok": False, "description": f"Could not reach Telegram: {e}"}), 502
+    except Exception as e:
+        print(f"bot_set_webhook error: {e}")
+        return jsonify({"ok": False, "description": "Internal error while registering webhook."}), 500
 
 
 # ── Bot admin API (used by bot_dashboard.html) ────────────────────────────────
@@ -3554,7 +3579,7 @@ ensure_dispatcher()
 
 # CSRF exemptions: Bearer-auth / non-cookie endpoints
 if csrf:
-    for _ep in ['bot_webhook','telegram_webhook','translation_callback','trigger_telegram','scheduled_fetch','bot_api_broadcast','bot_api_update_request']:
+    for _ep in ['bot_webhook','telegram_webhook','translation_callback','trigger_telegram','scheduled_fetch','bot_api_broadcast','bot_api_update_request','bot_set_webhook']:
         try:
             _fn = app.view_functions.get(_ep)
             if _fn: csrf.exempt(_fn)
