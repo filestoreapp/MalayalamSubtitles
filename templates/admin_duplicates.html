@@ -213,23 +213,34 @@ function showToast(msg){
 }
 
 function confirmDelete(id, title){
+  pendingKeepBestIds = null;
   document.getElementById('cm-title').textContent = 'Delete "'+title+'"?';
   document.getElementById('cm-msg').textContent   = 'ID '+id+' and all its translations will be permanently deleted.';
-  document.getElementById('cm-yes').onclick = ()=>{ doDelete(id); };
+  document.getElementById('cm-yes').onclick = ()=>{ if (pendingKeepBestIds) { const ids = pendingKeepBestIds; pendingKeepBestIds = null; doKeepBest(ids); } else { doDelete(id); } };
   document.getElementById('confirm-modal').style.display='flex';
 }
 
 async function doDelete(id){
   document.getElementById('confirm-modal').style.display='none';
-  const r = await fetch('/delete/'+id, {method:'POST'});
+  const r = await fetch('/delete/'+id, {method:'POST', headers:{'Accept': 'application/json'}});
   if(r.ok || r.redirected){ showToast('✅ Deleted'); setTimeout(()=>location.reload(),1200); }
   else showToast('❌ Error deleting');
 }
 
-// Auto-keep: keep entry with most translations, delete others
+// Auto-keep: keep entry with most translations, delete others.
+// Confirmation uses the custom in-page modal, NOT native confirm():
+// a native confirm() dialog blocks the renderer and has frozen the
+// browser on delete buttons elsewhere in the admin UI.
+let pendingKeepBestIds = null;
 async function keepBest(ids){
   if(!ids||ids.length<2){alert('Need at least 2 ids');return;}
-  if(!confirm('Keep best and delete the rest?')) return;
+  pendingKeepBestIds = ids;
+  document.getElementById('cm-title').textContent = 'Keep best and delete rest?';
+  document.getElementById('cm-msg').textContent = 'Keep the entry with the most translations and delete the rest. This cannot be undone.';
+  document.getElementById('confirm-modal').style.display='flex';
+  return;
+}
+async function doKeepBest(ids){
   const r = await fetch('/admin/duplicates/keep_best',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:ids})});
   const j = await r.json();
   if(r.ok){alert('Kept '+j.kept+', deleted '+j.deleted.join(', ')); location.reload();} else {alert('Error: '+(j.error||r.status));}
