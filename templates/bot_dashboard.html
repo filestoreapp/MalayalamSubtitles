@@ -72,6 +72,7 @@
     user-select: none;
   }
   .nav-item:hover { background: var(--card); color: var(--text); }
+  a.nav-item { text-decoration: none; }
   .nav-item.active { background: rgba(229,9,20,0.15); color: var(--accent); font-weight: 600; }
   .nav-icon { font-size: 15px; width: 18px; text-align: center; }
 
@@ -317,6 +318,18 @@
         <span class="nav-icon">⚙️</span> Settings
       </div>
     </nav>
+    <div style="margin:20px 16px 8px;font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--muted)">ADMIN</div>
+    <nav class="nav">
+      <a class="nav-item" href="/dashboard"><span class="nav-icon">📊</span> Dashboard</a>
+      <a class="nav-item" href="/admin"><span class="nav-icon">➕</span> Upload</a>
+      <a class="nav-item" href="/admin/series"><span class="nav-icon">📺</span> Series</a>
+      <a class="nav-item" href="/admin/duplicates"><span class="nav-icon">🔁</span> Duplicates</a>
+      <a class="nav-item" href="/admin/upload_planner"><span class="nav-icon">📅</span> Planner</a>
+      <a class="nav-item" href="/admin/search_analytics"><span class="nav-icon">🔍</span> Analytics</a>
+      <a class="nav-item" href="/admin/requests"><span class="nav-icon">🙋</span> Requests</a>
+      <a class="nav-item active" href="/admin/bot-dashboard"><span class="nav-icon">🤖</span> Bot</a>
+      <a class="nav-item" href="/admin/export_csv"><span class="nav-icon">📥</span> CSV</a>
+    </nav>
     <div class="sidebar-footer">
       <span class="bot-status-dot"></span>Bot online
     </div>
@@ -465,9 +478,9 @@ let currentTab = 'overview';
 let usersPage = 1;
 
 // ── Nav ──
-document.querySelectorAll('.nav-item').forEach(el => {
+document.querySelectorAll('.nav-item[data-tab]').forEach(el => {
   el.addEventListener('click', () => {
-    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.querySelectorAll('.nav-item[data-tab]').forEach(n => n.classList.remove('active'));
     el.classList.add('active');
     const tab = el.dataset.tab;
     currentTab = tab;
