@@ -82,13 +82,7 @@
 
   <div class="admin-topbar">
     <h1>🛠 Admin Panel</h1>
-    <nav class="admin-nav">
-      <a href="/dashboard">📊 Dashboard</a>
-      <a href="/admin">➕ Upload</a>
-      <a href="/admin/requests" class="active">🙋 Requests</a>
-      <a href="/admin/export_csv">📥 Export CSV</a>
-      <form action="/logout" method="post" style="display:inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" style="background:none;border:none;color:inherit;cursor:pointer;font:inherit">🚪 Logout</button></form>
-    </nav>
+    {% set active_page = 'requests' %}{% include "admin_nav.html" %}
   </div>
 
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem">
