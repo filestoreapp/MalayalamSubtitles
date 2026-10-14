@@ -62,15 +62,7 @@
   <!-- Top bar -->
   <div class="atb">
     <h1>🔁 Duplicate Detection</h1>
-    <nav class="anav">
-      <a href="/dashboard">📊 Dashboard</a>
-      <a href="/admin">➕ Upload</a>
-      <a href="/admin/series">📺 Series</a>
-      <a href="/admin/duplicates" class="active">🔁 Duplicates</a>
-      <a href="/admin/requests">🙋 Requests</a>
-      <a href="/admin/export_csv">📥 CSV</a>
-      <form action="/logout" method="post" style="display:inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" style="background:none;border:none;color:inherit;cursor:pointer;font:inherit">🚪 Logout</button></form>
-    </nav>
+    {% set active_page = 'duplicates' %}{% include "admin_nav.html" %}
   </div>
 
   <!-- How duplicates are handled explanation -->
