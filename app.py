@@ -2430,19 +2430,116 @@ def delete_series_all(title):
     log_admin_action('DeleteSeries', f"Deleted all {count} episodes of '{title}'")
     return jsonify({'ok': True, 'deleted': count})
 
+def _create_missing_episode(title, season_num, ep_num):
+    """Fetch the English SRT for a gap episode and create its Movie row + jobs.
+
+    Runs inside an app context (called from a background thread). Returns
+    (created: bool, detail: str). Idempotent: re-checks the row before insert.
+    """
+    rep = (Movie.query.filter_by(media_type='series', title=title)
+           .order_by(Movie.id.asc()).first())
+    if not rep:
+        return False, f"No existing episodes for '{title}'"
+    existing = (Movie.query.filter_by(media_type='series', title=title,
+                                      season=season_num, episode=ep_num).first())
+    if existing:
+        return False, f"S{season_num:02d}E{ep_num:02d} already exists (ID {existing.id})"
+    if not rep.imdb_id:
+        return False, f"No IMDb ID on '{title}' — cannot auto-fetch"
+    srt_text, source, errors = fetch_english_srt(rep.imdb_id, 'series', season_num, ep_num)
+    if not srt_text:
+        return False, f"No English SRT found: {' | '.join(errors) or 'Not found on any source'}"
+    storage_data = srt_text.replace('\x00', '')[:10*1024*1024]
+    if s3_client and r2_bucket:
+        safe_title = title.replace(" ", "_").replace("/", "").lower()
+        r2_filename = f"english_{safe_title}_s{season_num}e{ep_num}_{os.urandom(4).hex()}.srt"
+        try:
+            s3_client.put_object(Bucket=r2_bucket, Key=r2_filename,
+                                 Body=storage_data.encode('utf-8'),
+                                 ContentType='application/x-subrip')
+            storage_data = f"{r2_public_url}/{r2_filename}"
+        except Exception:
+            print("R2 Upload Failed (FetchMissing gap)")
+    new_media = Movie(
+        media_type='series', title=title,
+        season=season_num, episode=ep_num,
+        year=rep.year, rating=rep.rating, poster_url=rep.poster_url,
+        english_srt=storage_data, category=rep.category, plot=rep.plot,
+        runtime=rep.runtime, imdb_id=rep.imdb_id, is_silent=rep.is_silent)
+    db.session.add(new_media)
+    db.session.flush()
+    new_media.slug = _unique_slug(title, rep.year)
+    db.session.commit()
+    print(f"FetchMissing: created {title} S{season_num:02d}E{ep_num:02d} from {source}")
+    try:
+        trigger_hf_translation(new_media.id, storage_data)
+    except Exception as e:
+        print(f"FetchMissing: trigger failed for {title} S{season_num:02d}E{ep_num:02d}: {e}")
+    return True, f"Created S{season_num:02d}E{ep_num:02d} from {source}"
+
+
+def _fetch_missing_gap_worker(title, season_num, ep_num):
+    with app.app_context():
+        try:
+            _create_missing_episode(title, season_num, ep_num)
+        except Exception as e:
+            print(f"FetchMissing gap worker failed for {title} S{season_num:02d}E{ep_num:02d}: {e}")
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+
+
 @app.route('/admin/series/fetch_missing/<path:title>', methods=['POST'])
 @login_required
 def fetch_missing_series(title):
-    eps = (Movie.query
-           .filter_by(media_type='series', title=title)
-           .filter(Movie.english_srt.isnot(None), Movie.english_srt != '')
-           .all())
+    # Root causes fixed: (1) the old handler only iterated EXISTING episode
+    # rows, so a truly missing episode (no Movie row, e.g. ONE PIECE S02E05)
+    # could never be queued and always returned queued=0. (2) The old code
+    # spawned one thread per episode to create jobs, racing on the same
+    # (movie_id, language) rows; job creation is now synchronous (it only
+    # inserts Pending rows) and the slow external subtitle fetch for gaps
+    # runs in a background thread so the request returns immediately.
+    eps = Movie.query.filter_by(media_type='series', title=title).all()
+    if not eps:
+        return jsonify({'ok': False, 'error': f"No series found titled '{title}'"}), 404
     queued = 0
+    without_srt = []
     for ep in eps:
-        if not ep.translations:
-            threading.Thread(target=trigger_hf_translation, args=(ep.id, ep.english_srt)).start()
-            queued += 1
-    return jsonify({'ok': True, 'queued': queued})
+        if ep.english_srt:
+            if not ep.translations:
+                trigger_hf_translation(ep.id, ep.english_srt)
+                queued += 1
+        else:
+            without_srt.append(f"S{ep.season or 1:02d}E{ep.episode or 1:02d}")
+    # Gaps: episode numbers missing between min and max per season.
+    seasons = {}
+    for ep in eps:
+        seasons.setdefault(ep.season or 1, []).append(ep.episode)
+    gaps = []
+    for s_num, ep_nums in seasons.items():
+        ep_nums = sorted(e for e in ep_nums if e)
+        if ep_nums:
+            for i in range(ep_nums[0], ep_nums[-1] + 1):
+                if i not in ep_nums:
+                    gaps.append((s_num, i))
+    imdb_id = eps[0].imdb_id
+    fetching = []
+    gaps_without_imdb = []
+    for s_num, ep_num in gaps[:10]:
+        label = f"S{s_num:02d}E{ep_num:02d}"
+        if imdb_id:
+            threading.Thread(target=_fetch_missing_gap_worker,
+                             args=(title, s_num, ep_num), daemon=True).start()
+            fetching.append(label)
+        else:
+            gaps_without_imdb.append(label)
+    log_admin_action('FetchMissing',
+                     f"{title}: queued={queued} fetching_gaps={fetching} "
+                     f"gaps_without_imdb={gaps_without_imdb} without_srt={without_srt}")
+    return jsonify({'ok': True, 'queued': queued, 'fetching_gaps': fetching,
+                    'gaps_without_imdb': gaps_without_imdb,
+                    'episodes_without_srt': without_srt})
 
 @app.route('/admin/duplicates')
 @login_required
@@ -2668,20 +2765,17 @@ def _unique_slug(title, year, exclude_id=None):
             q = q.filter(Movie.id != exclude_id)
     return slug
 
-@app.route('/api/auto_fetch_srt', methods=['POST'])
-@login_required
-def auto_fetch_srt():
-    data       = request.json
-    imdb_id    = (data.get('imdb_id') or '').strip()
-    media_type = data.get('media_type', 'movie')
-    season     = data.get('season')
-    episode    = data.get('episode')
+def fetch_english_srt(imdb_id, media_type, season=None, episode=None):
+    """Search SubDL then OpenSubtitles for an English SRT.
 
+    Returns (srt_text_or_None, source_or_None, errors_list).
+    Shared by /api/auto_fetch_srt (manual upload) and the Fetch Missing
+    gap worker, so both paths use identical provider logic.
+    """
     SUBDL_API_KEY = os.environ.get('SUBDL_API_KEY')
     OS_API_KEY    = os.environ.get('OS_API_KEY')
-
     if not imdb_id or imdb_id in ('undefined', 'null', ''):
-        return jsonify({"error": "Missing IMDb ID. Auto-fill from TMDB first."}), 400
+        return None, None, ["Missing IMDb ID"]
     if not imdb_id.startswith('tt'):
         imdb_id = 'tt' + imdb_id
     clean_imdb = imdb_id.replace('tt', '')
@@ -2694,14 +2788,6 @@ def auto_fetch_srt():
         episode = int(episode) if episode not in (None, '', 'null') else None
     except (ValueError, TypeError):
         episode = None
-
-    if media_type == 'series':
-        if not season or not episode:
-            return jsonify({"error": "Season and Episode number are required for series."}), 400
-        exists, total_eps = tmdb_episode_exists_strict(imdb_id, season, episode)
-        if not exists:
-            extra = f" Season {season} only has {total_eps} episode(s)." if total_eps else ""
-            return jsonify({"error": f"S{season:02d}E{episode:02d} does not exist.{extra}"}), 400
 
     ua      = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120 Safari/537.36"
     headers = {"User-Agent": ua}
@@ -2781,7 +2867,7 @@ def auto_fetch_srt():
                     txt = (extract_srt(raw, season, episode) if raw[:2] == b'PK'
                            else raw.decode('utf-8', errors='ignore'))
                     if txt and txt.strip():
-                        return jsonify({"success": True, "srt_text": txt, "source": "Subdl"})
+                        return txt, "Subdl", errors
                 if ranked:
                     errors.append("Subdl: could not extract valid SRT from download")
         except Exception as ex:
@@ -2831,13 +2917,49 @@ def auto_fetch_srt():
                             txt = (extract_srt(raw, season, episode) if raw[:2] == b'PK'
                                    else raw.decode('utf-8', errors='ignore'))
                             if txt and txt.strip():
-                                return jsonify({"success": True, "srt_text": txt, "source": "OpenSubtitles"})
+                                return txt, "OpenSubtitles", errors
                         errors.append("OS: empty download link")
                     else:
                         errors.append(f"OS download HTTP {dl_r.status_code}")
         except Exception as ex:
             errors.append(f"OS crash: {ex}")
 
+    return None, None, errors
+
+@app.route('/api/auto_fetch_srt', methods=['POST'])
+@login_required
+def auto_fetch_srt():
+    data       = request.json
+    imdb_id    = (data.get('imdb_id') or '').strip()
+    media_type = data.get('media_type', 'movie')
+    season     = data.get('season')
+    episode    = data.get('episode')
+
+    if not imdb_id or imdb_id in ('undefined', 'null', ''):
+        return jsonify({"error": "Missing IMDb ID. Auto-fill from TMDB first."}), 400
+    if not imdb_id.startswith('tt'):
+        imdb_id = 'tt' + imdb_id
+
+    try:
+        season  = int(season)  if season  not in (None, '', 'null') else None
+    except (ValueError, TypeError):
+        season = None
+    try:
+        episode = int(episode) if episode not in (None, '', 'null') else None
+    except (ValueError, TypeError):
+        episode = None
+
+    if media_type == 'series':
+        if not season or not episode:
+            return jsonify({"error": "Season and Episode number are required for series."}), 400
+        exists, total_eps = tmdb_episode_exists_strict(imdb_id, season, episode)
+        if not exists:
+            extra = f" Season {season} only has {total_eps} episode(s)." if total_eps else ""
+            return jsonify({"error": f"S{season:02d}E{episode:02d} does not exist.{extra}"}), 400
+
+    txt, source, errors = fetch_english_srt(imdb_id, media_type, season, episode)
+    if txt:
+        return jsonify({"success": True, "srt_text": txt, "source": source})
     return jsonify({"error": " | ".join(errors) or "Not found on any source"}), 404
 
 @app.route('/admin', methods=['GET', 'POST'])
