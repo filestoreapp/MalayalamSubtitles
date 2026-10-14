@@ -716,7 +716,7 @@ async function setWebhook() {
       body: JSON.stringify({ url })
     });
     const d = await res.json();
-    result.textContent = d.ok ? '✅ Webhook registered!' : '❌ ' + (d.description || 'Failed');
+    result.textContent = d.ok ? '✅ Webhook registered!' : '❌ ' + (d.description || d.error || 'Failed');
     result.style.color = d.ok ? 'var(--green)' : 'var(--accent)';
   } catch(e) {
     result.textContent = '❌ Network error';
