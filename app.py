@@ -1925,6 +1925,64 @@ def translate_request(movie_id):
     return jsonify({'ok': True, 'status': 'queued', 'language': lang_key, 'progress': 0})
 
 
+def _looks_like_srt(s):
+    """Basic structural check before accepting a client-translated subtitle."""
+    if not s or len(s) > 5 * 1024 * 1024:
+        return False
+    cues = re.findall(r'^\d+\s*\n\d{2}:\d{2}:\d{2},\d{3}\s*-->', s, re.M)
+    return len(cues) >= 5
+
+
+@app.route('/api/srt-text/<int:movie_id>')
+def srt_text(movie_id):
+    """Serve the English source subtitle as text for in-browser translation."""
+    movie = Movie.query.get_or_404(movie_id)
+    srt = movie.english_srt
+    if not srt:
+        return jsonify({'error': 'no english subtitle'}), 404
+    if srt.startswith('http'):
+        try:
+            r = requests.get(srt, timeout=20)
+            r.raise_for_status()
+            srt = r.content.decode('utf-8', errors='replace')
+        except Exception:
+            return jsonify({'error': 'could not fetch subtitle file'}), 502
+    if len(srt) > 5 * 1024 * 1024:
+        return jsonify({'error': 'subtitle too large'}), 413
+    return jsonify({'text': srt})
+
+
+@app.route('/translate/save/<int:movie_id>', methods=['POST'])
+def translate_save(movie_id):
+    """Cache a browser-translated subtitle so the next visitor gets it instantly
+    (mirrors SubtitleCat: a translation is stored once somebody makes it)."""
+    data = request.get_json(force=True, silent=True) or {}
+    lang = str(data.get('language') or '').strip()
+    lang_key = next((k for k in ON_DEMAND_LANGUAGES if k.lower() == lang.lower()), None)
+    srt = data.get('srt') or ''
+    if not lang_key:
+        return jsonify({'ok': False, 'error': 'unsupported language'}), 400
+    if not _looks_like_srt(srt):
+        return jsonify({'ok': False, 'error': 'invalid subtitle data'}), 400
+    movie = Movie.query.get(movie_id)
+    if not movie:
+        return jsonify({'ok': False, 'error': 'title not found'}), 404
+    ip = _client_ip()
+    day_ago = datetime.utcnow() - timedelta(hours=24)
+    if OnDemandRequest.query.filter(OnDemandRequest.ip_address == ip,
+                                    OnDemandRequest.created_at >= day_ago).count() >= 10:
+        return jsonify({'ok': False, 'error': 'daily limit reached'}), 429
+    cache = TranslationCache.query.filter_by(movie_id=movie.id, language=lang_key).first()
+    if cache:
+        cache.translated_srt = srt
+    else:
+        db.session.add(TranslationCache(movie_id=movie.id, language=lang_key,
+                                        translated_srt=srt))
+    db.session.add(OnDemandRequest(ip_address=ip, movie_id=movie.id, language=lang_key))
+    db.session.commit()
+    return jsonify({'ok': True, 'language': lang_key})
+
+
 @app.route('/translate/status/<int:movie_id>/<lang>')
 def translate_status(movie_id, lang):
     """Poll the state of an on-demand translation."""

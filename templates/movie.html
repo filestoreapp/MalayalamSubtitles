@@ -186,15 +186,15 @@
     <!-- On-demand translation -->
     {% if movie.english_srt and od_languages %}
     <div class="od-box">
-      <h3>🌍 Need another language?</h3>
-      <p>Get this subtitle machine-translated into any language below. It will be queued and ready to download when done.</p>
+      <h3>⚡ Need another language?</h3>
+      <p>Get this subtitle machine-translated in seconds, right in your browser — then it's saved for everyone.</p>
       <div class="od-row">
         <select id="od-lang" aria-label="Choose language">
           {% for code, info in od_languages.items() %}
           <option value="{{ code }}">{{ info[1] }} {{ info[0] }}</option>
           {% endfor %}
         </select>
-        <button id="od-btn" class="dl-btn dl-od" onclick="requestOdTranslation()"><span class="btn-txt">🌍 Translate</span></button>
+        <button id="od-btn" class="dl-btn dl-od" onclick="instantTranslate()"><span class="btn-txt">⚡ Translate instantly</span></button>
       </div>
       <div id="od-status" style="display:none"></div>
     </div>
@@ -262,67 +262,174 @@
 const MID={{ movie.id }};
 const SECS=10;
 
-/* ══ On-demand translation (SubtitleCat-style) ══ */
+/* ══ Instant in-browser translation (SubtitleCat-style) ══
+   Parses the English SRT, translates cue text via Google Translate in small
+   batches (4 parallel), rebuilds the SRT, downloads it, and saves it to the
+   server so the next visitor gets it instantly. */
+let _odRunning=false;
+
+function parseSRT(text){
+  const cues=[];
+  const blocks=text.replace(/\r/g,'').split(/\n\s*\n/);
+  for(const b of blocks){
+    const lines=b.split('\n');
+    let ti=-1;
+    for(let k=0;k<lines.length;k++){ if(lines[k].indexOf('-->')>=0){ ti=k; break; } }
+    if(ti<0) continue;
+    const parts=lines[ti].split('-->');
+    if(parts.length<2) continue;
+    const txt=lines.slice(ti+1).join('\n').trim();
+    if(!txt) continue;
+    cues.push({i:(lines[0]||'').trim()||String(cues.length+1),
+               start:parts[0].trim(), end:parts[1].trim(), text:txt});
+  }
+  return cues;
+}
+
+function makeBatches(cues, maxChars){
+  maxChars=maxChars||3000;
+  const batches=[]; let cur=[], chars=0;
+  for(const c of cues){
+    const len=c.text.length+1;
+    if(cur.length && chars+len>maxChars){ batches.push(cur); cur=[]; chars=0; }
+    cur.push(c); chars+=len;
+  }
+  if(cur.length) batches.push(cur);
+  return batches;
+}
+
+async function gTranslate(text, lang){
+  const url='https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl='
+    +encodeURIComponent(lang)+'&dt=t';
+  const body=new URLSearchParams(); body.append('q', text);
+  const r=await fetch(url,{method:'POST',body:body});
+  if(!r.ok) throw new Error('translate service busy (http '+r.status+')');
+  const d=await r.json();
+  let out='';
+  for(const seg of d[0]){ out+=seg[0]; }
+  return out;
+}
+
+async function translateBatch(batch, lang){
+  const q=batch.map(c=>c.text).join('\n');
+  try{
+    const t=await gTranslate(q, lang);
+    const lines=t.split('\n');
+    if(lines.length===batch.length) return lines;
+  }catch(e){ /* fall through to per-cue retry */ }
+  // line-count mismatch or error: retry cue-by-cue (slower but aligned)
+  const single=[];
+  for(const c of batch){
+    single.push(await gTranslate(c.text, lang));
+    await new Promise(r=>setTimeout(r,150));
+  }
+  if(single.length!==batch.length) throw new Error('alignment failed');
+  return single;
+}
+
+function buildSRT(cues, texts){
+  return cues.map((c,i)=>c.i+'\n'+c.start+' --> '+c.end+'\n'+texts[i]).join('\n\n')+'\n';
+}
+
+function downloadBlob(name, text){
+  const blob=new Blob([text],{type:'text/plain;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob); a.download=name;
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+}
+
+async function instantTranslate(){
+  if(_odRunning) return; _odRunning=true;
+  const sel=document.getElementById('od-lang');
+  const btn=document.getElementById('od-btn');
+  const box=document.getElementById('od-status');
+  const lang=sel.value;
+  const setBtn=t=>{ btn.querySelector('.btn-txt').textContent=t; };
+  box.style.display='block';
+  try{
+    btn.disabled=true; setBtn('\u23F3 Fetching\u2026');
+    box.textContent='\u23F3 Fetching English subtitle\u2026';
+    const sr=await fetch('/api/srt-text/'+MID);
+    if(!sr.ok) throw new Error('english subtitle unavailable');
+    const data=await sr.json();
+    const cues=parseSRT(data.text||'');
+    if(cues.length<5) throw new Error('could not parse subtitle');
+    const batches=makeBatches(cues);
+    box.innerHTML='\u23F3 Translating\u2026 <b id="od-pct">0%</b>'
+      +' <span style="color:var(--text-muted)">('+cues.length+' lines)</span>';
+    const out=new Array(batches.length);
+    let done=0, idx=0;
+    const tick=()=>{ const e=document.getElementById('od-pct');
+      if(e) e.textContent=Math.round(done/batches.length*100)+'%'; };
+    const workers=[];
+    for(let w=0; w<4; w++){
+      workers.push((async()=>{
+        while(true){
+          const i=idx++; if(i>=batches.length) break;
+          out[i]=await translateBatch(batches[i], lang);
+          done++; tick();
+          await new Promise(r=>setTimeout(r,120));
+        }
+      })());
+    }
+    await Promise.all(workers);
+    const texts=out.flat();
+    if(texts.length!==cues.length) throw new Error('line mismatch');
+    const srt=buildSRT(cues, texts);
+    const opt=sel.querySelector('option[value="'+lang+'"]');
+    const lname=opt?opt.textContent.trim():lang;
+    downloadBlob('subtitle.'+lang+'.srt', srt);
+    box.innerHTML='\u2705 Translated '+cues.length+' lines \u2014 download started!'
+      +'<br><span style="color:var(--text-muted)">Saving to Subtitle Dog so others get it instantly\u2026</span>';
+    try{
+      const sv=await fetch('/translate/save/'+MID,{method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({language:lang, srt:srt})});
+      const sd=await sv.json();
+      if(sd.ok){
+        box.innerHTML='\u2705 Translated '+cues.length+' lines! '
+          +'<button class="dl-btn dl-en" onclick="dlCountdown(this,\'/download/'+MID+'/'+lang+'\')">'
+          +'<div class="btn-fill"></div><span class="btn-txt">\u2B07 Download '+lname+'</span></button>'
+          +'<br><span style="color:var(--text-muted)">Saved \u2014 future visitors download it instantly.</span>';
+        if(opt) opt.remove();
+      }else{
+        box.innerHTML='\u2705 Translated! Your download started.<br>'
+          +'<span style="color:var(--text-muted)">(Could not save to server: '+(sd.error||'unknown')+')</span>';
+      }
+    }catch(e2){
+      box.innerHTML='\u2705 Translated! Your download started.<br>'
+        +'<span style="color:var(--text-muted)">(Could not save to server \u2014 download still works.)</span>';
+    }
+  }catch(e){
+    box.innerHTML='\u274C Instant translation failed ('+e.message+'). '
+      +'<button class="dl-btn dl-od" onclick="queueServerTranslation()">'
+      +'<span class="btn-txt">\uD83D\uDC22 Queue on our server instead</span></button>';
+  }
+  btn.disabled=false; setBtn('\u26A1 Translate instantly');
+  _odRunning=false;
+}
+
+/* Fallback: server-side queue (slower, but works if browser translation is blocked) */
 let _odTimer=null;
-function requestOdTranslation(){
+function queueServerTranslation(){
   const sel=document.getElementById('od-lang');
   const btn=document.getElementById('od-btn');
   const box=document.getElementById('od-status');
   const lang=sel.value;
   btn.disabled=true;
-  btn.querySelector('.btn-txt').textContent='⏳ Queuing…';
-  box.style.display='block'; box.textContent='⏳ Requesting translation…';
+  box.style.display='block'; box.textContent='\u23F3 Queuing on our server\u2026';
   fetch('/translate/request/'+MID,{method:'POST',
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({language:lang})})
   .then(r=>r.json().then(d=>({http:r.status,body:d})))
   .then(({http,body})=>{
-    if(!body.ok){
-      box.textContent='❌ '+(body.error||'Something went wrong.');
-      btn.disabled=false;
-      btn.querySelector('.btn-txt').textContent='🌍 Translate';
-      return;
-    }
+    if(!body.ok){ box.textContent='\u274C '+(body.error||'Something went wrong.'); btn.disabled=false; return; }
     if(body.status==='ready'){ odShowReady(body.language); return; }
     odPoll(body.language);
   })
-  .catch(()=>{ box.textContent='❌ Network error. Please try again.';
-    btn.disabled=false;
-    btn.querySelector('.btn-txt').textContent='🌍 Translate'; });
+  .catch(()=>{ box.textContent='\u274C Network error.'; btn.disabled=false; });
 }
-function odPoll(lang){
-  const box=document.getElementById('od-status');
-  box.innerHTML='⏳ Translating… <span style="color:var(--text-muted)">this can take a few minutes</span>';
-  if(_odTimer) clearInterval(_odTimer);
-  _odTimer=setInterval(()=>{
-    fetch('/translate/status/'+MID+'/'+encodeURIComponent(lang))
-    .then(r=>r.json())
-    .then(d=>{
-      if(d.status==='ready'){ clearInterval(_odTimer); odShowReady(lang); }
-      else if(d.status==='failed'){ clearInterval(_odTimer);
-        box.textContent='❌ Translation failed. Please try again later.'; }
-      else if(d.status==='translating'){
-        box.innerHTML='⏳ Translating… '+(d.progress||0)+'%'; }
-    });
-  }, 8000);
-}
-function odShowReady(lang){
-  const box=document.getElementById('od-status');
-  const sel=document.getElementById('od-lang');
-  const opt=sel.querySelector('option[value="'+lang+'"]');
-  const name=opt?opt.textContent.trim():'';
-  const btn=document.getElementById('od-btn');
-  btn.disabled=false;
-  btn.querySelector('.btn-txt').textContent='🌍 Translate';
-  box.innerHTML='✅ Your '+name+' subtitle is ready!'
-    +'<button class="dl-btn dl-en" onclick="dlCountdown(this,\'/download/'+MID+'/'+lang+'\')">'
-    +'<div class="btn-fill"></div><span class="btn-txt">⬇ Download</span></button>';
-  if(opt) opt.remove();
-  if(!sel.options.length){
-    document.querySelector('.od-box').style.display='none';
-  }
-}
-
 /* ══ Countdown inside button ══
    - fill bar animates inside the button
    - window.location.href triggers the actual download
