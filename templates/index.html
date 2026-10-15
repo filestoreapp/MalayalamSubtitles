@@ -79,7 +79,7 @@
       <div class="card-body">
         <div class="card-title">{{ m.title }}</div>
         <div class="card-meta">
-          <span><span class="star">⭐</span>{{ '%.1f'|format(m.rating) if m.rating else 'N/A' }}</span>
+          <span><span class="star">⭐</span>{{ '%.1f'|format(m.rating|float) if m.rating else 'N/A' }}</span>
           <span class="badge-type {{ 'series' if m.media_type=='series' }}">{{ m.year or '—' }}</span>
         </div>
       </div>
@@ -125,7 +125,7 @@
   <!-- Recent Uploads -->
   <div class="section">
     <div class="sec-head"><h2>🆕 Recent Uploads</h2><a href="/new-this-week">All →</a></div>
-    <div class="scroll-row">{% for m in recent_uploads %}<a href="{{ '/movie/'+m.slug if m.slug and m.media_type=='movie' else ('/series/'+m.title|urlencode if m.media_type=='series' else '/movie/'+m.id|string) }}" class="movie-card"><img src="{{ m.poster_url or 'https://placehold.co/300x450/1a1a1a/555?text=?' }}" alt="{{ m.title }}" loading="lazy" onerror="this.src='https://placehold.co/300x450/1a1a1a/555?text=?'"><div class="card-body"><div class="card-title">{{ m.title }}</div><div class="card-meta"><span class="star">⭐</span><span>{{ '%.1f'|format(m.rating) if m.rating else 'N/A' }}</span><span class="badge-type {{ 'series' if m.media_type=='series' }}">{{ m.year or '—' }}</span></div></div></a>{% endfor %}</div>
+    <div class="scroll-row">{% for m in recent_uploads %}<a href="{{ '/movie/'+m.slug if m.slug and m.media_type=='movie' else ('/series/'+m.title|urlencode if m.media_type=='series' else '/movie/'+m.id|string) }}" class="movie-card"><img src="{{ m.poster_url or 'https://placehold.co/300x450/1a1a1a/555?text=?' }}" alt="{{ m.title }}" loading="lazy" onerror="this.src='https://placehold.co/300x450/1a1a1a/555?text=?'"><div class="card-body"><div class="card-title">{{ m.title }}</div><div class="card-meta"><span class="star">⭐</span><span>{{ '%.1f'|format(m.rating|float) if m.rating else 'N/A' }}</span><span class="badge-type {{ 'series' if m.media_type=='series' }}">{{ m.year or '—' }}</span></div></div></a>{% endfor %}</div>
   </div>
 
   <div class="home-layout">
@@ -146,13 +146,13 @@
       <!-- Top Rated Movies -->
       <div class="section">
         <div class="sec-head"><h2>⭐ Top Rated Movies</h2><a href="/search?type=movie&sort=rating_desc">All →</a></div>
-        <div class="scroll-row">{% for m in top_rated_movies %}<a href="/movie/{{ m.slug or m.id }}" class="movie-card"><img src="{{ m.poster_url or 'https://placehold.co/300x450/1a1a1a/555?text=?' }}" alt="{{ m.title }}" loading="lazy" onerror="this.src='https://placehold.co/300x450/1a1a1a/555?text=?'"><div class="card-body"><div class="card-title">{{ m.title }}</div><div class="card-meta"><span class="star">⭐{{ '%.1f'|format(m.rating) }}</span><span class="badge-type">{{ m.year or '—' }}</span></div></div></a>{% endfor %}</div>
+        <div class="scroll-row">{% for m in top_rated_movies %}<a href="/movie/{{ m.slug or m.id }}" class="movie-card"><img src="{{ m.poster_url or 'https://placehold.co/300x450/1a1a1a/555?text=?' }}" alt="{{ m.title }}" loading="lazy" onerror="this.src='https://placehold.co/300x450/1a1a1a/555?text=?'"><div class="card-body"><div class="card-title">{{ m.title }}</div><div class="card-meta"><span class="star">⭐{{ '%.1f'|format(m.rating|float) }}</span><span class="badge-type">{{ m.year or '—' }}</span></div></div></a>{% endfor %}</div>
       </div>
 
       <!-- Top Rated Series -->
       <div class="section">
         <div class="sec-head"><h2>⭐ Top Rated Series</h2><a href="/search?type=series&sort=rating_desc">All →</a></div>
-        <div class="scroll-row">{% for m in top_rated_series %}<a href="/series/{{ m.title|urlencode }}" class="movie-card"><img src="{{ m.poster_url or 'https://placehold.co/300x450/1a1a1a/555?text=?' }}" alt="{{ m.title }}" loading="lazy" onerror="this.src='https://placehold.co/300x450/1a1a1a/555?text=?'"><div class="card-body"><div class="card-title">{{ m.title }}</div><div class="card-meta"><span class="star">⭐{{ '%.1f'|format(m.rating) }}</span><span class="badge-type series">{{ m.year or '—' }}</span></div></div></a>{% endfor %}</div>
+        <div class="scroll-row">{% for m in top_rated_series %}<a href="/series/{{ m.title|urlencode }}" class="movie-card"><img src="{{ m.poster_url or 'https://placehold.co/300x450/1a1a1a/555?text=?' }}" alt="{{ m.title }}" loading="lazy" onerror="this.src='https://placehold.co/300x450/1a1a1a/555?text=?'"><div class="card-body"><div class="card-title">{{ m.title }}</div><div class="card-meta"><span class="star">⭐{{ '%.1f'|format(m.rating|float) }}</span><span class="badge-type series">{{ m.year or '—' }}</span></div></div></a>{% endfor %}</div>
       </div>
 
     </div><!-- /main col -->
