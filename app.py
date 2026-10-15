@@ -508,7 +508,7 @@ def build_seo_meta(movie):
         plot_short = movie.plot[:155] + '…' if len(movie.plot) > 155 else movie.plot
 
     if movie.media_type == 'series':
-        page_title = f"{movie.title} S{movie.season or 1:02d}E{movie.episode or 1:02d} Malayalam Subtitles | MalayalamSubs"
+        page_title = f"{movie.title} S{movie.season or 1:02d}E{movie.episode or 1:02d} Malayalam Subtitles | Subtitle Dog"
         og_title   = f"{movie.title} – Season {movie.season or 1}, Episode {movie.episode or 1} Subtitles"
         description = (f"Download Malayalam, Tamil & Hindi subtitles for {movie.title} "
                        f"Season {movie.season or 1} Episode {movie.episode or 1}. "
@@ -517,7 +517,7 @@ def build_seo_meta(movie):
         canonical = f"{WEBSITE_BASE_URL}/series/{encoded}/{movie.season or 1}"
     else:
         year_str   = f" ({movie.year})" if movie.year else ""
-        page_title = f"{movie.title}{year_str} Malayalam Subtitles Download | MalayalamSubs"
+        page_title = f"{movie.title}{year_str} Malayalam Subtitles Download | Subtitle Dog"
         og_title   = f"{movie.title}{year_str} – Malayalam, Tamil & Hindi Subtitles"
         description = (f"Download {genres} subtitles for {movie.title}{year_str} in Malayalam, Tamil and Hindi. "
                        f"{plot_short}")
@@ -761,7 +761,7 @@ def bot_handle_start(chat_id, tg_user):
     bot_get_or_create_user(tg_user)
     name = tg_user.get("first_name", "there")
     text = (
-        f"👋 <b>Welcome to MalSubs, {name}!</b>\n\n"
+        f"👋 <b>Welcome to Subtitle Dog, {name}!</b>\n\n"
         "I help you find Malayalam, Tamil, and Hindi subtitles.\n\n"
         "<b>Commands:</b>\n"
         "/search &lt;title&gt; — Search subtitles\n"
@@ -772,7 +772,7 @@ def bot_handle_start(chat_id, tg_user):
         "/myreqs — Your requests\n"
         "/language — Set preferred language\n"
         "/status — Site stats\n\n"
-        f"🌐 <a href='{WEBSITE_BASE_URL}'>Visit MalSubs</a>"
+        f"🌐 <a href='{WEBSITE_BASE_URL}'>Visit Subtitle Dog</a>"
     )
     keyboard = bot_keyboard([
         [("🔍 Search", "action:search_prompt"), ("🆕 New Uploads", "action:new")],
@@ -1039,7 +1039,7 @@ def bot_handle_status(chat_id):
                  "not_configured": "❓ Not configured"}.get(hf["status"], "❓ Unknown")
 
     text = (
-        f"📊 <b>MalSubs Status</b>\n\n"
+        f"📊 <b>Subtitle Dog Status</b>\n\n"
         f"🎬 Movies: <b>{total_movies}</b>\n"
         f"📺 Series: <b>{total_series}</b>\n"
         f"🌐 Translations: <b>{total_subs}</b>\n"
@@ -1047,7 +1047,7 @@ def bot_handle_status(chat_id):
         f"👥 Bot users: <b>{total_users}</b>\n"
         f"🔔 Waiting subs: <b>{active_subs}</b>\n\n"
         f"🤖 AI Worker: <b>{hf_status}</b>\n"
-        f"🌐 <a href='{WEBSITE_BASE_URL}'>Visit MalSubs</a>"
+        f"🌐 <a href='{WEBSITE_BASE_URL}'>Visit Subtitle Dog</a>"
     )
     bot_send(chat_id, text)
 
@@ -1381,7 +1381,7 @@ def bot_api_update_request(req_id):
                 bot_send(sub.chat_id,
                          f"🎉 <b>Subtitle Ready!</b>\n\n"
                          f"<b>{req.title}</b> is now available.\n\n"
-                         f"<a href='{WEBSITE_BASE_URL}'>⬇️ Download at MalSubs</a>")
+                         f"<a href='{WEBSITE_BASE_URL}'>⬇️ Download at Subtitle Dog</a>")
                 sub.notified = True
             db.session.commit()
 
@@ -1584,7 +1584,7 @@ def genre_page(genre):
         genre.title()
     )
     meta = GENRE_META.get(display_genre, {
-        'icon': '🎬', 'color': '#e50914', 'desc': f'{display_genre} movies and series'
+        'icon': '🎬', 'color': '#F5B01D', 'desc': f'{display_genre} movies and series'
     })
 
     page     = request.args.get('page', 1, type=int)
@@ -1612,7 +1612,7 @@ def genre_page(genre):
 
     related = [g for g in GENRE_META if g != display_genre][:8]
 
-    seo_title = f"{display_genre} Subtitles – Download Malayalam, Tamil & Hindi | MalSubs"
+    seo_title = f"{display_genre} Subtitles – Download Malayalam, Tamil & Hindi | Subtitle Dog"
     seo_desc  = (f"Download free Malayalam, Tamil and Hindi subtitles for "
                  f"{total} {display_genre} movies and series. {meta['desc']}.")
 
@@ -3311,7 +3311,7 @@ def telegram_webhook():
                       json=payload, timeout=8)
 
     if text == '/start':
-        send("👋 *Welcome to MalSubs Bot!*\n\n"
+        send("👋 *Welcome to Subtitle Dog Bot!*\n\n"
              "📌 *Commands:*\n"
              "🔍 `/search Interstellar` — find a subtitle\n"
              "🙋 `/request Interstellar` — request a missing subtitle\n"
@@ -3324,7 +3324,7 @@ def telegram_webhook():
         srv = Movie.query.filter(Movie.media_type == 'series').distinct(Movie.title).count()
         trl = TranslationCache.query.count()
         pnd = TranslationJob.query.filter_by(status='Pending').count()
-        send(f"📊 *MalSubs*\n\n🎬 Movies: {mv}\n📺 Series: {srv}\n🌐 Translations: {trl}\n⏳ Pending jobs: {pnd}")
+        send(f"📊 *Subtitle Dog*\n\n🎬 Movies: {mv}\n📺 Series: {srv}\n🌐 Translations: {trl}\n⏳ Pending jobs: {pnd}")
         return jsonify({"ok": True})
 
     query, command = text, None
@@ -3381,7 +3381,7 @@ def new_this_week():
     return render_template('new_this_week.html',
         new_movies=new_movies, new_series=new_series, total=total,
         week_ago=week_ago, categories=get_categories_list(),
-        seo_title=f"New Subtitles This Week ({total} titles) | MalSubs",
+        seo_title=f"New Subtitles This Week ({total} titles) | Subtitle Dog",
         seo_desc=f"{total} new subtitles added this week.")
 
 @app.route('/api/trending_week')

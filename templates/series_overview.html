@@ -1,33 +1,33 @@
 {% extends "base.html" %}
-{% block title %}{{ title }} – All Seasons | MalSubs{% endblock %}
+{% block title %}{{ title }} – All Seasons | Subtitle Dog{% endblock %}
 
 {% block extra_head %}
 <style>
-/* ══ HERO ══ */
-.hero-backdrop{position:relative;min-height:280px;overflow:hidden;display:flex;align-items:flex-end}
+/* ══ HERO (light professional) ══ */
+.hero-backdrop{position:relative;min-height:280px;overflow:hidden;display:flex;align-items:flex-end;background:linear-gradient(135deg,#FFFFFF 0%,#EFF3F9 100%);border-bottom:1px solid var(--border)}
 .hero-bg-img{
   position:absolute;inset:0;
   {% if show_data.poster_url %}background-image:url('{{ show_data.poster_url | replace("'","%27") }}');{% endif %}
   background-size:cover;background-position:center 20%;
-  filter:blur(0) brightness(.3);transform:scale(1.05);
+  filter:blur(50px) brightness(1.5);opacity:.22;transform:scale(1.05);
 }
-.hero-gradient{position:absolute;inset:0;background:linear-gradient(to top,#0d0d0d 0%,rgba(13,13,13,.65) 55%,rgba(13,13,13,.05) 100%)}
+.hero-gradient{position:absolute;inset:0;background:linear-gradient(to top,rgba(239,243,249,.95) 0%,rgba(239,243,249,.35) 55%,transparent 100%)}
 .hero-content{
   position:relative;z-index:2;display:flex;gap:1.1rem;align-items:flex-end;
   width:100%;max-width:1100px;margin:0 auto;padding:1.5rem 1rem 1.75rem;
 }
 @media(max-width:460px){.hero-content{flex-direction:column;align-items:flex-start}}
-.hero-poster{width:110px;flex-shrink:0;border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.9);border:2px solid rgba(255,255,255,.1)}
+.hero-poster{width:110px;flex-shrink:0;border-radius:10px;box-shadow:0 12px 32px rgba(35,42,92,.28);border:2px solid var(--border)}
 @media(min-width:500px){.hero-poster{width:135px}}
-.hero-tag{font-size:.65rem;font-weight:700;letter-spacing:.1em;color:var(--accent);text-transform:uppercase;margin-bottom:.35rem}
-.hero-title{font-size:clamp(1.3rem,5vw,2rem);font-weight:900;line-height:1.15;margin-bottom:.55rem;text-shadow:0 2px 12px rgba(0,0,0,.8)}
+.hero-tag{font-size:.65rem;font-weight:700;letter-spacing:.1em;color:var(--acc2);text-transform:uppercase;margin-bottom:.35rem}
+.hero-title{font-size:clamp(1.3rem,5vw,2rem);font-weight:900;line-height:1.15;margin-bottom:.55rem;color:var(--text)}
 .hero-meta{display:flex;flex-wrap:wrap;gap:.35rem;margin-bottom:.65rem}
-.hpill{display:inline-flex;align-items:center;gap:.3rem;background:rgba(255,255,255,.1);backdrop-filter:blur(4px);border:1px solid rgba(255,255,255,.15);border-radius:20px;padding:.24rem .62rem;font-size:.74rem;color:#ddd}
-.hpill.gold{background:rgba(245,197,24,.15);border-color:rgba(245,197,24,.4);color:var(--gold)}
-.hero-plot{color:#ccc;font-size:.83rem;line-height:1.6;max-width:580px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.hpill{display:inline-flex;align-items:center;gap:.3rem;background:var(--card);border:1px solid var(--border);border-radius:20px;padding:.24rem .62rem;font-size:.74rem;color:var(--text-muted);box-shadow:var(--shadow)}
+.hpill.gold{background:rgba(245,176,29,.15);border-color:rgba(245,176,29,.45);color:#8a5f0e}
+.hero-plot{color:var(--text);font-size:.83rem;line-height:1.6;max-width:580px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .hero-cats{margin-top:.55rem}
-.hero-cats a{display:inline-block;background:rgba(229,9,20,.15);border:1px solid rgba(229,9,20,.3);color:#ff8080;font-size:.68rem;border-radius:4px;padding:.18rem .5rem;margin:.15rem;transition:all .15s}
-.hero-cats a:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+.hero-cats a{display:inline-block;background:rgba(245,176,29,.12);border:1px solid rgba(245,176,29,.4);color:#8a5f0e;font-size:.68rem;border-radius:4px;padding:.18rem .5rem;margin:.15rem;transition:all .15s}
+.hero-cats a:hover{background:var(--accent);color:#232A5C;border-color:var(--accent)}
 
 /* ══ SEASON TABS ══ */
 .seasons-nav{
@@ -39,12 +39,12 @@
   display:flex;flex-direction:column;align-items:center;
   background:var(--card);border:2px solid var(--border);border-radius:10px;
   padding:.55rem .85rem;cursor:pointer;transition:all .2s;flex-shrink:0;min-width:76px;
-  text-decoration:none;
+  text-decoration:none;box-shadow:var(--shadow);
 }
-.s-tab:hover{border-color:#555;transform:translateY(-2px)}
-.s-tab.active{border-color:var(--accent);background:rgba(229,9,20,.12)}
-.s-tab .sn{font-size:1.05rem;font-weight:900;color:#fff;line-height:1}
-.s-tab .sc{font-size:.6rem;color:var(--muted);margin-top:.2rem;white-space:nowrap}
+.s-tab:hover{border-color:var(--accent);transform:translateY(-2px)}
+.s-tab.active{border-color:var(--accent);background:rgba(245,176,29,.15)}
+.s-tab .sn{font-size:1.05rem;font-weight:900;color:var(--text);line-height:1}
+.s-tab .sc{font-size:.6rem;color:var(--text-muted);margin-top:.2rem;white-space:nowrap}
 
 /* ══ SEASONS BODY ══ */
 .seasons-body{max-width:1100px;margin:1rem auto 2rem;padding:0 1rem}
@@ -56,17 +56,17 @@
   padding-bottom:.75rem;border-bottom:2px solid var(--border);
 }
 .season-num-badge{
-  background:linear-gradient(135deg,var(--accent),#ff5c35);
+  background:linear-gradient(135deg,var(--accent),var(--acc2));
   border-radius:8px;padding:.42rem .95rem;font-size:.95rem;font-weight:900;
-  color:#fff;flex-shrink:0;box-shadow:0 4px 14px rgba(229,9,20,.35);
+  color:#232A5C;flex-shrink:0;box-shadow:0 4px 14px rgba(245,176,29,.4);
 }
-.season-ep-count{font-size:.78rem;color:var(--muted)}
+.season-ep-count{font-size:.78rem;color:var(--text-muted)}
 .season-view-all{
   margin-left:auto;background:var(--card);border:1px solid var(--border);
-  color:var(--muted);font-size:.75rem;border-radius:6px;padding:.32rem .75rem;
+  color:var(--text-muted);font-size:.75rem;border-radius:6px;padding:.32rem .75rem;
   text-decoration:none;flex-shrink:0;transition:all .15s;white-space:nowrap;
 }
-.season-view-all:hover{color:#fff;border-color:#666}
+.season-view-all:hover{color:var(--text);border-color:var(--accent)}
 
 /* ══ EPISODE GRID ══ */
 .ep-grid{
@@ -81,33 +81,35 @@
   background:var(--card);border:1px solid var(--border);border-radius:10px;
   padding:.7rem .6rem;text-decoration:none;color:inherit;
   transition:all .18s;display:flex;flex-direction:column;align-items:center;gap:.3rem;
+  box-shadow:var(--shadow);
 }
-.ep-card:hover{border-color:var(--accent);background:#1e1e1e;transform:translateY(-2px);box-shadow:0 6px 18px rgba(229,9,20,.2)}
+.ep-card:hover{border-color:var(--accent);background:var(--card2);transform:translateY(-2px);box-shadow:0 6px 18px rgba(245,176,29,.3)}
 
 .ep-badge{
   width:44px;height:44px;border-radius:50%;
   display:flex;align-items:center;justify-content:center;
   font-size:.88rem;font-weight:800;
-  background:linear-gradient(135deg,#c62828,var(--accent));
-  box-shadow:0 4px 12px rgba(229,9,20,.3);color:#fff;
+  background:linear-gradient(135deg,var(--accent),var(--acc2));
+  box-shadow:0 4px 12px rgba(245,176,29,.35);color:#232A5C;
   transition:transform .15s,box-shadow .15s;
 }
-.ep-card:hover .ep-badge{transform:scale(1.1);box-shadow:0 6px 18px rgba(229,9,20,.45)}
+.ep-card:hover .ep-badge{transform:scale(1.1);box-shadow:0 6px 18px rgba(245,176,29,.5)}
 
-.ep-num-label{font-size:.72rem;font-weight:600;color:#ccc;text-align:center}
+.ep-num-label{font-size:.72rem;font-weight:600;color:var(--text);text-align:center}
 .ep-dots{display:flex;gap:.2rem;justify-content:center}
 .dot{width:7px;height:7px;border-radius:50%;background:var(--border)}
-.dot.en{background:#777}
-.dot.ml{background:#4caf50}
-.dot.ta{background:#ef5350}
-.dot.hi{background:#42a5f5}
+.dot.en{background:#7A8A99}
+.dot.ml{background:#1D9E64}
+.dot.ta{background:#E05348}
+.dot.hi{background:#3E7CC4}
 
 /* ══ EMPTY / DATA-FIX NOTICE ══ */
 .data-notice{
-  background:rgba(245,197,24,.08);border:1px solid rgba(245,197,24,.25);
-  border-radius:10px;padding:.85rem 1rem;margin-bottom:1.1rem;font-size:.82rem;color:#ffd54f;
+  background:rgba(245,176,29,.12);border:1px solid rgba(245,176,29,.4);
+  border-radius:10px;padding:.85rem 1rem;margin-bottom:1.1rem;font-size:.82rem;color:#8a5f0e;
 }
 </style>
+
 {% endblock %}
 
 {% block content %}
