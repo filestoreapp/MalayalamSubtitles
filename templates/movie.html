@@ -262,7 +262,7 @@ function parseSRT(text){
 }
 
 function makeBatches(cues, maxChars){
-  maxChars=maxChars||3000;
+  maxChars=maxChars||4500;
   const batches=[]; let cur=[], chars=0;
   for(const c of cues){
     const len=c.text.length+1;
@@ -359,6 +359,26 @@ function scQueue(lang, btn){
   })
   .catch(()=>{ btn.disabled=false; btn.innerHTML='Translate'; });
 }
+/* Prefetch the English SRT when the language grid scrolls into view,
+   so Translate starts instantly on click (no fetch wait). */
+let scSrtCache=null, scSrtFetching=null;
+function scPrefetchSRT(){
+  if(scSrtCache || scSrtFetching) return;
+  scSrtFetching=fetch('/api/srt-text/'+MID).then(r=>{
+    if(!r.ok) throw new Error('no srt');
+    return r.json();
+  }).then(d=>{ scSrtCache=d.text||''; scSrtFetching=null; })
+  .catch(()=>{ scSrtFetching=null; });
+}
+if('IntersectionObserver' in window){
+  const _scGrid=document.getElementById('sc-grid');
+  if(_scGrid){
+    const _io=new IntersectionObserver(es=>{
+      if(es.some(e=>e.isIntersecting)){ scPrefetchSRT(); _io.disconnect(); }
+    },{rootMargin:'500px'});
+    _io.observe(_scGrid);
+  }
+}
 /* Smooth 1%-step progress ticker (per-button state, safe for parallel cards) */
 function scTickBtn(btn, targetPct){
   targetPct=Math.min(100, Math.round(targetPct));
@@ -384,11 +404,19 @@ async function scInstant(lang, btn){
   if(btn.dataset.busy==='1') return; btn.dataset.busy='1';
   const orig='Translate';
   try{
-    btn.disabled=true; btn.innerHTML='\u23F3 Fetching\u2026';
-    const sr=await fetch('/api/srt-text/'+MID);
-    if(!sr.ok) throw new Error('no english subtitle');
-    const data=await sr.json();
-    const cues=parseSRT(data.text||'');
+    btn.disabled=true; btn.innerHTML='\u23F3 Starting\u2026';
+    let _srtText=scSrtCache;
+    if(!_srtText){
+      if(scSrtFetching){ try{ await scSrtFetching; }catch(e){} _srtText=scSrtCache; }
+      if(!_srtText){
+        const sr=await fetch('/api/srt-text/'+MID);
+        if(!sr.ok) throw new Error('english subtitle unavailable');
+        const data=await sr.json();
+        _srtText=data.text||'';
+      }
+    }
+    if(!_srtText) throw new Error('english subtitle unavailable');
+    const cues=parseSRT(_srtText);
     if(cues.length<5) throw new Error('parse failed');
     const batches=makeBatches(cues);
     const out=new Array(batches.length);
