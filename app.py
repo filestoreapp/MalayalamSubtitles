@@ -158,6 +158,14 @@ class TranslationJob(db.Model):
     queued_at  = db.Column(db.DateTime, server_default=func.now())
     movie      = db.relationship('Movie', backref=db.backref('jobs', cascade='all, delete-orphan'))
 
+class OnDemandRequest(db.Model):
+    """Rate-limit log for SubtitleCat-style on-demand translations (per IP)."""
+    id         = db.Column(db.Integer, primary_key=True)
+    ip_address = db.Column(db.String(64), index=True)
+    movie_id   = db.Column(db.Integer, db.ForeignKey('movie.id', ondelete='CASCADE'))
+    language   = db.Column(db.String(10))
+    created_at = db.Column(db.DateTime, server_default=func.now())
+
 class SiteStat(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     total_visitors = db.Column(db.Integer, default=0)
@@ -569,6 +577,29 @@ SCHEDULER_SECRET_REQUIRED = _required_env('SCHEDULER_SECRET')
 MAX_CONCURRENT     = int(os.environ.get('MAX_CONCURRENT_JOBS', '5'))
 SERIES_BATCH_SIZE  = int(os.environ.get('SERIES_BATCH_SIZE', '3'))
 AVG_MINS_PER_JOB   = float(os.environ.get('AVG_TRANSLATION_MINS', '4'))
+
+# ── On-demand translation (SubtitleCat-style) ───────────────────
+# Curated list of extra languages visitors can machine-translate any title
+# into on demand. Codes are Google Translate codes (deep_translator).
+# en/ml/ta/hi are curated pipeline languages and intentionally excluded.
+ON_DEMAND_LANGUAGES = {
+    'es': ('Spanish', '🇪🇸'), 'fr': ('French', '🇫🇷'),
+    'de': ('German', '🇩🇪'), 'ar': ('Arabic', '🇸🇦'),
+    'pt': ('Portuguese', '🇵🇹'), 'ru': ('Russian', '🇷🇺'),
+    'ja': ('Japanese', '🇯🇵'), 'ko': ('Korean', '🇰🇷'),
+    'zh-CN': ('Chinese (Simplified)', '🇨🇳'),
+    'it': ('Italian', '🇮🇹'), 'nl': ('Dutch', '🇳🇱'),
+    'tr': ('Turkish', '🇹🇷'), 'pl': ('Polish', '🇵🇱'),
+    'uk': ('Ukrainian', '🇺🇦'), 'vi': ('Vietnamese', '🇻🇳'),
+    'th': ('Thai', '🇹🇭'), 'id': ('Indonesian', '🇮🇩'),
+    'ms': ('Malay', '🇲🇾'), 'bn': ('Bengali', '🇧🇩'),
+    'te': ('Telugu', '🇮🇳'), 'kn': ('Kannada', '🇮🇳'),
+    'mr': ('Marathi', '🇮🇳'), 'pa': ('Punjabi', '🇮🇳'),
+    'gu': ('Gujarati', '🇮🇳'), 'fa': ('Persian', '🇮🇷'),
+    'he': ('Hebrew', '🇮🇱'), 'el': ('Greek', '🇬🇷'),
+    'sv': ('Swedish', '🇸🇪'), 'da': ('Danish', '🇩🇰'),
+}
+ON_DEMAND_DAILY_LIMIT = 3  # per IP per 24h
 
 # ── Bot config ───────────────────────────────────────────────────────────────
 BOT_TOKEN      = os.environ.get('TELEGRAM_BOT_TOKEN', '')
@@ -1738,11 +1769,14 @@ def movie_hub(slug):
     is_favorite = Favorite.query.filter_by(session_id=sid, movie_id=movie.id).first() is not None
     seo = build_seo_meta(movie)
 
+    od_languages = {k: v for k, v in ON_DEMAND_LANGUAGES.items()
+                    if k not in ready_languages}
     return render_template('movie.html', movie=movie,
                            ready_languages=ready_languages,
                            related_movies=related_movies,
                            lang_ratings=lang_ratings,
-                           is_favorite=is_favorite, seo=seo)
+                           is_favorite=is_favorite, seo=seo,
+                           od_languages=od_languages)
 
 @app.route('/series/<string:title>')
 def series_overview(title):
@@ -1835,6 +1869,77 @@ def download(movie_id, language):
 
     return send_file(mem_file, as_attachment=True, download_name=final_name,
                      mimetype='application/x-subrip')
+
+
+# ══════════════════════════════════════════════════════════════
+# ON-DEMAND TRANSLATION (SubtitleCat-style: any language, on request)
+# ══════════════════════════════════════════════════════════════
+def _client_ip():
+    fwd = request.headers.get('X-Forwarded-For', '')
+    if fwd:
+        return fwd.split(',')[0].strip()
+    return (request.remote_addr or '').strip() or 'unknown'
+
+
+@app.route('/translate/request/<int:movie_id>', methods=['POST'])
+def translate_request(movie_id):
+    """Queue a machine translation of a title into an on-demand language."""
+    data = request.get_json(force=True, silent=True) or {}
+    lang = str(data.get('language') or '').strip()
+    # normalize: allow 'zh-cn' from the form, map to canonical code
+    lang_key = next((k for k in ON_DEMAND_LANGUAGES if k.lower() == lang.lower()), None)
+
+    movie = Movie.query.get(movie_id)
+    if not movie or not movie.english_srt:
+        return jsonify({'ok': False, 'error': 'English subtitle is not available for this title yet.'}), 400
+    if not lang_key:
+        return jsonify({'ok': False, 'error': 'That language is not supported for on-demand translation.'}), 400
+
+    # Already translated?
+    if TranslationCache.query.filter_by(movie_id=movie.id, language=lang_key).first():
+        return jsonify({'ok': True, 'status': 'ready', 'language': lang_key})
+    # Already queued / in flight?
+    job = TranslationJob.query.filter_by(movie_id=movie.id, language=lang_key).first()
+    if job and job.status in ('Pending', 'Processing'):
+        return jsonify({'ok': True, 'status': 'queued', 'language': lang_key,
+                        'progress': job.progress or 0})
+
+    # Abuse guard: N requests per IP per 24h.
+    ip = _client_ip()
+    day_ago = datetime.utcnow() - timedelta(hours=24)
+    recent = OnDemandRequest.query.filter(
+        OnDemandRequest.ip_address == ip,
+        OnDemandRequest.created_at >= day_ago).count()
+    if recent >= ON_DEMAND_DAILY_LIMIT:
+        return jsonify({'ok': False,
+                        'error': f'Daily limit reached ({ON_DEMAND_DAILY_LIMIT} translations per day). Try again tomorrow.'}), 429
+
+    if job:
+        job.status, job.progress, job.priority = 'Pending', 0, 2
+    else:
+        db.session.add(TranslationJob(movie_id=movie.id, language=lang_key,
+                                      status='Pending', progress=0, priority=2))
+    db.session.add(OnDemandRequest(ip_address=ip, movie_id=movie.id, language=lang_key))
+    db.session.commit()
+    ensure_dispatcher()
+    return jsonify({'ok': True, 'status': 'queued', 'language': lang_key, 'progress': 0})
+
+
+@app.route('/translate/status/<int:movie_id>/<lang>')
+def translate_status(movie_id, lang):
+    """Poll the state of an on-demand translation."""
+    lang_key = next((k for k in ON_DEMAND_LANGUAGES if k.lower() == lang.lower()), None)
+    if not lang_key:
+        return jsonify({'status': 'none'})
+    if TranslationCache.query.filter_by(movie_id=movie_id, language=lang_key).first():
+        return jsonify({'status': 'ready'})
+    job = TranslationJob.query.filter_by(movie_id=movie_id, language=lang_key).first()
+    if not job:
+        return jsonify({'status': 'none'})
+    if job.status == 'Failed':
+        return jsonify({'status': 'failed'})
+    return jsonify({'status': 'translating', 'progress': job.progress or 0})
+
 
 @app.route('/search')
 def advanced_search():

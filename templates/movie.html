@@ -41,6 +41,19 @@
 .prog-bar{height:3px;background:#E4EAF2;border-radius:2px;margin-top:.35rem;overflow:hidden}
 .prog-fill{height:100%;background:var(--accent);border-radius:2px;width:0;transition:width .3s}
 
+/* On-demand translation (SubtitleCat-style) */
+.od-box{margin:0 1.1rem 1.1rem;padding:1rem 1.1rem;background:var(--card2);border:1px dashed var(--border);border-radius:12px}
+.od-box h3{font-size:.9rem;font-weight:700;color:var(--text);margin-bottom:.3rem}
+.od-box p{font-size:.78rem;color:var(--text-muted);margin-bottom:.7rem}
+.od-row{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
+.od-row select{flex:1;min-width:180px;background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:.55rem .8rem;font-size:.85rem}
+.od-row select:focus{outline:none;border-color:var(--accent)}
+.dl-btn.dl-od{background:linear-gradient(135deg,var(--accent),var(--acc2));color:#fff;border:none;white-space:nowrap}
+.dl-btn.dl-od:hover{filter:brightness(1.06)}
+.dl-btn.dl-od:disabled{opacity:.6;cursor:wait}
+#od-status{font-size:.82rem;color:var(--text);margin-top:.6rem}
+#od-status .dl-btn{margin-left:.5rem}
+
 /* Reviews section */
 .reviews-sec{padding:.9rem 1.1rem;border-top:1px solid var(--border)}
 .reviews-sec h3{font-size:.88rem;font-weight:700;margin-bottom:.6rem;color:var(--text)}
@@ -170,6 +183,23 @@
 
     </div>
 
+    <!-- On-demand translation -->
+    {% if movie.english_srt and od_languages %}
+    <div class="od-box">
+      <h3>🌍 Need another language?</h3>
+      <p>Get this subtitle machine-translated into any language below. It will be queued and ready to download when done.</p>
+      <div class="od-row">
+        <select id="od-lang" aria-label="Choose language">
+          {% for code, info in od_languages.items() %}
+          <option value="{{ code }}">{{ info[1] }} {{ info[0] }}</option>
+          {% endfor %}
+        </select>
+        <button id="od-btn" class="dl-btn dl-od" onclick="requestOdTranslation()"><span class="btn-txt">🌍 Translate</span></button>
+      </div>
+      <div id="od-status" style="display:none"></div>
+    </div>
+    {% endif %}
+
     <!-- Community reviews -->
     {% for lc, data in lang_ratings.items() %}{% if data.comments %}
     <div class="reviews-sec">
@@ -231,6 +261,67 @@
 <script>
 const MID={{ movie.id }};
 const SECS=10;
+
+/* ══ On-demand translation (SubtitleCat-style) ══ */
+let _odTimer=null;
+function requestOdTranslation(){
+  const sel=document.getElementById('od-lang');
+  const btn=document.getElementById('od-btn');
+  const box=document.getElementById('od-status');
+  const lang=sel.value;
+  btn.disabled=true;
+  btn.querySelector('.btn-txt').textContent='⏳ Queuing…';
+  box.style.display='block'; box.textContent='⏳ Requesting translation…';
+  fetch('/translate/request/'+MID,{method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({language:lang})})
+  .then(r=>r.json().then(d=>({http:r.status,body:d})))
+  .then(({http,body})=>{
+    if(!body.ok){
+      box.textContent='❌ '+(body.error||'Something went wrong.');
+      btn.disabled=false;
+      btn.querySelector('.btn-txt').textContent='🌍 Translate';
+      return;
+    }
+    if(body.status==='ready'){ odShowReady(body.language); return; }
+    odPoll(body.language);
+  })
+  .catch(()=>{ box.textContent='❌ Network error. Please try again.';
+    btn.disabled=false;
+    btn.querySelector('.btn-txt').textContent='🌍 Translate'; });
+}
+function odPoll(lang){
+  const box=document.getElementById('od-status');
+  box.innerHTML='⏳ Translating… <span style="color:var(--text-muted)">this can take a few minutes</span>';
+  if(_odTimer) clearInterval(_odTimer);
+  _odTimer=setInterval(()=>{
+    fetch('/translate/status/'+MID+'/'+encodeURIComponent(lang))
+    .then(r=>r.json())
+    .then(d=>{
+      if(d.status==='ready'){ clearInterval(_odTimer); odShowReady(lang); }
+      else if(d.status==='failed'){ clearInterval(_odTimer);
+        box.textContent='❌ Translation failed. Please try again later.'; }
+      else if(d.status==='translating'){
+        box.innerHTML='⏳ Translating… '+(d.progress||0)+'%'; }
+    });
+  }, 8000);
+}
+function odShowReady(lang){
+  const box=document.getElementById('od-status');
+  const sel=document.getElementById('od-lang');
+  const opt=sel.querySelector('option[value="'+lang+'"]');
+  const name=opt?opt.textContent.trim():'';
+  const btn=document.getElementById('od-btn');
+  btn.disabled=false;
+  btn.querySelector('.btn-txt').textContent='🌍 Translate';
+  box.innerHTML='✅ Your '+name+' subtitle is ready!'
+    +'<button class="dl-btn dl-en" onclick="dlCountdown(this,\'/download/'+MID+'/'+lang+'\')">'
+    +'<div class="btn-fill"></div><span class="btn-txt">⬇ Download</span></button>';
+  if(opt) opt.remove();
+  if(!sel.options.length){
+    document.querySelector('.od-box').style.display='none';
+  }
+}
 
 /* ══ Countdown inside button ══
    - fill bar animates inside the button
