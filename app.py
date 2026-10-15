@@ -1717,11 +1717,37 @@ def index():
         .order_by(SubtitleRequest.votes.desc())\
         .limit(5).all()
 
+    # Latest-subtitles table rows (SubtitleCat-style): title, size, downloads, languages
+    latest_subs = []
+    for m in Movie.query.filter(Movie.english_srt.isnot(None))\
+            .order_by(Movie.id.desc()).limit(20).all():
+        try:
+            srt = m.english_srt or ''
+            size_kb = len(srt.encode('utf-8')) / 1024 if not srt.startswith('http') else 0
+        except Exception:
+            size_kb = 0
+        try:
+            dl_count = DownloadLog.query.filter_by(movie_id=m.id).count()
+        except Exception:
+            dl_count = 0
+        try:
+            n_langs = 1 + len(m.translations)
+        except Exception:
+            n_langs = 1
+        latest_subs.append({
+            'id': m.id, 'slug': m.slug, 'title': m.title, 'year': m.year,
+            'media_type': m.media_type, 'season': m.season, 'episode': m.episode,
+            'size': (f"{size_kb:.0f} KB" if size_kb >= 1 else "—"),
+            'downloads': dl_count,
+            'languages': n_langs,
+        })
+
     return render_template('index.html', mode="home", categories=categories_list,
                            trending_movies=trending_movies, trending_series=trending_series,
                            popular_movies=popular_movies, top_rated_movies=top_rated_movies,
                            top_rated_series=top_rated_series, recent_uploads=recent_uploads,
-                           top_requests=top_requests, search_query='', pagination=None)
+                           top_requests=top_requests, search_query='', pagination=None,
+                           latest_subs=latest_subs)
 
 @app.route('/robots.txt')
 def robots_txt():
@@ -1771,12 +1797,17 @@ def movie_hub(slug):
 
     od_languages = {k: v for k, v in ON_DEMAND_LANGUAGES.items()
                     if k not in ready_languages}
+    od_sorted = sorted(od_languages.items(), key=lambda kv: kv[1][0])
+    job_langs = [j.language for j in TranslationJob.query.filter(
+        TranslationJob.movie_id == movie.id,
+        TranslationJob.status.in_(['Pending', 'Processing'])).all()]
     return render_template('movie.html', movie=movie,
                            ready_languages=ready_languages,
                            related_movies=related_movies,
                            lang_ratings=lang_ratings,
                            is_favorite=is_favorite, seo=seo,
-                           od_languages=od_languages)
+                           od_languages=od_languages,
+                           od_sorted=od_sorted, job_langs=job_langs)
 
 @app.route('/series/<string:title>')
 def series_overview(title):

@@ -10,6 +10,18 @@
 
 /* Section */
 .section{margin-bottom:1.75rem}
+/* Latest-subtitles table (SubtitleCat-style) */
+.sc-table-wrap{background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:1.6rem;box-shadow:var(--shadow)}
+.sc-table{width:100%;border-collapse:collapse;font-size:.82rem}
+.sc-table th{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);text-align:left;padding:.7rem 1rem;border-bottom:1px solid var(--border);white-space:nowrap}
+.sc-table th.c,.sc-table td.c{text-align:center}
+.sc-table td{padding:.55rem 1rem;border-top:1px dotted #e4e3e3;vertical-align:middle}
+.sc-table tr:first-child td{border-top:none}
+.sc-table a.stitle{color:var(--text);font-weight:600;text-decoration:none;word-break:break-word}
+.sc-table a.stitle:hover{color:var(--acc2)}
+.sc-table .smeta{color:var(--text-muted);white-space:nowrap;font-size:.78rem}
+.sc-table-title{font-size:1.05rem;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--text);padding:.9rem 1rem .2rem}
+.sc-table-title small{font-size:.68rem;font-weight:400;color:var(--text-muted);text-transform:none;letter-spacing:0;margin-left:.4rem}
 
 /* Two-col layout */
 .home-layout{display:grid;grid-template-columns:minmax(0,1fr);gap:0}
@@ -115,6 +127,26 @@
 </div>
 
 <div class="page">
+
+  {% if latest_subs %}
+  <!-- Latest Subtitles (SubtitleCat-style table) -->
+  <div class="sc-table-title">Latest Subtitles<small>{{ latest_subs|length }} recent files</small></div>
+  <div class="sc-table-wrap">
+    <table class="sc-table">
+      <thead><tr><th>Subtitle</th><th class="c">Size</th><th class="c">Downloads</th><th class="c">Languages</th></tr></thead>
+      <tbody>
+      {% for r in latest_subs %}
+        <tr>
+          <td><a class="stitle" href="/movie/{{ r.slug or r.id }}">{% if r.media_type=='series' %}S{{ '%02d'|format(r.season or 1) }}E{{ '%02d'|format(r.episode or 1) }} · {% endif %}{{ r.title }}{% if r.year %} ({{ r.year }}){% endif %}</a></td>
+          <td class="c smeta">{{ r.size }}</td>
+          <td class="c smeta">{{ r.downloads }} downloads</td>
+          <td class="c smeta">{{ r.languages }} languages</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
 
   <!-- Trending This Week -->
   <div class="section" id="trending-week-section" style="display:none">
