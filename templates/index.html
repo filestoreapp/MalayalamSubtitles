@@ -7,18 +7,14 @@
 .hero{background:linear-gradient(135deg,#FFFFFF 0%,#F5F8FC 70%,#EDF2F9 100%);padding:2.25rem 1rem 2rem;text-align:center;border-bottom:1px solid var(--border)}
 .hero h1{font-size:clamp(1.4rem,5vw,2.1rem);font-weight:800;margin-bottom:.4rem;color:var(--navy);letter-spacing:-.01em}
 .hero p{color:var(--text-muted);font-size:.88rem;max-width:440px;margin:0 auto .9rem}
-.hero-search{display:flex;gap:.4rem;max-width:500px;margin:0 auto}
-.hero-search input{flex:1;background:#fff;border:1px solid var(--border);color:var(--text);border-radius:9px;padding:.6rem .9rem;font-size:.95rem;box-shadow:var(--shadow)}
-.hero-search input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(245,176,29,.25)}
-.hero-search button{background:var(--accent);border:none;color:var(--navy);border-radius:9px;padding:.6rem 1.1rem;font-size:.95rem;font-weight:700}
-.hero-search button:hover{background:var(--acc2);color:var(--navy)}
 
 /* Section */
 .section{margin-bottom:1.75rem}
 
 /* Two-col layout */
-.home-layout{display:grid;grid-template-columns:1fr;gap:0}
-@media(min-width:900px){.home-layout{grid-template-columns:1fr 280px;gap:1.5rem}}
+.home-layout{display:grid;grid-template-columns:minmax(0,1fr);gap:0}
+.home-layout>div{min-width:0}
+@media(min-width:900px){.home-layout{grid-template-columns:minmax(0,1fr) 280px;gap:1.5rem}}
 
 /* Sidebar */
 .sidebar{display:none}
@@ -83,7 +79,7 @@
       <div class="card-body">
         <div class="card-title">{{ m.title }}</div>
         <div class="card-meta">
-          <span><span class="star">⭐</span>{{ m.rating or 'N/A' }}</span>
+          <span><span class="star">⭐</span>{{ '%.1f'|format(m.rating) if m.rating else 'N/A' }}</span>
           <span class="badge-type {{ 'series' if m.media_type=='series' }}">{{ m.year or '—' }}</span>
         </div>
       </div>
@@ -115,13 +111,7 @@
 <!-- ───── HOME ───── -->
 <div class="hero">
   <h1>🐶 Subtitle Dog</h1>
-  <p>Malayalam · Tamil · Hindi subtitles for movies &amp; series</p>
-  <div class="hero-search">
-    <form action="/" method="get" style="display:flex;gap:.4rem;width:100%">
-      <input type="text" name="q" placeholder="Search movies or series…" autocomplete="off">
-      <button type="submit">Search</button>
-    </form>
-  </div>
+  <p>Malayalam · Tamil · Hindi subtitles for movies &amp; series — fetch any title above</p>
 </div>
 
 <div class="page">
@@ -135,7 +125,7 @@
   <!-- Recent Uploads -->
   <div class="section">
     <div class="sec-head"><h2>🆕 Recent Uploads</h2><a href="/new-this-week">All →</a></div>
-    <div class="scroll-row">{% for m in recent_uploads %}<a href="{{ '/movie/'+m.slug if m.slug and m.media_type=='movie' else ('/series/'+m.title|urlencode if m.media_type=='series' else '/movie/'+m.id|string) }}" class="movie-card"><img src="{{ m.poster_url or 'https://placehold.co/300x450/1a1a1a/555?text=?' }}" alt="{{ m.title }}" loading="lazy" onerror="this.src='https://placehold.co/300x450/1a1a1a/555?text=?'"><div class="card-body"><div class="card-title">{{ m.title }}</div><div class="card-meta"><span class="star">⭐</span><span>{{ m.rating or 'N/A' }}</span><span class="badge-type {{ 'series' if m.media_type=='series' }}">{{ m.year or '—' }}</span></div></div></a>{% endfor %}</div>
+    <div class="scroll-row">{% for m in recent_uploads %}<a href="{{ '/movie/'+m.slug if m.slug and m.media_type=='movie' else ('/series/'+m.title|urlencode if m.media_type=='series' else '/movie/'+m.id|string) }}" class="movie-card"><img src="{{ m.poster_url or 'https://placehold.co/300x450/1a1a1a/555?text=?' }}" alt="{{ m.title }}" loading="lazy" onerror="this.src='https://placehold.co/300x450/1a1a1a/555?text=?'"><div class="card-body"><div class="card-title">{{ m.title }}</div><div class="card-meta"><span class="star">⭐</span><span>{{ '%.1f'|format(m.rating) if m.rating else 'N/A' }}</span><span class="badge-type {{ 'series' if m.media_type=='series' }}">{{ m.year or '—' }}</span></div></div></a>{% endfor %}</div>
   </div>
 
   <div class="home-layout">
@@ -156,13 +146,13 @@
       <!-- Top Rated Movies -->
       <div class="section">
         <div class="sec-head"><h2>⭐ Top Rated Movies</h2><a href="/search?type=movie&sort=rating_desc">All →</a></div>
-        <div class="scroll-row">{% for m in top_rated_movies %}<a href="/movie/{{ m.slug or m.id }}" class="movie-card"><img src="{{ m.poster_url or 'https://placehold.co/300x450/1a1a1a/555?text=?' }}" alt="{{ m.title }}" loading="lazy" onerror="this.src='https://placehold.co/300x450/1a1a1a/555?text=?'"><div class="card-body"><div class="card-title">{{ m.title }}</div><div class="card-meta"><span class="star">⭐{{ m.rating }}</span><span class="badge-type">{{ m.year or '—' }}</span></div></div></a>{% endfor %}</div>
+        <div class="scroll-row">{% for m in top_rated_movies %}<a href="/movie/{{ m.slug or m.id }}" class="movie-card"><img src="{{ m.poster_url or 'https://placehold.co/300x450/1a1a1a/555?text=?' }}" alt="{{ m.title }}" loading="lazy" onerror="this.src='https://placehold.co/300x450/1a1a1a/555?text=?'"><div class="card-body"><div class="card-title">{{ m.title }}</div><div class="card-meta"><span class="star">⭐{{ '%.1f'|format(m.rating) }}</span><span class="badge-type">{{ m.year or '—' }}</span></div></div></a>{% endfor %}</div>
       </div>
 
       <!-- Top Rated Series -->
       <div class="section">
         <div class="sec-head"><h2>⭐ Top Rated Series</h2><a href="/search?type=series&sort=rating_desc">All →</a></div>
-        <div class="scroll-row">{% for m in top_rated_series %}<a href="/series/{{ m.title|urlencode }}" class="movie-card"><img src="{{ m.poster_url or 'https://placehold.co/300x450/1a1a1a/555?text=?' }}" alt="{{ m.title }}" loading="lazy" onerror="this.src='https://placehold.co/300x450/1a1a1a/555?text=?'"><div class="card-body"><div class="card-title">{{ m.title }}</div><div class="card-meta"><span class="star">⭐{{ m.rating }}</span><span class="badge-type series">{{ m.year or '—' }}</span></div></div></a>{% endfor %}</div>
+        <div class="scroll-row">{% for m in top_rated_series %}<a href="/series/{{ m.title|urlencode }}" class="movie-card"><img src="{{ m.poster_url or 'https://placehold.co/300x450/1a1a1a/555?text=?' }}" alt="{{ m.title }}" loading="lazy" onerror="this.src='https://placehold.co/300x450/1a1a1a/555?text=?'"><div class="card-body"><div class="card-title">{{ m.title }}</div><div class="card-meta"><span class="star">⭐{{ '%.1f'|format(m.rating) }}</span><span class="badge-type series">{{ m.year or '—' }}</span></div></div></a>{% endfor %}</div>
       </div>
 
     </div><!-- /main col -->
@@ -229,7 +219,7 @@ fetch('/api/recently_viewed').then(r=>r.json()).then(d=>{
     <a href="${m.type==='movie'?'/movie/'+(m.slug||m.id):'/series/'+encodeURIComponent(m.title||'')}" class="rv-item">
       <img src="${m.poster||'https://placehold.co/32x48/1a1a1a/555?text=?'}" class="rv-poster"
            onerror="this.src='https://placehold.co/32x48/1a1a1a/555?text=?'">
-      <div><div class="rv-title">${m.title||''}</div><div class="rv-meta">⭐${m.rating||'N/A'} · ${m.year||''}</div></div>
+      <div><div class="rv-title">${m.title||''}</div><div class="rv-meta">⭐${m.rating?Number(m.rating).toFixed(1):'N/A'} · ${m.year||''}</div></div>
     </a>`).join('');
 });
 </script>
