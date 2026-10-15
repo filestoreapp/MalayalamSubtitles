@@ -156,6 +156,7 @@ class TranslationJob(db.Model):
     progress   = db.Column(db.Integer, default=0)
     priority   = db.Column(db.Integer, default=2)
     queued_at  = db.Column(db.DateTime, server_default=func.now())
+    updated_at = db.Column(db.DateTime, server_default=func.now(), onupdate=func.now())
     movie      = db.relationship('Movie', backref=db.backref('jobs', cascade='all, delete-orphan'))
 
 class OnDemandRequest(db.Model):
@@ -305,6 +306,8 @@ def _run_startup_migrations():
             "ALTER TABLE site_stat ADD COLUMN IF NOT EXISTS r2_size_bytes BIGINT DEFAULT 0",
             "ALTER TABLE site_stat ADD COLUMN IF NOT EXISTS r2_file_count INTEGER DEFAULT 0",
             "ALTER TABLE site_stat ADD COLUMN IF NOT EXISTS r2_checked_at TIMESTAMP NULL",
+            "ALTER TABLE translation_job ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()",
+            "UPDATE translation_job SET updated_at = queued_at WHERE updated_at IS NULL",
             "CREATE INDEX IF NOT EXISTS ix_movie_title ON movie (title)",
             "CREATE INDEX IF NOT EXISTS ix_movie_imdb_media ON movie (imdb_id, media_type)",
             "CREATE INDEX IF NOT EXISTS ix_movie_media_created ON movie (media_type, created_at)",
@@ -606,7 +609,8 @@ BOT_TOKEN      = os.environ.get('TELEGRAM_BOT_TOKEN', '')
 TELEGRAM_API   = f"https://api.telegram.org/bot{BOT_TOKEN}"
 ADMIN_CHAT_IDS = [int(x) for x in os.environ.get('TELEGRAM_ADMIN_IDS', '').split(',') if x.strip()]
 
-def _send_to_hf(job, movie):
+def _post_to_hf(job, movie):
+    """POST a claimed job to the HF worker. Network only; the caller owns DB state."""
     try:
         resp = requests.post(HF_WORKER_URL, json={
             "movie_id":         movie.id,
@@ -614,17 +618,12 @@ def _send_to_hf(job, movie):
             "language":         job.language
         }, headers={'Authorization': f'Bearer {HF_SECRET}'}, timeout=10)
         if resp.status_code == 200:
-            job.status   = 'Processing'
-            job.progress = 0
             print(f"✅ Dispatched {job.language.upper()} job {job.id} (movie {movie.id}, priority {job.priority})")
             return True
-        else:
-            job.status = 'Failed'
-            print(f"❌ HF rejected job {job.id}: HTTP {resp.status_code}")
-            return False
-    except Exception:
-        job.status = 'Failed'
-        print(f"❌ HF error job {job.id}")
+        print(f"❌ HF rejected job {job.id}: HTTP {resp.status_code}")
+        return False
+    except Exception as e:
+        print(f"❌ HF error job {job.id}: {e}")
         return False
 
 
@@ -641,10 +640,13 @@ def dispatch_pending_jobs():
         if free_slots == 0:
             return
         # Atomic claim via status update per job (avoids double-dispatch).
+        # SKIP LOCKED: with 2 gunicorn workers each running this loop, the row
+        # lock makes the claim atomic so the same job is never dispatched twice.
         pending = (TranslationJob.query
                    .filter_by(status='Pending')
                    .order_by(TranslationJob.priority.asc(), TranslationJob.queued_at.asc())
                    .limit(free_slots + SERIES_BATCH_SIZE)
+                   .with_for_update(skip_locked=True)
                    .all())
         dispatched_series = 0
         dispatched_total = 0
@@ -659,9 +661,15 @@ def dispatch_pending_jobs():
             is_series = movie.media_type == 'series'
             if is_series and dispatched_series >= SERIES_BATCH_SIZE:
                 continue
-            ok = _send_to_hf(job, movie)
+            # Claim BEFORE the network call; the lock is released on commit.
+            job.status = 'Processing'
+            job.progress = 0
             db.session.commit()
-            if ok:
+            ok = _post_to_hf(job, movie)
+            if not ok:
+                job.status = 'Failed'
+                db.session.commit()
+            else:
                 dispatched_total += 1
                 if is_series:
                     dispatched_series += 1
@@ -678,7 +686,19 @@ def _dispatcher_loop():
                     TranslationJob.queued_at < cutoff).update(
                     {TranslationJob.status: 'Pending', TranslationJob.progress: 0},
                     synchronize_session=False)
+                # Orphan recovery: the HF worker is a HF Space and can restart
+                # mid-job, leaving the row stuck in Processing forever and
+                # clogging a concurrency slot. updated_at tracks the last worker
+                # callback, so silence > 45 min means the job is dead.
+                orphan_cutoff = datetime.utcnow() - timedelta(minutes=45)
+                orphans = TranslationJob.query.filter(
+                    TranslationJob.status == 'Processing',
+                    TranslationJob.updated_at < orphan_cutoff).update(
+                    {TranslationJob.status: 'Pending', TranslationJob.progress: 0},
+                    synchronize_session=False)
                 db.session.commit()
+                if orphans:
+                    print(f"♻️ Recovered {orphans} orphaned Processing job(s)")
         except Exception:
             pass
         time.sleep(15)
