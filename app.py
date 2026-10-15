@@ -2379,6 +2379,36 @@ def dashboard():
     bot_users        = TelegramUser.query.count()
     bot_subs         = TelegramSubscription.query.filter_by(notified=False).count()
 
+    # On-demand (SubtitleCat-style) translation stats
+    od_lang_names = {k: v[0] for k, v in ON_DEMAND_LANGUAGES.items()}
+    try:
+        od_total = OnDemandRequest.query.count()
+    except Exception:
+        od_total = 0
+    try:
+        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        od_today = OnDemandRequest.query.filter(OnDemandRequest.created_at >= today_start).count()
+    except Exception:
+        od_today = 0
+    try:
+        od_by_lang = db.session.query(
+            OnDemandRequest.language, func.count(OnDemandRequest.id)
+        ).group_by(OnDemandRequest.language)\
+         .order_by(func.count(OnDemandRequest.id).desc()).limit(8).all()
+    except Exception:
+        od_by_lang = []
+    try:
+        od_saved = TranslationCache.query.filter(
+            TranslationCache.language.in_(list(ON_DEMAND_LANGUAGES.keys()))).count()
+    except Exception:
+        od_saved = 0
+    try:
+        od_recent = db.session.query(OnDemandRequest, Movie.title)\
+            .join(Movie, Movie.id == OnDemandRequest.movie_id)\
+            .order_by(OnDemandRequest.id.desc()).limit(10).all()
+    except Exception:
+        od_recent = []
+
     return render_template('dashboard.html',
                            visitors=stat.total_visitors,
                            downloads=total_dl,
@@ -2396,7 +2426,10 @@ def dashboard():
                            pending_requests=pending_requests,
                            total_ratings=total_ratings,
                            bot_users=bot_users,
-                           bot_subs=bot_subs)
+                           bot_subs=bot_subs,
+                           od_total=od_total, od_today=od_today,
+                           od_by_lang=od_by_lang, od_lang_names=od_lang_names,
+                           od_saved=od_saved, od_recent=od_recent)
 
 @app.route('/admin/cleanup_jobs', methods=['POST'])
 @login_required
@@ -2433,6 +2466,7 @@ def analytics_data():
         TranslationCache.language, func.sum(TranslationCache.downloads)
     ).group_by(TranslationCache.language).all()
     lang_map = {'ml': 'Malayalam', 'ta': 'Tamil', 'hi': 'Hindi', 'en': 'English'}
+    lang_map.update({k: v[0] for k, v in ON_DEMAND_LANGUAGES.items()})
     downloads_by_lang = {
         "labels": [lang_map.get(r[0], r[0]) for r in lang_raw],
         "data":   [int(r[1] or 0) for r in lang_raw]

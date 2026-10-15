@@ -15,13 +15,39 @@
   .dash-topbar h1 { font-size: 1.2rem; font-weight: 800; }
   .admin-nav { display: flex; gap: .4rem; flex-wrap: wrap; }
   .admin-nav a {
-    background: #1a1a1a; border: 1px solid var(--border); color: var(--text-muted);
+    background: var(--card2); border: 1px solid var(--border); color: var(--text-muted);
     border-radius: 8px; padding: .38rem .85rem; text-decoration: none; font-size: .8rem; transition: all .2s;
   }
-  .admin-nav a:hover { color: #fff; border-color: #555; }
+  .admin-nav a:hover { color: var(--text); border-color: var(--accent); }
   .admin-nav a.active { background: var(--accent); border-color: var(--accent); color: #fff; }
   .admin-nav a.bot-link { border-color: #0088cc44; color: #29b6f6; }
   .admin-nav a.bot-link:hover { background: rgba(0,136,204,.15); border-color: #0088cc; }
+
+  /* On-demand translations widget */
+  .odw { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+         padding: 1.1rem 1.25rem; margin-bottom: 1.25rem; }
+  .odw-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .5rem; margin-bottom: .9rem; }
+  .odw-head h2 { font-size: 1rem; font-weight: 800; }
+  .odw-head p { font-size: .76rem; color: var(--text-muted); }
+  .odw-stats { display: grid; grid-template-columns: repeat(auto-fill,minmax(150px,1fr)); gap: .7rem; margin-bottom: 1rem; }
+  .odw-stat { background: var(--card2); border: 1px solid var(--border); border-radius: 9px; padding: .7rem .9rem; }
+  .odw-stat .v { font-size: 1.45rem; font-weight: 800; }
+  .odw-stat .l { font-size: .72rem; color: var(--text-muted); }
+  .odw-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  @media(max-width:768px){ .odw-cols { grid-template-columns: 1fr; } }
+  .odw h4 { font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+            color: var(--text-muted); margin-bottom: .6rem; }
+  .odw-lang { display: flex; align-items: center; justify-content: space-between;
+              padding: .4rem 0; border-top: 1px dotted #e4e3e3; font-size: .82rem; }
+  .odw-lang:first-of-type { border-top: none; }
+  .odw-lang .c { font-weight: 700; background: var(--accent); color: #fff;
+                 border-radius: 10px; padding: .05rem .45rem; font-size: .72rem; }
+  .odw-table { width: 100%; border-collapse: collapse; font-size: .78rem; }
+  .odw-table td { padding: .42rem .2rem; border-top: 1px dotted #e4e3e3; vertical-align: middle; }
+  .odw-table tr:first-child td { border-top: none; }
+  .odw-table .t { font-weight: 600; }
+  .odw-table .m { color: var(--text-muted); font-size: .7rem; }
+  .odw-empty { color: var(--text-muted); font-size: .82rem; padding: .5rem 0; }
 
   /* Stat cards */
   .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px,1fr)); gap: .75rem; margin-bottom: 1.25rem; }
@@ -55,9 +81,10 @@
   /* Actions bar */
   .actions-bar { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
   .action-btn {
-    background: #1a1a1a; border: 1px solid var(--border); color: var(--text-muted);
+    background: var(--card2); border: 1px solid var(--border); color: var(--text);
     border-radius: 8px; padding: .45rem .9rem; text-decoration: none; font-size: .82rem; transition: all .2s; cursor: pointer;
   }
+  .action-btn:hover { border-color: var(--accent); }
   .action-btn:hover { border-color: var(--accent); color: var(--accent); }
   .action-btn.danger:hover { border-color: #ff4444; color: #ff4444; }
   .action-btn.bot { border-color: #0088cc44; color: #29b6f6; }
@@ -130,7 +157,7 @@
   .hf-status-text{font-size:.88rem;font-weight:700}
   .hf-meta{font-size:.75rem;color:var(--text-muted)}
   .hf-stats{display:flex;gap:.65rem;flex-wrap:wrap;margin-top:.65rem}
-  .hfs{background:#111;border:1px solid var(--border);border-radius:8px;padding:.5rem .75rem;font-size:.8rem;flex:1;min-width:100px}
+  .hfs{background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:.5rem .75rem;font-size:.8rem;flex:1;min-width:100px}
   .hfs .v{font-size:1.1rem;font-weight:800;margin-bottom:.1rem}
   .hfs .l{font-size:.68rem;color:var(--text-muted)}
   .hf-wake-btn{background:var(--accent);border:none;color:#fff;border-radius:7px;padding:.38rem .85rem;font-size:.78rem;cursor:pointer;transition:all .18s}
@@ -145,7 +172,7 @@
   .tq-head h2{font-size:.95rem;font-weight:700}
   .tq-refresh{font-size:.72rem;color:var(--text-muted)}
   .tq-stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:.65rem;margin-bottom:1rem}
-  .tqs{background:#111;border:1px solid var(--border);border-radius:9px;padding:.7rem .85rem;text-align:center}
+  .tqs{background:var(--card2);border:1px solid var(--border);border-radius:9px;padding:.7rem .85rem;text-align:center}
   .tqs .n{font-size:1.4rem;font-weight:800;line-height:1;margin-bottom:.2rem}
   .tqs .l{font-size:.68rem;color:var(--text-muted)}
   .tqs.pending .n{color:#ffd54f}
@@ -154,18 +181,18 @@
   .tqs.done .n{color:#81c784}
   .tq-pbar-wrap{margin-bottom:.75rem}
   .tq-pbar-label{display:flex;justify-content:space-between;font-size:.78rem;color:var(--text-muted);margin-bottom:.35rem}
-  .tq-pbar{height:10px;background:#1a1a1a;border-radius:5px;overflow:hidden}
+  .tq-pbar{height:10px;background:#E4EAF2;border-radius:5px;overflow:hidden}
   .tq-pbar-fill{height:100%;background:linear-gradient(90deg,#4caf50,#81c784);border-radius:5px;transition:width .5s ease}
   .tq-langs{display:flex;gap:.6rem;margin-bottom:.75rem;flex-wrap:wrap}
-  .tql{flex:1;min-width:80px;background:#111;border:1px solid var(--border);border-radius:8px;padding:.5rem .65rem}
+  .tql{flex:1;min-width:80px;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:.5rem .65rem}
   .tql-name{font-size:.7rem;font-weight:700;margin-bottom:.3rem;display:flex;justify-content:space-between}
-  .tql-bar{height:5px;background:#1a1a1a;border-radius:3px;overflow:hidden}
+  .tql-bar{height:5px;background:#E4EAF2;border-radius:3px;overflow:hidden}
   .tql-fill{height:100%;border-radius:3px}
   .tql-ml .tql-fill{background:#4caf50}
   .tql-ta .tql-fill{background:#ef5350}
   .tql-hi .tql-fill{background:#42a5f5}
   .tq-types{display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:.75rem}
-  .tqt{background:#111;border:1px solid var(--border);border-radius:8px;padding:.5rem .85rem;font-size:.8rem;flex:1;min-width:120px}
+  .tqt{background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:.5rem .85rem;font-size:.8rem;flex:1;min-width:120px}
   .tqt .tv{font-size:1.1rem;font-weight:800}
   .tqt .tl{font-size:.68rem;color:var(--text-muted);margin-top:.1rem}
   .tq-eta{background:rgba(245,197,24,.08);border:1px solid rgba(245,197,24,.2);border-radius:8px;padding:.6rem .9rem;font-size:.82rem;color:#ffd54f;display:flex;align-items:center;gap:.5rem}
@@ -183,7 +210,7 @@
   .bot-widget-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:.85rem; flex-wrap:wrap; gap:.5rem; }
   .bot-widget-head h2 { font-size:.95rem; font-weight:700; }
   .bot-stats { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:.65rem; margin-bottom:.85rem; }
-  .bstat { background:#111; border:1px solid var(--border); border-radius:9px; padding:.7rem .85rem; text-align:center; }
+  .bstat { background:var(--card2); border:1px solid var(--border); border-radius:9px; padding:.7rem .85rem; text-align:center; }
   .bstat .n { font-size:1.4rem; font-weight:800; line-height:1; margin-bottom:.2rem; }
   .bstat .l { font-size:.68rem; color:var(--text-muted); }
   .bstat.users .n  { color:#29b6f6; }
@@ -231,7 +258,10 @@
 
   <!-- Top bar -->
   <div class="dash-topbar">
-    <h1>📊 Dashboard</h1>
+    <h1 style="display:flex;align-items:center;gap:.55rem">
+      <img src="/static/subtitle-dog-logo.png" alt="Subtitle Dog" style="width:38px;height:38px;border-radius:50%;background:var(--navy)">
+      <span>Subtitle Dog <span style="font-size:.75rem;font-weight:600;color:var(--text-muted)">· Admin</span></span>
+    </h1>
     {% set active_page = 'dashboard' %}{% include "admin_nav.html" %}
   </div>
 
@@ -402,6 +432,49 @@
     {% endif %}
   </div>
 
+  <!-- ⚡ On-Demand Translations (SubtitleCat-style instant translations) -->
+  <div class="odw">
+    <div class="odw-head">
+      <div>
+        <h2>⚡ On-Demand Translations</h2>
+        <p>Instant browser translations requested by visitors — saved to the library for everyone</p>
+      </div>
+    </div>
+    <div class="odw-stats">
+      <div class="odw-stat"><div class="v">{{ od_total | default(0) }}</div><div class="l">Total requests</div></div>
+      <div class="odw-stat"><div class="v">{{ od_today | default(0) }}</div><div class="l">Requested today</div></div>
+      <div class="odw-stat"><div class="v">{{ od_by_lang | length }}</div><div class="l">Languages requested</div></div>
+      <div class="odw-stat"><div class="v" style="color:var(--green)">{{ od_saved | default(0) }}</div><div class="l">Saved to library</div></div>
+    </div>
+    <div class="odw-cols">
+      <div>
+        <h4>Top requested languages</h4>
+        {% if od_by_lang %}
+          {% for code, cnt in od_by_lang %}
+          <div class="odw-lang"><span>{{ od_lang_names.get(code, code) }}</span><span class="c">{{ cnt }}</span></div>
+          {% endfor %}
+        {% else %}
+          <div class="odw-empty">No on-demand translations yet — they appear here when visitors use ⚡ Translate on a title.</div>
+        {% endif %}
+      </div>
+      <div>
+        <h4>Recent activity</h4>
+        {% if od_recent %}
+        <table class="odw-table">
+          {% for req, title in od_recent %}
+          <tr>
+            <td><div class="t">{{ title[:38] }}</div><div class="m">{{ req.created_at.strftime('%b %d, %H:%M') if req.created_at else '' }}</div></td>
+            <td style="text-align:right"><span class="c" style="font-weight:700;background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:.05rem .45rem;font-size:.72rem">{{ od_lang_names.get(req.language, req.language) }}</span></td>
+          </tr>
+          {% endfor %}
+        </table>
+        {% else %}
+          <div class="odw-empty">Nothing yet.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
   <!-- Failed jobs alert -->
   {% if failed_jobs_count > 0 %}
   <div class="failed-alert">
@@ -508,7 +581,7 @@
         {% if m.poster_url %}
         <img src="{{ m.poster_url }}" class="poster-thumb" alt="" loading="lazy" onerror="this.style.display='none'">
         {% else %}
-        <div style="width:38px;height:56px;background:#1a1a1a;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:.9rem">🎬</div>
+        <div style="width:38px;height:56px;background:var(--card2);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:.9rem">🎬</div>
         {% endif %}
       </div>
       <div>
@@ -587,7 +660,7 @@
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.35rem">
         <span class="job-status st-{{ job.status }}">{{ job.status }}</span>
         {% if job.progress > 0 %}
-        <div style="width:80px;height:4px;background:#1a1a1a;border-radius:2px;overflow:hidden">
+        <div style="width:80px;height:4px;background:#E4EAF2;border-radius:2px;overflow:hidden">
           <div style="width:{{ job.progress }}%;height:100%;background:#4caf50;border-radius:2px"></div>
         </div>
         {% endif %}
@@ -616,13 +689,13 @@
 {% endblock %}
 
 <div id="confirm-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2000;align-items:center;justify-content:center;padding:1rem" onclick="if(event.target===this)closeConfirmModal()">
-  <div style="background:#1a1a1a;border:1px solid var(--border);border-radius:14px;padding:1.5rem;width:min(360px,95vw);text-align:center">
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:1.5rem;width:min(360px,95vw);text-align:center">
     <div style="font-size:2rem;margin-bottom:.75rem">🗑</div>
     <h3 style="margin-bottom:.5rem">Are you sure?</h3>
     <p id="confirm-modal-msg" style="color:var(--text-muted);font-size:.85rem;margin-bottom:1.25rem">This cannot be undone.</p>
     <div style="display:flex;gap:.65rem;justify-content:center">
       <button type="button" id="confirm-modal-yes" style="background:#e53935;color:#fff;border:none;border-radius:8px;padding:.52rem 1.5rem;cursor:pointer">Delete</button>
-      <button type="button" style="background:#1a1a1a;color:var(--text-muted);border:1px solid var(--border);border-radius:8px;padding:.52rem 1.5rem;cursor:pointer" onclick="closeConfirmModal()">Cancel</button>
+      <button type="button" style="background:var(--card2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:.52rem 1.5rem;cursor:pointer" onclick="closeConfirmModal()">Cancel</button>
     </div>
   </div>
 </div>
