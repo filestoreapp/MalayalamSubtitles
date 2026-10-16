@@ -104,10 +104,10 @@ def _google_batch(lines, target_lang):
         return []
     url = "https://translate.googleapis.com/translate_a/single"
     params = {"client": "gtx", "sl": "en", "tl": target_lang, "dt": "t"}
-    for attempt in range(4):
+    for attempt in range(3):
         try:
             r = requests.post(url, params=params,
-                              data={"q": "\n".join(lines)}, timeout=25)
+                              data={"q": "\n".join(lines)}, timeout=20)
             if r.status_code == 429 or r.status_code >= 500:
                 raise Exception(f"HTTP {r.status_code}")
             r.raise_for_status()
@@ -119,8 +119,7 @@ def _google_batch(lines, target_lang):
                 return out
             raise ValueError(f"line mismatch ({len(out)} != {len(lines)})")
         except Exception as e:
-            # 5s, 10s, 20s, 40s — rate limits need real cool-down time.
-            wait = 5 * (2 ** attempt)
+            wait = [3, 8, 15][attempt]
             print(f"  \u26a0\ufe0f  Google [{target_lang}] batch of {len(lines)} "
                   f"attempt {attempt+1} failed: {e} (retry in {wait}s)", flush=True)
             time.sleep(wait)
@@ -143,20 +142,22 @@ def translate_srt(english_srt: str, target_lang: str,
     hf_hdrs = {"Authorization": f"Bearer {HF_API_TOKEN}"} if HF_API_TOKEN else None
 
     def hf_fallback(lines):
-        out = []
-        for line in lines:
-            try:
-                r = requests.post(hf_url, headers=hf_hdrs,
-                                  json={"inputs": line}, timeout=20)
-                r.raise_for_status()
-                data = r.json()
-                out.append(data[0].get("translation_text", line)
-                           if isinstance(data, list) and data else line)
-            except Exception as e:
-                print(f"  \u274c HF fallback failed: {e}", flush=True)
-                out.append(line)
-            time.sleep(0.5)
-        return out
+        # Single request for the whole batch (newline-joined). If the model
+        # doesn't preserve line alignment, fall back to English.
+        try:
+            r = requests.post(hf_url, headers=hf_hdrs,
+                              json={"inputs": "\n".join(lines)}, timeout=25)
+            r.raise_for_status()
+            data = r.json()
+            txt = data[0].get("translation_text", "") if isinstance(data, list) and data else ""
+            out = txt.split("\n")
+            if len(out) == len(lines):
+                return out
+            print(f"  \u26a0\ufe0f  HF line mismatch ({len(out)} != {len(lines)})",
+                  flush=True)
+        except Exception as e:
+            print(f"  \u274c HF fallback failed: {e}", flush=True)
+        return list(lines)
 
     blocks = re.split(r"\n\s*\n", english_srt.strip())
 
