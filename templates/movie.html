@@ -279,25 +279,35 @@ async function gFetch(url, opts, ms){
   try{ return await fetch(url, Object.assign({}, opts||{}, {signal:c.signal})); }
   finally{ clearTimeout(t); }
 }
+// Circuit breaker: if Google throttles us repeatedly, fail fast with a clear
+// message instead of grinding through hundreds of doomed retries.
+let gThrottleCount=0;
+const THROTTLE_LIMIT=5;
 async function gTranslate(text, lang, attempts){
   const url='https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl='
     +encodeURIComponent(lang)+'&dt=t';
   attempts=attempts||4;
   let lastErr=null;
   for(let attempt=0; attempt<attempts; attempt++){
+    if(gThrottleCount>=THROTTLE_LIMIT) throw new Error('THROTTLED');
     try{
       const body=new URLSearchParams(); body.append('q', text);
       const r=await gFetch(url,{method:'POST',body:body},20000);
       if(r.status===429 || r.status>=500){
+        gThrottleCount++;
         lastErr=new Error('translate service busy (http '+r.status+')');
       }else{
         if(!r.ok) throw new Error('translate service busy (http '+r.status+')');
         const d=await r.json();
         let out='';
         for(const seg of d[0]){ out+=seg[0]; }
+        gThrottleCount=0;
         return out;
       }
-    }catch(e){ lastErr=e; }
+    }catch(e){
+      if(e.message==='THROTTLED') throw e;
+      lastErr=e;
+    }
     await new Promise(res=>setTimeout(res, 2000*Math.pow(2,attempt)));
   }
   throw lastErr||new Error('translate failed');
@@ -454,9 +464,17 @@ async function scInstant(lang, btn){
     }catch(e2){}
     scMakeDownload(btn, lang);
   }catch(e){
-    btn.disabled=false; btn.innerHTML=orig;
-    btn.onclick=()=>scQueue(lang, btn);
-    btn.title='Instant failed \u2014 click to queue on our server';
+    btn.disabled=false;
+    const msg=(e&&e.message)||'';
+    if(msg==='THROTTLED'||msg.includes('429')){
+      btn.innerHTML='\u23F3 Busy \u2014 try again soon';
+      btn.title='Google is throttling translations right now. Try again in a few minutes.';
+      btn.onclick=()=>scInstant(lang, btn);
+    }else{
+      btn.innerHTML=orig;
+      btn.onclick=()=>scQueue(lang, btn);
+      btn.title='Instant failed \u2014 click to queue on our server';
+    }
   }
   delete btn.dataset.busy;
 }
