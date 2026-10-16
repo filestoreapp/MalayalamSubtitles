@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+deep-translator
+psycopg2-binary
+boto3
+requests
+pydantic

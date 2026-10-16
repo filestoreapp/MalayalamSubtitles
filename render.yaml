@@ -56,3 +56,34 @@ services:
         sync: false
       - key: WEBSITE_BASE_URL
         value: https://malayalamsubtitles.onrender.com
+
+  - type: web
+    name: subtitle-translator
+    env: python
+    branch: Claude-3
+    plan: free
+    region: singapore
+    buildCommand: pip install -r translator/requirements.txt
+    startCommand: uvicorn translator.worker:api --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/status
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: R2_ENDPOINT_URL
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET_NAME
+        sync: false
+      - key: R2_PUBLIC_URL
+        sync: false
+      - key: CALLBACK_URL
+        value: https://malayalamsubtitles.onrender.com/api/translation_callback
+      - key: CALLBACK_SECRET
+        sync: false
+      - key: API_SECRET
+        sync: false
+      - key: HF_API_TOKEN
+        sync: false
