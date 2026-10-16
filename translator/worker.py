@@ -44,7 +44,6 @@ socket.setdefaulttimeout(30)
 import boto3
 import psycopg2
 import requests
-from deep_translator import GoogleTranslator
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
 
@@ -82,31 +81,66 @@ def _next_seq():
 
 
 # ── Translation ──────────────────────────────────────────────────────────────
+def _chunk_jobs(jobs, max_lines=40, max_chars=4500):
+    """Split (block_i, line_i, text) jobs into chunks that fit one HTTP
+    request: at most max_lines lines and max_chars characters."""
+    chunk, chars = [], 0
+    for job in jobs:
+        t = job[2]
+        if chunk and (len(chunk) >= max_lines or chars + len(t) + 1 > max_chars):
+            yield chunk
+            chunk, chars = [], 0
+        chunk.append(job)
+        chars += len(t) + 1
+    if chunk:
+        yield chunk
+
+
+def _google_batch(lines, target_lang):
+    """Translate a list of lines with ONE HTTP request to Google's gtx
+    endpoint (newline-joined, alignment verified). Returns the list of
+    translated lines, or None if all attempts failed."""
+    if not lines:
+        return []
+    url = "https://translate.googleapis.com/translate_a/single"
+    params = {"client": "gtx", "sl": "en", "tl": target_lang, "dt": "t"}
+    for attempt in range(4):
+        try:
+            r = requests.post(url, params=params,
+                              data={"q": "\n".join(lines)}, timeout=25)
+            if r.status_code == 429 or r.status_code >= 500:
+                raise Exception(f"HTTP {r.status_code}")
+            r.raise_for_status()
+            data = r.json()
+            segs = data[0] if isinstance(data, list) and data else []
+            full = "".join(seg[0] for seg in segs if seg and seg[0])
+            out = full.split("\n")
+            if len(out) == len(lines):
+                return out
+            raise ValueError(f"line mismatch ({len(out)} != {len(lines)})")
+        except Exception as e:
+            # 5s, 10s, 20s, 40s — rate limits need real cool-down time.
+            wait = 5 * (2 ** attempt)
+            print(f"  \u26a0\ufe0f  Google [{target_lang}] batch of {len(lines)} "
+                  f"attempt {attempt+1} failed: {e} (retry in {wait}s)", flush=True)
+            time.sleep(wait)
+    return None
+
+
 def translate_srt(english_srt: str, target_lang: str,
                   progress_callback=None) -> str:
-    """Translate an SRT to target_lang. Google (batched) -> HF fallback -> English."""
-    google = GoogleTranslator(source="en", target=target_lang)
+    """
+    Translate an SRT file to target_lang.
+    • Primary: Google Translate gtx endpoint, TRUE batching — all dialogue
+      lines are sent newline-joined, one HTTP request per ~40 lines
+      (~50x fewer requests than one-per-line).
+    • Fallback: HuggingFace Helsinki-NLP opus-mt model (per failed batch).
+    • Last resort: keep the original English line.
+    Reports progress as batches complete.
+    """
     hf_url = (f"https://api-inference.huggingface.co/models/"
               f"Helsinki-NLP/opus-mt-en-{target_lang}")
     hf_hdrs = {"Authorization": f"Bearer {HF_API_TOKEN}"} if HF_API_TOKEN else None
-
-    def google_batch(lines):
-        if not lines:
-            return []
-        for attempt in range(4):
-            try:
-                out = google.translate_batch(lines)
-                if isinstance(out, str):
-                    out = [out]
-                if isinstance(out, list) and len(out) == len(lines):
-                    return out
-                raise ValueError(f"batch length mismatch ({len(out)} != {len(lines)})")
-            except Exception as e:
-                wait = 5 * (2 ** attempt)  # 5s, 10s, 20s, 40s
-                print(f"  ⚠️  Google [{target_lang}] batch of {len(lines)} "
-                      f"attempt {attempt+1} failed: {e} (retry in {wait}s)", flush=True)
-                time.sleep(wait)
-        return None
 
     def hf_fallback(lines):
         out = []
@@ -119,7 +153,7 @@ def translate_srt(english_srt: str, target_lang: str,
                 out.append(data[0].get("translation_text", line)
                            if isinstance(data, list) and data else line)
             except Exception as e:
-                print(f"  ❌ HF fallback failed: {e}", flush=True)
+                print(f"  \u274c HF fallback failed: {e}", flush=True)
                 out.append(line)
             time.sleep(0.5)
         return out
@@ -141,22 +175,23 @@ def translate_srt(english_srt: str, target_lang: str,
             if l.strip():
                 jobs.append((bi, li, l.strip()))
 
-    # Translate everything in batches (one Google request per BATCH_LINES).
+    # Translate in true HTTP batches.
     results = {}
-    for b in range(0, len(jobs), BATCH_LINES):
-        chunk = jobs[b:b + BATCH_LINES]
+    chunks = list(_chunk_jobs(jobs, BATCH_LINES, 4500))
+    for ci, chunk in enumerate(chunks):
         chunk_txt = [c[2] for c in chunk]
-        out = google_batch(chunk_txt)
+        out = _google_batch(chunk_txt, target_lang)
         if out is None and hf_hdrs:
-            print(f"  ↪️  HF fallback for batch of {len(chunk)} lines", flush=True)
+            print(f"  \u21aa\ufe0f  HF fallback for batch of {len(chunk)} lines",
+                  flush=True)
             out = hf_fallback(chunk_txt)
         if out is None:
             out = chunk_txt  # last resort: keep English
         for (bi, li, _), tr in zip(chunk, out):
             txt = tr.replace("", "").strip() if tr else ""
             results[(bi, li)] = txt
-        if progress_callback and jobs:
-            progress_callback(min(int((b + len(chunk)) / len(jobs) * 100), 100))
+        if progress_callback and chunks:
+            progress_callback(min(int((ci + 1) / len(chunks) * 100), 100))
         time.sleep(TRANSLATE_DELAY)
 
     # Reassemble: timestamps untouched, only dialogue swapped.
@@ -173,8 +208,8 @@ def translate_srt(english_srt: str, target_lang: str,
 
     if progress_callback:
         progress_callback(100)
-    print(f"  📝 [{target_lang}] done: {len(blocks)} blocks, "
-          f"{len(jobs)} lines translated", flush=True)
+    print(f"  \U0001f4dd [{target_lang}] done: {len(blocks)} blocks, "
+          f"{len(jobs)} lines in {len(chunks)} HTTP requests", flush=True)
     return "\n\n".join(translated) + "\n"
 
 
