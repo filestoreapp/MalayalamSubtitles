@@ -586,6 +586,7 @@ AVG_MINS_PER_JOB   = float(os.environ.get('AVG_TRANSLATION_MINS', '4'))
 # into on demand. Codes are Google Translate codes (deep_translator).
 # en/ml/ta/hi are curated pipeline languages and intentionally excluded.
 ON_DEMAND_LANGUAGES = {
+    'ml': ('Malayalam', '🇮🇳'), 'ta': ('Tamil', '🇮🇳'), 'hi': ('Hindi', '🇮🇳'),
     'es': ('Spanish', '🇪🇸'), 'fr': ('French', '🇫🇷'),
     'de': ('German', '🇩🇪'), 'ar': ('Arabic', '🇸🇦'),
     'pt': ('Portuguese', '🇵🇹'), 'ru': ('Russian', '🇷🇺'),
@@ -1818,7 +1819,7 @@ def movie_hub(slug):
     seo = build_seo_meta(movie)
 
     od_languages = {k: v for k, v in ON_DEMAND_LANGUAGES.items()
-                    if k not in ready_languages}
+                    if k not in ready_languages and k not in ('ml', 'ta', 'hi')}
     od_sorted = sorted(od_languages.items(), key=lambda kv: kv[1][0])
     job_langs = [j.language for j in TranslationJob.query.filter(
         TranslationJob.movie_id == movie.id,

@@ -153,10 +153,8 @@
         <span class="sc-flag">🇮🇳</span><span class="sc-name">{{ name }}</span>
         {% if code in ready_languages %}
         <button class="sc-btn sc-dl" onclick="window.location.href='/download/{{ movie.id }}/{{ code }}'">Download</button>
-        {% elif code in job_langs %}
-        <button class="sc-btn sc-tr" disabled data-sc-poll="{{ code }}">⏳ Queued</button>
         {% else %}
-        <button class="sc-btn sc-tr" onclick="scQueue('{{ code }}',this)">Translate</button>
+        <button class="sc-btn sc-tr" onclick="scInstant('{{ code }}',this)">Translate</button>
         {% endif %}
       </div>
       {% endfor %}
