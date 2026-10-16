@@ -689,8 +689,10 @@ def _dispatcher_loop():
                 # Orphan recovery: the HF worker is a HF Space and can restart
                 # mid-job, leaving the row stuck in Processing forever and
                 # clogging a concurrency slot. updated_at tracks the last worker
-                # callback, so silence > 45 min means the job is dead.
-                orphan_cutoff = datetime.utcnow() - timedelta(minutes=45)
+                # callback, so silence > 3h means the job is dead. (Generous on
+                # purpose: the worker also holds an internal queue, and yanking
+                # a merely-queued job too early would churn it to the back.)
+                orphan_cutoff = datetime.utcnow() - timedelta(minutes=180)
                 orphans = TranslationJob.query.filter(
                     TranslationJob.status == 'Processing',
                     TranslationJob.updated_at < orphan_cutoff).update(
