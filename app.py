@@ -692,7 +692,7 @@ def _dispatcher_loop():
                 # callback, so silence > 3h means the job is dead. (Generous on
                 # purpose: the worker also holds an internal queue, and yanking
                 # a merely-queued job too early would churn it to the back.)
-                orphan_cutoff = datetime.utcnow() - timedelta(minutes=180)
+                orphan_cutoff = datetime.utcnow() - timedelta(minutes=5)  # TEMP: unclog HF-era orphans
                 orphans = TranslationJob.query.filter(
                     TranslationJob.status == 'Processing',
                     TranslationJob.updated_at < orphan_cutoff).update(
