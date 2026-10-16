@@ -31,8 +31,15 @@ import hmac
 import os
 import queue
 import re
+import socket
 import threading
 import time
+
+# Hard ceiling on any network operation. deep_translator does not set its own
+# timeout, and Google sometimes black-holes datacenter connections instead of
+# rejecting them — without this, a hung socket stalls the worker thread forever
+# (no exception, no retry, no failure; the job just sits in-flight).
+socket.setdefaulttimeout(30)
 
 import boto3
 import psycopg2
