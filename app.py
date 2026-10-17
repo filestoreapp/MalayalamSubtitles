@@ -643,11 +643,23 @@ def dispatch_pending_jobs():
         # Atomic claim via status update per job (avoids double-dispatch).
         # SKIP LOCKED: with 2 gunicorn workers each running this loop, the row
         # lock makes the claim atomic so the same job is never dispatched twice.
-        # Malayalam jobs first (user priority), then TA/HI by priority/age.
-        # Within each language: movies (P1) before series (P2), oldest first.
+        # Malayalam first (user priority), but TA/HI must not starve:
+        # if the oldest TA/HI job waited > 4h, it jumps ahead of ML.
+        # Within each group: movies (P1) before series (P2), oldest first.
+        starve_cutoff = datetime.utcnow() - timedelta(hours=4)
+        starved_id = db.session.query(TranslationJob.id)\
+            .filter_by(status='Pending')\
+            .filter(TranslationJob.language != 'ml')\
+            .filter(TranslationJob.queued_at < starve_cutoff)\
+            .order_by(TranslationJob.queued_at.asc()).limit(1).scalar()
+        if starved_id:
+            lang_order = db.case((TranslationJob.id == starved_id, 0),
+                                 (TranslationJob.language == 'ml', 1), else_=2)
+        else:
+            lang_order = db.case((TranslationJob.language == 'ml', 0), else_=1)
         pending = (TranslationJob.query
                    .filter_by(status='Pending')
-                   .order_by(db.case((TranslationJob.language == 'ml', 0), else_=1),
+                   .order_by(lang_order,
                              TranslationJob.priority.asc(),
                              TranslationJob.queued_at.asc())
                    .limit(free_slots + SERIES_BATCH_SIZE)
