@@ -2432,6 +2432,17 @@ def dashboard():
     except Exception:
         od_recent = []
 
+    # Translation coverage: how many movies/series have ML/TA/HI subtitles
+    try:
+        cov = {}
+        for lang in ('ml', 'ta', 'hi'):
+            cov[lang] = db.session.query(func.count(func.distinct(TranslationCache.movie_id)))\
+                .filter(TranslationCache.language == lang).scalar() or 0
+        cov_total_movies = Movie.query.count()
+    except Exception:
+        cov = {'ml': 0, 'ta': 0, 'hi': 0}
+        cov_total_movies = 0
+
     return render_template('dashboard.html',
                            visitors=stat.total_visitors,
                            downloads=total_dl,
@@ -2452,7 +2463,8 @@ def dashboard():
                            bot_subs=bot_subs,
                            od_total=od_total, od_today=od_today,
                            od_by_lang=od_by_lang, od_lang_names=od_lang_names,
-                           od_saved=od_saved, od_recent=od_recent)
+                           od_saved=od_saved, od_recent=od_recent,
+                           cov=cov, cov_total=cov_total_movies)
 
 @app.route('/admin/cleanup_jobs', methods=['POST'])
 @login_required

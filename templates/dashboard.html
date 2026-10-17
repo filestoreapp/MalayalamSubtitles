@@ -432,6 +432,28 @@
     {% endif %}
   </div>
 
+  <!-- ── Translation Coverage ── -->
+  <div class="tq-widget" id="cov-widget">
+    <div class="tq-head">
+      <h2>📊 Translation Coverage</h2>
+      <span class="tq-refresh" id="cov-total-label">{{ cov_total }} titles</span>
+    </div>
+    <div class="tq-langs">
+      <div class="tql tql-ml">
+        <div class="tql-name"><span>🟢 Malayalam</span><span>{{ cov.ml }} / {{ cov_total }}</span></div>
+        <div class="tql-bar"><div class="tql-fill" style="width:{{ (cov.ml / cov_total * 100) | round(1) if cov_total else 0 }}%"></div></div>
+      </div>
+      <div class="tql tql-ta">
+        <div class="tql-name"><span>🔴 Tamil</span><span>{{ cov.ta }} / {{ cov_total }}</span></div>
+        <div class="tql-bar"><div class="tql-fill" style="width:{{ (cov.ta / cov_total * 100) | round(1) if cov_total else 0 }}%"></div></div>
+      </div>
+      <div class="tql tql-hi">
+        <div class="tql-name"><span>🔵 Hindi</span><span>{{ cov.hi }} / {{ cov_total }}</span></div>
+        <div class="tql-bar"><div class="tql-fill" style="width:{{ (cov.hi / cov_total * 100) | round(1) if cov_total else 0 }}%"></div></div>
+      </div>
+    </div>
+  </div>
+
   <!-- ⚡ On-Demand Translations (SubtitleCat-style instant translations) -->
   <div class="odw">
     <div class="odw-head">
