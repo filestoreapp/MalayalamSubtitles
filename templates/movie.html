@@ -316,6 +316,20 @@ async function gTranslate(text, lang, attempts){
   throw lastErr||new Error('translate failed');
 }
 
+// MyMemory fallback: free, no key, works when Google throttles.
+// Limit ~400 chars per request, so used per-cue only.
+async function gTranslateMM(text, lang){
+  if(text.length>400) text=text.substring(0,397)+'...';
+  const url='https://api.mymemory.translated.net/get?q='+encodeURIComponent(text)
+    +'&langpair=en|'+encodeURIComponent(lang);
+  const r=await gFetch(url,null,15000);
+  if(!r.ok) throw new Error('mymemory http '+r.status);
+  const d=await r.json();
+  if(d.responseStatus!==200||!d.responseData||!d.responseData.translatedText)
+    throw new Error('mymemory failed');
+  return d.responseData.translatedText;
+}
+
 async function translateBatch(batch, lang){
   const q=batch.map(c=>c.text).join('\n');
   try{
@@ -323,10 +337,16 @@ async function translateBatch(batch, lang){
     const lines=t.split('\n');
     if(lines.length===batch.length) return lines;
   }catch(e){ /* fall through to per-cue retry */ }
-  // line-count mismatch or error: retry cue-by-cue (slower but aligned)
+  // line-count mismatch or error: retry cue-by-cue (slower but aligned).
+  // If Google throttles, fall back to MyMemory per cue.
   const single=[];
   for(const c of batch){
-    single.push(await gTranslate(c.text, lang, 2));
+    try{
+      single.push(await gTranslate(c.text, lang, 2));
+    }catch(e2){
+      try{ single.push(await gTranslateMM(c.text, lang)); }
+      catch(e3){ throw e2; }
+    }
     await new Promise(r=>setTimeout(r,150));
   }
   if(single.length!==batch.length) throw new Error('alignment failed');
