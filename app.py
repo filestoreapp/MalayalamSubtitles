@@ -746,7 +746,9 @@ def trigger_hf_translation(movie_id: int, english_srt_url: str):
         movie    = Movie.query.get(movie_id)
         priority = 1 if (movie and movie.media_type == 'movie') else 2
 
-        for lang in ['ml', 'ta', 'hi']:
+        # Auto-queue ALL supported languages (user: every language, automatically).
+        # Dispatch priority: ML > HI/TA > others (handled by dispatcher ordering).
+        for lang in ON_DEMAND_LANGUAGES.keys():
             job = TranslationJob.query.filter_by(movie_id=movie_id, language=lang).first()
             if not job:
                 job = TranslationJob(
