@@ -444,7 +444,7 @@ async function scInstant(lang, btn){
   if(btn.dataset.busy==='1') return; btn.dataset.busy='1';
   const orig='Translate';
   try{
-    btn.disabled=true; btn.innerHTML='\u23F3 Starting\u2026';
+    btn.disabled=true; btn.innerHTML='\u23F3 Fetching subtitles\u2026';
     let _srtText=scSrtCache;
     if(!_srtText){
       if(scSrtFetching){ try{ await scSrtFetching; }catch(e){} _srtText=scSrtCache; }
@@ -458,6 +458,7 @@ async function scInstant(lang, btn){
     if(!_srtText) throw new Error('english subtitle unavailable');
     const cues=parseSRT(_srtText);
     if(cues.length<5) throw new Error('parse failed');
+    btn.innerHTML='\u23F3 Translating 0%';
     const batches=makeBatches(cues);
     const out=new Array(batches.length);
     let doneCues=0, idx=0;
