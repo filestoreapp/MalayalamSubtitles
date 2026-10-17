@@ -318,16 +318,24 @@ async function gTranslate(text, lang, attempts){
 
 // MyMemory fallback: free, no key, works when Google throttles.
 // Limit ~400 chars per request, so used per-cue only.
+let gMMFailCount=0;
 async function gTranslateMM(text, lang){
+  if(gMMFailCount>=3) throw new Error('MM_THROTTLED');
   if(text.length>400) text=text.substring(0,397)+'...';
   const url='https://api.mymemory.translated.net/get?q='+encodeURIComponent(text)
     +'&langpair=en|'+encodeURIComponent(lang);
-  const r=await gFetch(url,null,15000);
-  if(!r.ok) throw new Error('mymemory http '+r.status);
-  const d=await r.json();
-  if(d.responseStatus!==200||!d.responseData||!d.responseData.translatedText)
-    throw new Error('mymemory failed');
-  return d.responseData.translatedText;
+  try{
+    const r=await gFetch(url,null,8000);
+    if(!r.ok) throw new Error('mymemory http '+r.status);
+    const d=await r.json();
+    if(d.responseStatus!==200||!d.responseData||!d.responseData.translatedText)
+      throw new Error('mymemory failed');
+    gMMFailCount=0;
+    return d.responseData.translatedText;
+  }catch(e){
+    gMMFailCount++;
+    throw e;
+  }
 }
 
 async function translateBatch(batch, lang){
@@ -345,7 +353,10 @@ async function translateBatch(batch, lang){
       single.push(await gTranslate(c.text, lang, 2));
     }catch(e2){
       try{ single.push(await gTranslateMM(c.text, lang)); }
-      catch(e3){ throw e2; }
+      catch(e3){
+        if(e3.message==='MM_THROTTLED') throw new Error('THROTTLED');
+        throw e2;
+      }
     }
     await new Promise(r=>setTimeout(r,150));
   }
