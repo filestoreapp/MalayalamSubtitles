@@ -4127,7 +4127,7 @@ ensure_dispatcher()
 
 # CSRF exemptions: Bearer-auth / non-cookie endpoints
 if csrf:
-    for _ep in ['bot_webhook','telegram_webhook','translation_callback','trigger_telegram','scheduled_fetch','bot_api_broadcast','bot_api_update_request','bot_set_webhook']:
+    for _ep in ['bot_webhook','telegram_webhook','translation_callback','trigger_telegram','scheduled_fetch','bot_api_broadcast','bot_api_update_request','bot_set_webhook','backfill_languages']:
         try:
             _fn = app.view_functions.get(_ep)
             if _fn: csrf.exempt(_fn)
