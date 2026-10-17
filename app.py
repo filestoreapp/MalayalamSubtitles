@@ -2383,29 +2383,6 @@ def _refresh_r2_cache(force=False):
         pass
     return (total, count)
 
-@app.route('/admin/backfill_languages', methods=['POST'])
-def backfill_languages():
-    # Temporary one-time endpoint: queue all 32 languages for existing titles.
-    # Protected by secret header. Remove after use.
-    if request.headers.get('X-Backfill-Secret') != 'temp-backfill-2026':
-        return jsonify({'error': 'unauthorized'}), 403
-    langs = [k for k in ON_DEMAND_LANGUAGES.keys() if k not in ('ml', 'ta', 'hi')]
-    lang_vals = ",".join([f"'{l}'" for l in langs])
-    sql = f"""
-        INSERT INTO translation_job (movie_id, language, status, progress, priority)
-        SELECT m.id, l.lang, 'Pending', 0,
-               CASE WHEN m.media_type = 'movie' THEN 1 ELSE 2 END
-        FROM movie m
-        CROSS JOIN (VALUES {','.join([f"('{x}')" for x in langs])}) AS l(lang)
-        WHERE NOT EXISTS (
-            SELECT 1 FROM translation_job j
-            WHERE j.movie_id = m.id AND j.language = l.lang
-        )
-    """
-    result = db.session.execute(db.text(sql))
-    db.session.commit()
-    return jsonify({'inserted': result.rowcount})
-
 @app.route('/dashboard')
 @login_required
 def dashboard():
@@ -4127,7 +4104,7 @@ ensure_dispatcher()
 
 # CSRF exemptions: Bearer-auth / non-cookie endpoints
 if csrf:
-    for _ep in ['bot_webhook','telegram_webhook','translation_callback','trigger_telegram','scheduled_fetch','bot_api_broadcast','bot_api_update_request','bot_set_webhook','backfill_languages']:
+    for _ep in ['bot_webhook','telegram_webhook','translation_callback','trigger_telegram','scheduled_fetch','bot_api_broadcast','bot_api_update_request','bot_set_webhook']:
         try:
             _fn = app.view_functions.get(_ep)
             if _fn: csrf.exempt(_fn)
